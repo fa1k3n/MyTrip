@@ -39,6 +39,13 @@ export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(
 export const Traveler = z.object({ id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()) });
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });
 export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative() });
+export const Expense = z.object({
+  id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
+  paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
+  date: Date_.optional(),
+});
+export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional() })
+  .refine((p) => p.from !== p.to, { message: "A payment needs two different travelers", path: ["to"] }); // MI-06
 export const BudgetItem = z.object({ id: Id, category: z.string().min(1), amount: z.number().nonnegative(), paid: z.boolean(), owner: z.string().optional() });
 
 export const Trip = z.object({
@@ -49,6 +56,7 @@ export const Trip = z.object({
   note: z.string().optional(), inbox: z.string().email().optional(),
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
+  expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
   stops: z.array(Stop), days: z.array(Day), places: z.array(Place),
   bookings: z.array(Booking), tasks: z.array(Task), travelers: z.array(Traveler),
 });

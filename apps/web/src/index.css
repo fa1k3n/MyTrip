@@ -59,3 +59,8 @@ input,select{font:inherit;width:100%;padding:9px;border-radius:8px;border:1px so
 
 /* Additions not in the prototype: weather credit (WX-15). */
 .credit{font-size:.75rem;color:var(--mute);text-align:center;margin:24px 0 8px}.credit a{color:inherit}
+/* Additions for Uppleva and Summera, built from the prototype's tokens and components. */
+.stop[aria-pressed=true]{background:var(--sage);color:#1b2a20;border-color:var(--sage)}.stop[aria-pressed=true] small{color:#1b2a20}
+.add{margin-top:10px}.btn.sm{padding:3px 10px;font-size:.85rem;margin-left:6px}
+.over{color:var(--acct);font-weight:600}.err{color:var(--acct);font-weight:600;margin:0 0 10px}
+.check{display:flex;align-items:center;gap:10px;min-height:44px}.check input{width:22px;height:22px;margin:0;accent-color:var(--sage)}

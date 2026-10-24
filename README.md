@@ -5,7 +5,7 @@ Generic trip planning platform. No personal data lives here: trips are JSON file
 - `packages/schema`: zod schema, pure change engine (`applyOps`) and plan checks (`checkTrip`).
 - `apps/api`: Hono API (read, propose, approve). Runs on Node now; a Cloudflare Worker entry with a D1 store is the next step.
 - `packages/mcp`: MCP server (stdio) so an LLM can read the plan and propose changes.
-- `apps/web`: React + Tailwind v4 front end: hub with all trips, trip page with the tabs Drömma, Nåla and Översikten, admin view. Weather from Open-Meteo.
+- `apps/web`: React + Tailwind v4 front end: start page (Längta) with all trips, trip page with the tabs Drömma (ideas), Nåla (plan), Uppleva (today during the trip) and Summera (shared costs, payments and budget follow-up), admin view. Weather from Open-Meteo.
 
 ```
 npm install
@@ -20,4 +20,4 @@ Tokens: **read** sees the plan without sensitive fields, **propose** (give this 
 
 ## Example trips
 
-`examples/` holds two fictional trips (Höstlovsresa till Berlin, Sommar i Skåne) with cover images. `npm run seed` copies them into the data folder (`TRIP_DIR`, default `data/`). Existing trips are kept; add `-- --force` to overwrite them. The API reads the folder on every request, so seeded trips show up in a running instance after a page reload.
+`examples/` holds two fictional trips with cover images: Höstlovsresa till Berlin (under way, shows Uppleva) and Sommar i Skåne (finished, with shared costs between three people in Summera). `npm run seed` copies them into the data folder (`TRIP_DIR`, default `data/`). Existing trips are kept; add `-- --force` to overwrite them. The API reads the folder on every request, so seeded trips show up in a running instance after a page reload.

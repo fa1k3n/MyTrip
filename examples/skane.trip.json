@@ -13,7 +13,23 @@
   "places": [],
   "bookings": [],
   "tasks": [],
-  "travelers": [],
+  "travelers": [
+    {
+      "id": "anna",
+      "name": "Anna",
+      "packing": []
+    },
+    {
+      "id": "erik",
+      "name": "Erik",
+      "packing": []
+    },
+    {
+      "id": "lisa",
+      "name": "Lisa",
+      "packing": []
+    }
+  ],
   "dreams": [],
   "budget": [
     {
@@ -36,6 +52,66 @@
       "amount": 1200,
       "paid": true,
       "owner": "Erik"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp-1",
+      "text": "Stugan i Skanör",
+      "category": "Boende",
+      "amount": 8700,
+      "paidBy": "anna",
+      "sharedBy": [],
+      "date": "2026-07-06"
+    },
+    {
+      "id": "exp-2",
+      "text": "Glass och fika",
+      "category": "Mat/Fritid",
+      "amount": 640,
+      "paidBy": "lisa",
+      "sharedBy": [],
+      "date": "2026-07-07"
+    },
+    {
+      "id": "exp-3",
+      "text": "Cykelhyra",
+      "category": "Transport",
+      "amount": 1200,
+      "paidBy": "erik",
+      "sharedBy": [],
+      "date": "2026-07-08"
+    },
+    {
+      "id": "exp-4",
+      "text": "Middag i Ystad",
+      "category": "Mat/Fritid",
+      "amount": 2310,
+      "paidBy": "lisa",
+      "sharedBy": [],
+      "date": "2026-07-09"
+    },
+    {
+      "id": "exp-5",
+      "text": "Bensin",
+      "category": "Transport",
+      "amount": 980,
+      "paidBy": "erik",
+      "sharedBy": [
+        "anna",
+        "erik"
+      ],
+      "date": "2026-07-11"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay-1",
+      "from": "lisa",
+      "to": "anna",
+      "amount": 1500,
+      "date": "2026-07-12",
+      "note": "Swish"
     }
   ]
 }

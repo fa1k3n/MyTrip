@@ -20,9 +20,11 @@ export const dayTime = (d: DayLike) =>
 
 export const activityTime = (a: { start?: string; estimated: boolean }) => (a.start ? ca(a.start, a.estimated) : "");
 
-export const kr = (n: number) => n.toLocaleString("sv-SE") + " kr";
+export const kr = (n: number) =>
+  n.toLocaleString("sv-SE", Number.isInteger(n) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " kr";
 
 const dayMonth = (iso: string) => { const p = parts(iso); return `${p.d} ${sv.months[p.m - 1]}`; };
+export const shortDate = (iso: string) => `${dayMonth(iso)} ${parts(iso).y}`;
 
 export function tripDates(t: { days: { date: string }[]; dateLabel?: string }) {
   if (t.dateLabel) return t.dateLabel;

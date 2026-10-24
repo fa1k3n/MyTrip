@@ -4,9 +4,13 @@ import { api, maskedToken } from "./api.ts";
 import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Tab } from "./TripView.tsx";
+import { defaultTab, todayIn } from "./today.ts";
+import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
 import { sv } from "./sv.ts";
 
-type Dlg = null | { kind: "place"; name: string; address: string } | { kind: "dream" };
+type Dlg = null | { kind: "place"; name: string; address: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" };
+const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
+const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 
 /** Cover images need the auth header, so they are fetched as blobs. */
 function useCovers(trips: Trip[]) {
@@ -52,6 +56,8 @@ export function App() {
   const [chart, setChart] = useState(true);
   const [dlg, setDlg] = useState<Dlg>(null);
   const [scrollTo, setScrollTo] = useState<string | null>(null);
+  const [upDay, setUpDay] = useState<string | null>(null);
+  const [err, setErr] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
 
@@ -60,9 +66,11 @@ export function App() {
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
   const forecast = useForecast(view === "trip" ? t : undefined);
+  const today = t ? todayIn(t.timezone) : "";
 
   useEffect(() => {
     const d = dialog.current!;
+    setErr("");
     if (dlg && !d.open) { opener.current = document.activeElement as HTMLElement; d.showModal(); }
     if (!dlg && d.open) d.close();
   }, [dlg]);
@@ -74,12 +82,18 @@ export function App() {
   }, [scrollTo]);
 
   const openTrip = (id: string, nextTab?: Tab) => {
-    setTripId(id); setView("trip"); setOpen({});
-    if (nextTab) setTab(nextTab);
+    const x = trips?.find((y) => y.id === id);
+    setTripId(id); setView("trip"); setOpen({}); setUpDay(null);
+    setTab(nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala")); // MT-09
     window.scrollTo(0, 0);
   };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
-  const newTrip = async () => { const n = await api.create(sv.newTripTitle); await load(); openTrip(n.id, "dr"); };
+  const newTrip = async () => {
+    const n = await api.create(sv.newTripTitle);
+    setTrips((ts) => [...(ts ?? []), n]);
+    openTrip(n.id, "dr");
+    load();
+  };
   const removeTrip = async () => {
     if (!confirm(sv.confirmDelete)) return;
     await api.remove(tripId); setView("portal"); load();
@@ -91,6 +105,30 @@ export function App() {
     change([{ op: "add", path: "dreams/-", value: { id, title, category: String(f.get("category")), source: sv.manual, icon: "✨", votes: 0 } }], "add dream");
     setDlg(null);
   };
+  const savePayment = (x: Transfer & { note?: string }) =>
+    change([{ op: "add", path: "payments/-", value: { id: newId("pay"), ...x, date: today } }], "payment");
+  const saveForm = (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
+    const f = new FormData(form), str = (k: string) => String(f.get(k) ?? "").trim();
+    if (kind === "person") {
+      if (!str("name")) return;
+      change([{ op: "add", path: "travelers/-", value: { id: newId("p"), name: str("name"), packing: [] } }], "add traveler");
+    } else {
+      const amount = parseAmount(str("amount"));
+      if (Number.isNaN(amount)) return setErr(sv.badAmount); // MI-03
+      if (kind === "expense") {
+        if (!str("text")) return;
+        const sharedBy = sharedByValue(f.getAll("sharedBy").map(String), t!.travelers.map((x) => x.id));
+        change([{ op: "add", path: "expenses/-", value: { id: newId("exp"), text: str("text"), category: str("category"), amount, paidBy: str("paidBy"), sharedBy, date: today } }], "add expense");
+      } else {
+        if (str("from") === str("to")) return;
+        savePayment({ from: str("from"), to: str("to"), amount, ...(str("note") ? { note: str("note") } : {}) });
+      }
+    }
+    setDlg(null);
+  };
+  const people = (field: string, pick = 0) => (
+    <select name={field} defaultValue={t?.travelers[pick]?.id}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+  );
 
   let page;
   if (failed) page = <p className="ro">{sv.error}</p>;
@@ -123,13 +161,16 @@ export function App() {
       place={(name, address) => setDlg({ kind: "place", name, address })}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
+      today={today} upDay={upDay} setUpDay={setUpDay}
+      addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
+      addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
     />
   );
 
   return <>
     <div className="wrap">{page}</div>
     <dialog
-      ref={dialog} aria-label={dlg?.kind === "place" ? dlg.name : sv.newDream}
+      ref={dialog} aria-label={!dlg ? undefined : dlg.kind === "place" ? dlg.name : dlgTitle[dlg.kind]}
       onClose={() => { setDlg(null); opener.current?.focus(); }}
       onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
         const r = e.currentTarget.getBoundingClientRect();
@@ -144,6 +185,29 @@ export function App() {
           <h3>{sv.newDream}</h3>
           <label>{sv.title}<input name="title" autoFocus /></label>
           <label>{sv.category}<select name="category">{sv.dreamCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <button className="btn" type="submit">{sv.save}</button>{" "}
+          <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
+        </form>
+      )}
+      {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
+        <form onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
+          <h3>{dlgTitle[dlg.kind]}</h3>
+          {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus /></label>}
+          {dlg.kind === "expense" && <>
+            <label>{sv.text}<input name="text" autoFocus /></label>
+            <label>{sv.amount}<input name="amount" inputMode="decimal" /></label>
+            <label>{sv.category}<select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
+            <label>{sv.paidBy}{people("paidBy")}</label>
+            <div className="ro">{sv.sharedBy}</div>
+            {t?.travelers.map((x) => <label className="check" key={x.id}><input type="checkbox" name="sharedBy" value={x.id} defaultChecked />{x.name}</label>)}
+          </>}
+          {dlg.kind === "payment" && <>
+            <label>{sv.from}{people("from")}</label>
+            <label>{sv.to}{people("to", 1)}</label>
+            <label>{sv.amount}<input name="amount" inputMode="decimal" autoFocus /></label>
+            <label>{sv.note}<input name="note" /></label>
+          </>}
+          {err && <p className="err" role="alert">{err}</p>}
           <button className="btn" type="submit">{sv.save}</button>{" "}
           <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
         </form>

@@ -1,11 +1,14 @@
 // Markup and class names mirror design/prototype.html one to one, so the prototype CSS applies unchanged.
 import type { Trip } from "@trip/schema";
-import { activityTime, bookingDates, budgetByCategory, dateBadge, dayTime, kr, paidTotal, routeLabel, timelineStops, toggleAllLabel, tripDates, vehicleIcons, type Open } from "./format.ts";
+import { activityTime, bookingDates, budgetByCategory, dateBadge, dayTime, kr, paidTotal, timelineStops, toggleAllLabel, tripDates, vehicleIcons, type Open } from "./format.ts";
 import { forecastRows, weatherSymbol, type Forecast } from "./weather.ts";
 import { sv } from "./sv.ts";
+import type { Transfer } from "./money.ts";
+import { Uppleva } from "./Uppleva.tsx";
+import { Summera } from "./Summera.tsx";
 
 type Day = Trip["days"][number];
-export type Tab = "dr" | "nala" | "ov";
+export type Tab = "dr" | "nala" | "up" | "mi";
 const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" };
 const DREAM_BG = ["#E8D5C4", "#D5E0D8", "#EFE2BF"];
 
@@ -30,7 +33,7 @@ function Donut({ items }: { items: Trip["budget"] }) {
   );
 }
 
-function Budget({ t, lock, chart, onToggle }: { t: Trip; lock?: boolean; chart: boolean; onToggle: () => void }) {
+export function Budget({ t, lock, chart, onToggle }: { t: Trip; lock?: boolean; chart: boolean; onToggle: () => void }) {
   return (
     <section className="card">
       <h3>{sv.budget}</h3>
@@ -43,7 +46,7 @@ function Budget({ t, lock, chart, onToggle }: { t: Trip; lock?: boolean; chart: 
   );
 }
 
-function Bookings({ t }: { t: Trip }) {
+export function Bookings({ t }: { t: Trip }) {
   return (
     <section className="card">
       <h3>{sv.bookings}</h3>
@@ -54,6 +57,28 @@ function Bookings({ t }: { t: Trip }) {
         </div>
       ))}
     </section>
+  );
+}
+
+export function Activities({ t, x, onPlace }: { t: Trip; x: Day; onPlace: (name: string, address: string) => void }) {
+  return <>{x.activities.map((a) => {
+    const p = t.places.find((p) => p.id === a.placeIds[0]);
+    return (
+      <div className="act" key={a.id}>
+        <time>{activityTime(a)}</time>
+        <span>{p ? <button className="place" onClick={() => onPlace(a.text, p.address)}>{a.text}</button> : a.text}</span>
+      </div>
+    );
+  })}</>;
+}
+
+export function Weather({ forecast }: { forecast?: Forecast }) {
+  if (!forecast) return null;
+  const [cond, temp, wind] = forecastRows(forecast);
+  return (
+    <div className="wx" title={`${cond}, ${temp}, vind ${wind}`}>
+      <div>{weatherSymbol(forecast.code)} {cond}</div><div>🌡️ {temp}</div><div>💨 {wind}</div>
+    </div>
   );
 }
 
@@ -68,23 +93,8 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace }: {
         <div><h3>{x.title} {x.icons.join("")}</h3><div className="sum">{x.summary}</div><div className="time">🕐 {dayTime(x)}</div></div>
       </button>
       <div className="body">
-        {x.activities.map((a) => {
-          const p = t.places.find((p) => p.id === a.placeIds[0]);
-          return (
-            <div className="act" key={a.id}>
-              <time>{activityTime(a)}</time>
-              <span>{p ? <button className="place" onClick={() => onPlace(a.text, p.address)}>{a.text}</button> : a.text}</span>
-            </div>
-          );
-        })}
-        {forecast && (() => {
-          const [cond, temp, wind] = forecastRows(forecast);
-          return (
-            <div className="wx" title={`${cond}, ${temp}, vind ${wind}`}>
-              <div>{weatherSymbol(forecast.code)} {cond}</div><div>🌡️ {temp}</div><div>💨 {wind}</div>
-            </div>
-          );
-        })()}
+        <Activities t={t} x={x} onPlace={onPlace} />
+        <Weather forecast={forecast} />
         {vehicles && <p><span className="badge">{vehicles} {sv.travelTime}</span></p>}
       </div>
     </article>
@@ -95,10 +105,12 @@ export type TripViewProps = {
   t: Trip; cover?: string; tab: Tab; open: Open; chart: boolean; forecast: Record<string, Forecast>;
   setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; toggleChart: () => void;
   place: (name: string, address: string) => void; vote: (i: number) => void; addDream: () => void; back: () => void; admin: () => void;
+  today: string; upDay: string | null; setUpDay: (id: string) => void;
+  addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
 };
 
 export function TripView(p: TripViewProps) {
-  const { t, tab } = p, lock = tab === "ov";
+  const { t, tab } = p, lock = tab === "up";
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
   let main;
   if (tab === "dr") main = <>
@@ -120,17 +132,9 @@ export function TripView(p: TripViewProps) {
       <div>{days.map((x) => <DayCard key={x.id} t={t} x={x} open={!!p.open[x.id]} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)} onPlace={p.place} />)}</div>
       <div><Bookings t={t} /><Budget t={t} chart={p.chart} onToggle={p.toggleChart} /></div>
     </div>
-    {Object.keys(p.forecast).length > 0 && <p className="credit">Väderdata: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></p>}
   </>;
-  else main = (
-    <div className="cols">
-      <div>
-        <section className="card"><h3>{sv.route}</h3><div className="map">{sv.map} {routeLabel(days)}</div></section>
-        <section className="card"><h3>{sv.todo}</h3>{t.tasks.map((k) => <div className="row" key={k.id}><span>{k.text}</span></div>)}</section>
-      </div>
-      <div><Budget t={t} lock chart={p.chart} onToggle={p.toggleChart} /></div>
-    </div>
-  );
+  else if (tab === "up") main = <Uppleva {...p} />;
+  else main = <Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson} />;
   return <>
     <div className="top"><button className="btn ghost" onClick={p.back}>{sv.allTrips}</button><button className="btn ghost" data-mut="" onClick={p.admin}>{sv.admin}</button></div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
@@ -139,5 +143,8 @@ export function TripView(p: TripViewProps) {
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>
     <div className={lock ? "lock" : ""}>{main}</div>
+    {(tab === "nala" || tab === "up") && Object.keys(p.forecast).length > 0 && (
+      <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></p>
+    )}
   </>;
 }

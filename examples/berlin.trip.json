@@ -362,7 +362,18 @@
       "done": false
     }
   ],
-  "travelers": [],
+  "travelers": [
+    {
+      "id": "anna",
+      "name": "Anna",
+      "packing": []
+    },
+    {
+      "id": "erik",
+      "name": "Erik",
+      "packing": []
+    }
+  ],
   "dreams": [
     {
       "id": "fernsehturm",
@@ -425,5 +436,26 @@
       "paid": true,
       "owner": "Erik"
     }
-  ]
+  ],
+  "expenses": [
+    {
+      "id": "exp-1",
+      "text": "Parkering Helsingborg",
+      "category": "Transport",
+      "amount": 180,
+      "paidBy": "erik",
+      "sharedBy": [],
+      "date": "2026-10-24"
+    },
+    {
+      "id": "exp-2",
+      "text": "Lunch på Torvehallerne",
+      "category": "Mat/Fritid",
+      "amount": 640,
+      "paidBy": "anna",
+      "sharedBy": [],
+      "date": "2026-10-24"
+    }
+  ],
+  "payments": []
 }

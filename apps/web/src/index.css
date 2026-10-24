@@ -1,0 +1,61 @@
+/* Tailwind without preflight, in cascade layers, so the prototype styles below win and the look is unchanged. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Design tokens and styles copied verbatim from design/prototype.html (UI-02). */
+:root{--bg:#F5F2EB;--card:#fff;--ink:#2C2A29;--mute:#6B6560;--acc:#C87A53;--acct:#9A4F2B;--sage:#7A9A82;--sageT:#3F6249;--line:#E4DED2;--sh:0 2px 14px rgba(44,42,41,.07);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1F1D1B;--card:#2A2826;--ink:#F3EFE8;--mute:#B5ADA3;--acct:#E0A27F;--sageT:#A5C4AC;--line:#3E3A36;--sh:0 2px 14px rgba(0,0,0,.3)}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 "Instrument Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:600;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.logo{font-family:Fraunces,Georgia,serif;font-size:1.5rem;font-weight:700}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:4px 12px;font-size:.85rem}
+.btn{background:var(--acc);color:#2C2A29;border:0;border-radius:10px;padding:9px 16px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.red{background:#B3382C;color:#fff}
+.card{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.trip{cursor:pointer;text-align:left;border:0;display:block;width:100%}
+.new{border:2px dashed var(--acc);background:transparent;box-shadow:none;color:var(--acct);font-weight:600;display:flex;align-items:center;justify-content:center;min-height:110px}
+.donutbox{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.legend div{display:flex;gap:8px;align-items:center;font-size:.9rem}.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.manifest{font-family:Fraunces,Georgia,serif;font-size:1.1rem;line-height:1.7;padding:22px;border-left:5px solid var(--acc)}
+.tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;background:var(--bg);padding:8px 0;margin-bottom:8px}
+.tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px;font-weight:600}
+.tab[aria-selected=true]{background:var(--sage);color:#1b2a20;border-color:var(--sage)}
+.tl{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.stop{flex:0 0 auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 12px;text-align:left}
+.stop small{display:block;color:var(--mute)}
+.cols{display:block}@media(min-width:1000px){.cols{display:grid;grid-template-columns:3fr 2fr;gap:20px;align-items:start}}
+.day{padding:0;overflow:hidden}
+.hd{display:flex;gap:12px;width:100%;background:none;border:0;padding:14px;text-align:left;align-items:flex-start}
+.date{background:var(--bg);border-radius:10px;padding:4px 10px;text-align:center;line-height:1.2;min-width:52px}.date b{font-size:1.3rem;display:block}.date span{font-size:.8rem;color:var(--mute)}
+.sum{color:var(--mute);font-size:.92rem}.time{font-size:.85rem;color:var(--sageT);font-weight:600}
+.body{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}.day.open .body{display:block}
+.act{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}.act time{min-width:64px;font-weight:600}
+.place{background:none;border:0;border-bottom:2px solid var(--acc);color:var(--acct);padding:0;font-weight:600}
+.badge{display:inline-block;background:var(--bg);border-radius:8px;padding:1px 8px;font-size:.8rem;margin-right:4px}
+.ok{background:var(--sage);color:#1b2a20}
+.wx{font-size:.88rem;margin-top:8px;color:var(--mute)}.wx div{padding:1px 0}
+dialog{border:0;border-radius:16px;background:var(--card);color:var(--ink);max-width:420px;width:92%;padding:20px}dialog::backdrop{background:rgba(0,0,0,.45)}
+.map{height:130px;border-radius:10px;background:repeating-linear-gradient(45deg,var(--bg),var(--bg) 10px,var(--line) 10px,var(--line) 11px);display:flex;align-items:center;justify-content:center;color:var(--mute);margin:10px 0}
+.dreams{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.dream{padding:0;overflow:hidden;position:relative;margin:0}
+.img{height:110px;display:flex;align-items:center;justify-content:center;font-size:2.4rem}
+.dream .in{padding:12px}.src{font-size:.78rem;color:var(--mute)}
+.heart{position:absolute;top:8px;right:8px;background:var(--card);border:0;border-radius:99px;padding:4px 10px;font-weight:700;box-shadow:var(--sh)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));box-shadow:var(--sh);padding:12px 18px}
+.lock [data-mut]{display:none!important}
+.lock .heart{pointer-events:none}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+input,select{font:inherit;width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin:4px 0 10px}
+.danger{border:2px solid #B3382C}
+.cover{width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:10px;display:block}.hero{height:min(300px,45vw);border-radius:16px;margin-bottom:14px}
+.ro{color:var(--mute);font-size:.85rem}
+
+/* Additions not in the prototype: weather credit (WX-15). */
+.credit{font-size:.75rem;color:var(--mute);text-align:center;margin:24px 0 8px}.credit a{color:inherit}

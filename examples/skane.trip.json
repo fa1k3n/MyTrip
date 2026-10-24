@@ -1,0 +1,41 @@
+{
+  "revision": 1,
+  "title": "Sommar i Skåne",
+  "timezone": "Europe/Stockholm",
+  "purpose": "Strand, glass och cykling.",
+  "image": "skane.jpg",
+  "imageAlt": "Familjen äter glass vid stranden i Skåne",
+  "dateLabel": "jul 2026 · avslutad",
+  "note": "exempeldata",
+  "currency": "SEK",
+  "stops": [],
+  "days": [],
+  "places": [],
+  "bookings": [],
+  "tasks": [],
+  "travelers": [],
+  "dreams": [],
+  "budget": [
+    {
+      "id": "bg-1",
+      "category": "Boende",
+      "amount": 8400,
+      "paid": true,
+      "owner": "Anna"
+    },
+    {
+      "id": "bg-2",
+      "category": "Mat/Fritid",
+      "amount": 4100,
+      "paid": true,
+      "owner": "Erik"
+    },
+    {
+      "id": "bg-3",
+      "category": "Transport",
+      "amount": 1200,
+      "paid": true,
+      "owner": "Erik"
+    }
+  ]
+}

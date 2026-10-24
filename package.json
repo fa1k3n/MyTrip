@@ -1,0 +1,21 @@
+{
+  "name": "trip-platform",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @trip/api",
+    "dev:web": "npm run dev -w @trip/web",
+    "mcp": "npm run start -w @trip/mcp",
+    "typecheck": "tsc",
+    "seed": "node apps/api/src/seed.ts",
+    "test": "node --test \"packages/*/test/*.test.ts\" \"apps/*/test/*.test.ts\""
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

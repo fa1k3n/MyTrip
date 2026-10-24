@@ -1,0 +1,429 @@
+{
+  "revision": 1,
+  "title": "Höstlovsresa till Berlin",
+  "timezone": "Europe/Berlin",
+  "purpose": "Fyra dagar med familjen: Köpenhamn, Berlin och hem via färjan från Rostock. Lugna dagar, bra mat och inga långa bilpass utan paus.",
+  "image": "berlin.jpg",
+  "imageAlt": "Familjen äter vid hamnen i Rostock med färjan i bakgrunden",
+  "note": "exempeldata",
+  "inbox": "berlin2026@example.com",
+  "currency": "SEK",
+  "stops": [
+    {
+      "label": "Köpenhamn",
+      "sub": "24 lör",
+      "dayId": "day-1"
+    },
+    {
+      "label": "Berlin",
+      "sub": "25 sön",
+      "dayId": "day-2"
+    },
+    {
+      "label": "Berlin",
+      "sub": "26 mån",
+      "dayId": "day-3"
+    },
+    {
+      "label": "Rostock",
+      "sub": "28 ons",
+      "dayId": "day-4"
+    }
+  ],
+  "days": [
+    {
+      "id": "day-1",
+      "date": "2026-10-24",
+      "title": "Helsingborg → Köpenhamn",
+      "summary": "Färjan över sundet och en lång promenad i stan.",
+      "icons": [
+        "🚢",
+        "🏙️"
+      ],
+      "start": "09:00",
+      "end": "18:00",
+      "location": "Köpenhamn",
+      "weather": {
+        "lat": 55.68,
+        "lon": 12.57
+      },
+      "legs": [
+        {
+          "vehicle": "car",
+          "origin": "Helsingborg",
+          "destination": "Helsingborg färjeläge",
+          "waypoints": []
+        },
+        {
+          "vehicle": "ferry",
+          "origin": "Helsingborg",
+          "destination": "Helsingör",
+          "waypoints": []
+        }
+      ],
+      "activities": [
+        {
+          "id": "a-1",
+          "text": "Färja Helsingborg–Helsingör",
+          "placeIds": [
+            "helsingor-terminal"
+          ],
+          "start": "09:00",
+          "estimated": false
+        },
+        {
+          "id": "a-2",
+          "text": "Lunch på Torvehallerne",
+          "placeIds": [
+            "torvehallerne"
+          ],
+          "start": "12:00",
+          "estimated": true
+        },
+        {
+          "id": "a-3",
+          "text": "Nyhavn och Tivoli",
+          "placeIds": [
+            "nyhavn"
+          ],
+          "start": "15:00",
+          "estimated": true
+        }
+      ]
+    },
+    {
+      "id": "day-2",
+      "date": "2026-10-25",
+      "title": "Köpenhamn → Berlin",
+      "summary": "Bilen söderut via Rödby och färjan till Puttgarden.",
+      "icons": [
+        "🚗",
+        "🚢"
+      ],
+      "start": "08:30",
+      "end": "17:00",
+      "endEstimated": true,
+      "location": "Berlin",
+      "weather": {
+        "lat": 52.52,
+        "lon": 13.4
+      },
+      "legs": [
+        {
+          "vehicle": "car",
+          "origin": "Köpenhamn",
+          "destination": "Rødby",
+          "waypoints": [],
+          "departure": "08:30"
+        },
+        {
+          "vehicle": "ferry",
+          "origin": "Rødby",
+          "destination": "Puttgarden",
+          "waypoints": []
+        },
+        {
+          "vehicle": "car",
+          "origin": "Puttgarden",
+          "destination": "Berlin",
+          "waypoints": [
+            "Lübeck"
+          ]
+        }
+      ],
+      "activities": [
+        {
+          "id": "a-4",
+          "text": "Avfärd från hotellet",
+          "placeIds": [
+            "skt-petri"
+          ],
+          "start": "08:30",
+          "estimated": false
+        },
+        {
+          "id": "a-5",
+          "text": "Lunch i Lübeck",
+          "placeIds": [
+            "holstentor"
+          ],
+          "start": "12:30",
+          "estimated": true
+        },
+        {
+          "id": "a-6",
+          "text": "Incheckning Berlin",
+          "placeIds": [
+            "hotel-am-zoo"
+          ],
+          "start": "17:00",
+          "estimated": true
+        }
+      ]
+    },
+    {
+      "id": "day-3",
+      "date": "2026-10-26",
+      "title": "Berlin: Museiön",
+      "summary": "Museer, kupolen och kvällsmat vid Hackescher Markt.",
+      "icons": [
+        "🏛️",
+        "🍽️"
+      ],
+      "start": "10:00",
+      "end": "21:00",
+      "location": "Berlin",
+      "weather": {
+        "lat": 52.52,
+        "lon": 13.4
+      },
+      "legs": [
+        {
+          "vehicle": "transit",
+          "origin": "Hotel am Zoo",
+          "destination": "Museumsinsel",
+          "waypoints": []
+        }
+      ],
+      "activities": [
+        {
+          "id": "a-7",
+          "text": "Pergamonmuseum",
+          "placeIds": [
+            "pergamon"
+          ],
+          "start": "10:00",
+          "estimated": false
+        },
+        {
+          "id": "a-8",
+          "text": "Reichstagskupolen",
+          "placeIds": [
+            "reichstag"
+          ],
+          "start": "14:00",
+          "estimated": true
+        },
+        {
+          "id": "a-9",
+          "text": "Middag Hackescher Markt",
+          "placeIds": [
+            "hackescher-markt"
+          ],
+          "start": "19:00",
+          "estimated": true
+        }
+      ]
+    },
+    {
+      "id": "day-4",
+      "date": "2026-10-28",
+      "title": "Berlin → Rostock → hem",
+      "summary": "Kort bilresa till färjan och natt ombord mot Trelleborg.",
+      "icons": [
+        "🚗",
+        "🚢"
+      ],
+      "start": "11:00",
+      "end": "23:00",
+      "endEstimated": true,
+      "location": "Rostock",
+      "weather": {
+        "lat": 54.09,
+        "lon": 12.13
+      },
+      "legs": [
+        {
+          "vehicle": "car",
+          "origin": "Berlin",
+          "destination": "Rostock Überseehafen",
+          "waypoints": [],
+          "departure": "11:00"
+        },
+        {
+          "vehicle": "ferry",
+          "origin": "Rostock",
+          "destination": "Trelleborg",
+          "waypoints": []
+        }
+      ],
+      "activities": [
+        {
+          "id": "a-10",
+          "text": "Utcheckning",
+          "placeIds": [
+            "hotel-am-zoo"
+          ],
+          "start": "11:00",
+          "estimated": false
+        },
+        {
+          "id": "a-11",
+          "text": "Incheckning färja",
+          "placeIds": [
+            "rostock-hamn"
+          ],
+          "start": "14:00",
+          "estimated": true
+        }
+      ]
+    }
+  ],
+  "places": [
+    {
+      "id": "helsingor-terminal",
+      "name": "Helsingör färjeterminal",
+      "address": "Helsingör färjeterminal, Helsingör"
+    },
+    {
+      "id": "torvehallerne",
+      "name": "Torvehallerne",
+      "address": "Torvehallerne, Frederiksborggade 21, Köpenhamn"
+    },
+    {
+      "id": "nyhavn",
+      "name": "Nyhavn",
+      "address": "Nyhavn 17, 1051 Köpenhamn"
+    },
+    {
+      "id": "skt-petri",
+      "name": "Hotel Skt. Petri",
+      "address": "Hotel Skt. Petri, Krystalgade 22, Köpenhamn"
+    },
+    {
+      "id": "holstentor",
+      "name": "Holstentor",
+      "address": "Holstentor, Holstentorplatz, Lübeck"
+    },
+    {
+      "id": "hotel-am-zoo",
+      "name": "Hotel am Zoo",
+      "address": "Hotel am Zoo, Kurfürstendamm 25, Berlin"
+    },
+    {
+      "id": "pergamon",
+      "name": "Pergamonmuseum",
+      "address": "Bodestraße 1-3, Berlin"
+    },
+    {
+      "id": "reichstag",
+      "name": "Reichstagskupolen",
+      "address": "Platz der Republik 1, Berlin"
+    },
+    {
+      "id": "hackescher-markt",
+      "name": "Hackescher Markt",
+      "address": "Hackescher Markt, Berlin"
+    },
+    {
+      "id": "rostock-hamn",
+      "name": "Überseehafen Rostock",
+      "address": "Überseehafen, Rostock"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "hotel-am-zoo-bk",
+      "name": "Hotel am Zoo",
+      "from": "2026-10-25",
+      "to": "2026-10-28",
+      "status": "paid",
+      "reference": "HZ-48213",
+      "placeId": "hotel-am-zoo"
+    },
+    {
+      "id": "farja-rostock",
+      "name": "Färja Rostock–Trelleborg",
+      "from": "2026-10-28",
+      "to": "2026-10-28",
+      "status": "ready",
+      "reference": "TL-99120",
+      "placeId": "rostock-hamn"
+    },
+    {
+      "id": "oresundsfarjan",
+      "name": "Öresundsfärjan",
+      "from": "2026-10-24",
+      "to": "2026-10-24",
+      "status": "paid",
+      "reference": "HH-5531",
+      "placeId": "helsingor-terminal"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t-1",
+      "text": "Packa regnjackor",
+      "done": false
+    },
+    {
+      "id": "t-2",
+      "text": "Ladda ner färjebiljetter",
+      "done": false
+    }
+  ],
+  "travelers": [],
+  "dreams": [
+    {
+      "id": "fernsehturm",
+      "title": "Fernsehturm i solnedgång",
+      "category": "Utsikt",
+      "source": "Från Claude",
+      "icon": "🗼",
+      "votes": 3
+    },
+    {
+      "id": "currywurst",
+      "title": "Currywurst på Konnopke’s",
+      "category": "Mat",
+      "source": "Mejlad länk",
+      "icon": "🌭",
+      "votes": 5
+    },
+    {
+      "id": "vabali",
+      "title": "Badhuset Vabali",
+      "category": "Avkoppling",
+      "source": "Från Claude",
+      "icon": "♨️",
+      "votes": 1
+    }
+  ],
+  "budget": [
+    {
+      "id": "bg-1",
+      "category": "Boende",
+      "amount": 5200,
+      "paid": true,
+      "owner": "Anna"
+    },
+    {
+      "id": "bg-2",
+      "category": "Transport",
+      "amount": 2300,
+      "paid": true,
+      "owner": "Erik"
+    },
+    {
+      "id": "bg-3",
+      "category": "Transport",
+      "amount": 1900,
+      "paid": false,
+      "owner": "Erik"
+    },
+    {
+      "id": "bg-4",
+      "category": "Mat/Fritid",
+      "amount": 3000,
+      "paid": false,
+      "owner": "Anna"
+    },
+    {
+      "id": "bg-5",
+      "category": "Övrigt",
+      "amount": 600,
+      "paid": true,
+      "owner": "Erik"
+    }
+  ]
+}

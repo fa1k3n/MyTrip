@@ -63,6 +63,9 @@ export function budgetByCategory(items: BudgetLike[]): [string, number][] {
   return [...g];
 }
 
+/** Font size (viewBox units) of the donut total, so it fits the 62-unit hole with a margin; about 0.6 em per character (BG-11). */
+export const donutTotalSize = (text: string) => Math.min(10, Math.floor((48 / (0.6 * text.length)) * 10) / 10);
+
 export const anyOpen = (open: Open) => Object.values(open).some(Boolean);
 export const toggleOne = (open: Open, id: string): Open => ({ ...open, [id]: !open[id] });
 export const toggleAll = (open: Open, ids: string[]): Open => (anyOpen(open) ? {} : Object.fromEntries(ids.map((id) => [id, true])));

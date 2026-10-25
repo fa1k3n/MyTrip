@@ -2,7 +2,8 @@
 // Loaded on demand with the Nåla tab to keep the page under 200 KB (PF-01).
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
-import { bookingDates, budgetByCategory, kr, shortDate } from "./format.ts";
+import { bookingDates, kr, shortDate } from "./format.ts";
+import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText, budgetRows, money } from "./budget.ts";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
@@ -11,38 +12,15 @@ import { Icon, IconButton } from "./Icons.tsx";
 import { PartLock, PlaceLink, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 
-const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" };
-
 type Part = (id: string) => { on: boolean; toggle: () => void };
 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02), with its own lock (ED-18). */
-const Section = ({ title, lock, children }: { title: string; lock: ReturnType<Part>; children: ReactNode }) => (
-  <details className={`card sec ${lock.on ? "" : "lock"}`}>
-    <summary><h3>{title}</h3><span className="seclock" onClick={(e) => e.preventDefault()}><PartLock on={lock.on} part={title} toggle={lock.toggle} /></span></summary>
+const Section = ({ title, lock, flag, tint = "", children }: { title: string; lock: ReturnType<Part>; flag?: ReactNode; tint?: string; children: ReactNode }) => (
+  <details className={`card sec ${lock.on ? "" : "lock"} ${tint}`}>
+    <summary><h3>{title}</h3>{flag}<span className="seclock" onClick={(e) => e.preventDefault()}><PartLock on={lock.on} part={title} toggle={lock.toggle} /></span></summary>
     {children}
   </details>
 );
-
-function Donut({ items }: { items: { category: string; amount?: number; paid: boolean }[] }) {
-  const groups = budgetByCategory(items);
-  const total = groups.reduce((a, [, v]) => a + v, 0);
-  const r = 40, c = 2 * Math.PI * r;
-  let off = 0;
-  return (
-    <div className="donutbox">
-      <svg viewBox="0 0 120 120" width="150" role="img" aria-label={sv.budgetChart}>
-        {groups.map(([k, v]) => {
-          const l = (v / (total || 1)) * c, o = off;
-          off += l;
-          return <circle key={k} r={r} cx="60" cy="60" fill="none" stroke={COL[k] ?? COL["Övrigt"]} strokeWidth="18" strokeDasharray={`${l} ${c - l}`} strokeDashoffset={-o} transform="rotate(-90 60 60)" />;
-        })}
-        <text x="60" y="58" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor">{kr(total)}</text>
-        <text x="60" y="72" textAnchor="middle" fontSize="7" fill="currentColor">{sv.total}</text>
-      </svg>
-      <div className="legend">{groups.map(([k, v]) => <div key={k}><i style={{ background: COL[k] ?? COL["Övrigt"] }}></i>{k} {kr(v)}</div>)}</div>
-    </div>
-  );
-}
 
 function Budget({ t, chart, onToggle, edit, part }: { part: Part; t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
   const { paid, totals, other } = budgetRows(t.budget, t.currency);
@@ -56,11 +34,11 @@ function Budget({ t, chart, onToggle, edit, part }: { part: Part; t: Trip; chart
   );
   const sum = totals.map((x) => money(x.sum, x.currency)).join(" + ") || kr(0);
   return (
-    <Section title={sv.budget} lock={part("budget")}>
+    <Section title={sv.budget} lock={part("budget")} flag={<LimitIcon t={t} />} tint={limitClass(t)}>
       <div className="row mid"><span className="ro">{sv.paidSoFar} {sum}</span>
         <IconButton icon={chart ? "list" : "chart"} label={chart ? sv.showList : sv.showChart} onClick={onToggle} tip="left" /></div>
       {chart
-        ? <Donut items={t.budget.filter((i) => !i.currency || i.currency === t.currency)} />
+        ? <Donut t={t} />
         : <>
           {paid.map((i) => row(i, false))}
           {paid.length > 0 && <div className="row"><b>{sv.paidSoFar.replace(":", "")}</b><b>{sum}</b></div>}

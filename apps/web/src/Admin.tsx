@@ -5,6 +5,7 @@ import { api, ApiError, maskedToken } from "./api.ts";
 import { shareUrl } from "./access.ts";
 import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
+import { money } from "./budget.ts";
 import { IconButton } from "./Icons.tsx";
 import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
@@ -76,7 +77,8 @@ export function AdminPage({ t, settings, back, edit, change, removeTrip, openSet
   return <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={back} tip="right" /></div><h1>{sv.admin}</h1>
     <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
-      <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div></div>
+      <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
+      <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div></div>
     <ShareLink t={t} />
     {(t.inbox || maskedToken()) && (
       <div className="card">

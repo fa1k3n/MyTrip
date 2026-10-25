@@ -60,11 +60,12 @@ export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: 
 }
 
 /** Forecast under the date badge: symbols in one column, values in the next (WX-02..WX-09, WX-13). */
-export function Weather({ forecast }: { forecast?: Forecast }) {
+/** `big`: one larger row, as at the top of Uppleva (UP-11). */
+export function Weather({ forecast, big }: { forecast?: Forecast; big?: boolean }) {
   if (!forecast) return null;
   const label = wxLabel(forecast);
   return (
-    <div className="wxs" role="img" aria-label={label} title={label}>
+    <div className={`wxs ${big ? "big" : ""}`} role="img" aria-label={label} title={label}>
       {wxRows(forecast).map(([s, v]) => <span key={s} className="wr"><LineIcon symbol={s} /><span>{v}</span></span>)}
     </div>
   );

@@ -12,7 +12,7 @@ import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggle
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
-import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
+import { newExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
 import { Gear, IconButton } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
@@ -24,6 +24,7 @@ import { sv } from "./sv.ts";
 
 type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
 const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
+const ADDER_KEY = "mytrip.adder";
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 
 /** Cover images need the auth header, so they are fetched as blobs. */
@@ -194,23 +195,30 @@ export function App() {
     if (kind === "person") {
       if (!str("name")) return;
       change([{ op: "add", path: "travelers/-", value: { id: newId("p"), name: str("name"), packing: [] } }], "add traveler");
+    } else if (kind === "expense") {
+      const input = { text: str("text"), amount: str("amount"), category: str("category"), paidBy: str("paidBy"), sharedBy: f.getAll("sharedBy").map(String), addedBy: str("addedBy") };
+      const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp")); // UP-13: who added it and when
+      if (!r.ok) return setErr(r.error);
+      try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, input.addedBy); } catch { /* not remembered in private mode */ }
+      change(r.ops, "add expense");
     } else {
       const amount = parseAmount(str("amount"));
       if (Number.isNaN(amount)) return setErr(sv.badAmount); // MI-03
-      if (kind === "expense") {
-        if (!str("text")) return;
-        const sharedBy = sharedByValue(f.getAll("sharedBy").map(String), t!.travelers.map((x) => x.id));
-        change([{ op: "add", path: "expenses/-", value: { id: newId("exp"), text: str("text"), category: str("category"), amount, paidBy: str("paidBy"), sharedBy, date: today } }], "add expense");
-      } else {
-        if (str("from") === str("to")) return;
-        savePayment({ from: str("from"), to: str("to"), amount, ...(str("note") ? { note: str("note") } : {}) });
-      }
+      if (str("from") === str("to")) return;
+      savePayment({ from: str("from"), to: str("to"), amount, ...(str("note") ? { note: str("note") } : {}) });
     }
     setDlg(null);
   };
-  const people = (field: string, pick = 0) => (
-    <select name={field} defaultValue={t?.travelers[pick]?.id}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+  const people = (field: string, pick = 0, value = t?.travelers[pick]?.id) => (
+    <select name={field} defaultValue={value}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
   );
+
+  /** The traveler who added the last expense on this device, if still on the trip (UP-13). */
+  const adder = () => {
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(`${ADDER_KEY}.${t?.id}`); } catch { /* storage blocked */ }
+    return pickAdder(t?.travelers ?? [], stored);
+  };
 
   let page;
   if (failed) page = <p className="ro">{sv.error}</p>;
@@ -292,7 +300,8 @@ export function App() {
             <label>{sv.text}<input name="text" autoFocus /></label>
             <label>{sv.amount}<input name="amount" inputMode="decimal" /></label>
             <label>{sv.category}<select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
-            <label>{sv.paidBy}{people("paidBy")}</label>
+            <label>{sv.addedBy}{people("addedBy", 0, adder())}</label>
+            <label>{sv.paidBy}{people("paidBy", 0, adder())}</label>
             <div className="ro">{sv.sharedBy}</div>
             {t?.travelers.map((x) => <label className="check" key={x.id}><input type="checkbox" name="sharedBy" value={x.id} defaultChecked />{x.name}</label>)}
           </>}

@@ -3,7 +3,7 @@ import { useState, type ChangeEvent, type ReactNode } from "react";
 import type { Op, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
-  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, setTripDates, tripRange,
+  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
   type BookingInput, type Result,
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
@@ -75,6 +75,18 @@ function TripForm(p: Props) {
       </div>
       <textarea id="purpose" rows={4} {...text("purpose")} />
       <p className="ro note">{suggestion ? sv.purposeHint : sv.noPurposeYet}</p>
+    </Form>
+  );
+}
+
+/** The trip's maximum budget; empty removes it (BG-12). */
+function BudgetMaxForm(p: Props) {
+  const s = useSave(p);
+  const { f, text } = useFields({ max: p.t.budgetMax !== undefined ? String(p.t.budgetMax).replace(".", ",") : "" });
+  return (
+    <Form title={sv.editBudgetMax} {...s} close={p.close} onSubmit={() => s.submit(saveBudgetMax(p.t, f.max), "budget max")}>
+      <label>{sv.budgetMax} ({p.t.currency})<input {...text("max")} inputMode="decimal" autoFocus /></label>
+      <p className="ro note">{sv.budgetMaxHint}</p>
     </Form>
   );
 }
@@ -295,6 +307,7 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
   switch (dlg.kind) {
     case "trip": return <TripForm {...p} />;
     case "dates": return <DatesForm {...p} />;
+    case "budgetMax": return <BudgetMaxForm {...p} />;
     case "day": return <DayForm {...p} id={dlg.id} />;
     case "activity": return <ActivityForm {...p} dayId={dlg.dayId} id={dlg.id} />;
     case "booking": return <BookingForm {...p} id={dlg.id} />;

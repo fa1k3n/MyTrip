@@ -1,8 +1,9 @@
-// Uppleva: one day of the trip, read-only (UP-01..UP-09).
+// Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
 import { useEffect, useRef } from "react";
-import { bookingDates, dayTime, kr, timelineStops } from "./format.ts";
+import { bookingDates, dateBadge, dayTime, kr, timelineStops } from "./format.ts";
 import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickDay } from "./today.ts";
 import { IconButton } from "./Icons.tsx";
+import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { Activities, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
@@ -20,6 +21,7 @@ export function Uppleva(p: TripViewProps) {
   const s = budgetStatus(t.budget, t.expenses);
   const bookings = bookingsOn(t.bookings, day.date);
   const marked = new Set(coveringStops(t, day.id).map((n) => t.stops[n]));
+  const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   return <>
     <div className="tl" ref={tl}>{timelineStops(t).map((x, i) => (
@@ -29,38 +31,46 @@ export function Uppleva(p: TripViewProps) {
       <div>
         <section className="card">
           <div className="dayhead">
-            <h3>{dayHeading(day.date, p.today)}</h3>
+            <div className="daytitle">
+              <span className="date" aria-hidden="true"><b>{badge.d}</b><span>{badge.w}</span></span>
+              <div>
+                {day.date === p.today && <small className="ro" aria-hidden="true">{sv.today}</small>}
+                <h3><span className="sr">{dayHeading(day.date, p.today)}: </span>{day.title}</h3>
+                <div className="dmeta"><CatIcons ids={dayIcons(day)} /><span className="time"><LineIcon shape="clock" /> {dayTime(day)}</span></div>
+                <Weather forecast={p.forecast[day.id]} big />
+              </div>
+            </div>
             <span className="daynav">
               {prev && <IconButton icon="prev" look="bare" tip="left" label={`${sv.prevDay}: ${dayHeading(prev.date, p.today)}`} onClick={() => p.setUpDay(prev.id)} />}
               {next && <IconButton icon="next" look="bare" tip="left" label={`${sv.nextDay}: ${dayHeading(next.date, p.today)}`} onClick={() => p.setUpDay(next.id)} />}
             </span>
           </div>
-          <p className="ro">{day.title} <CatIcons ids={dayIcons(day)} /> · <LineIcon shape="clock" /> {dayTime(day)}</p>
           {day.activities.length ? <Activities t={t} x={day} onPlace={p.place} /> : <p className="ro">{sv.noActivities}</p>}
-          <Weather forecast={p.forecast[day.id]} />
+        </section>
+      </div>
+      <div>
+        <section className={`card ${limitClass(t)}`}>
+          <div className="sechead"><h3>{sv.budgetStatus}</h3><LimitIcon t={t} big /></div>
+          <Donut t={t} />
+          <div className="row"><span>{sv.paidAhead}</span><span>{kr(s.paid)}</span></div>
+          <div className="row"><span>{sv.leftToPay}</span><span>{kr(s.left)}</span></div>
+          <div className="row"><span>{sv.spentOnTrip}</span><span>{kr(s.spent)}</span></div>
+          {/* Not an editing control: the admin and link holders may add expenses here (UP-07, UP-12). */}
+          {t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={p.addExpense} tip="right" /></div>}
         </section>
         <section className="card">
           <h3>{sv.ticketsToday}</h3>
           {bookings.length ? bookings.map((b) => {
             return (
-              <div className="row" key={b.id}>
+              <div className="row mid" key={b.id}>
                 <span>
                   <PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><br />
                   <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
                 </span>
-                <span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span>
+                <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span></span>
               </div>
             );
           }) : <p className="ro">{sv.noBookingsToday}</p>}
-        </section>
-      </div>
-      <div>
-        <section className="card">
-          <h3>{sv.budgetStatus}</h3>
-          <div className="row"><span>{sv.planned}</span><span>{kr(s.planned)}</span></div>
-          <div className="row"><span>{sv.paidAhead}</span><span>{kr(s.paid)}</span></div>
-          <div className="row"><span>{sv.leftToPay}</span><span>{kr(s.left)}</span></div>
-          <div className="row"><span>{sv.spentOnTrip}</span><span>{kr(s.spent)}</span></div>
         </section>
       </div>
     </div>

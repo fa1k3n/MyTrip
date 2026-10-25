@@ -1,4 +1,5 @@
 // Shared costs for Summera. All sums are done in whole öre so balances add up to exactly zero (MI-04).
+import type { Op } from "@trip/schema";
 import { kr } from "./format.ts";
 import { sv } from "./sv.ts";
 
@@ -60,3 +61,18 @@ export function budgetVsActual(budget: { category: string; amount?: number; paid
 
 export const balanceText = (v: number) =>
   Math.abs(v) < 0.005 ? sv.even : v > 0 ? `${sv.owedBack} ${kr(v)}` : `${sv.owes} ${kr(-v)}`;
+
+export type ExpenseInput = { text: string; amount: string; category: string; paidBy: string; sharedBy: string[]; addedBy: string };
+
+/** A new expense with who added it and when (MI-02, UP-13). `date` is the trip's today, `at` the moment as ISO time. */
+export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date: string, at: string, id: string): { ok: true; ops: Op[] } | { ok: false; error: string } {
+  const amount = parseAmount(input.amount);
+  if (!input.text.trim()) return { ok: false, error: sv.errors.expenseText };
+  if (Number.isNaN(amount)) return { ok: false, error: sv.badAmount }; // MI-03
+  const sharedBy = sharedByValue(input.sharedBy, t.travelers.map((x) => x.id));
+  return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, addedBy: input.addedBy, addedAt: at } }] };
+}
+
+/** Who adds the expense: the traveler remembered on this device if still on the trip, else the first (UP-13). */
+export const pickAdder = (travelers: Person[], stored: string | null) =>
+  travelers.some((x) => x.id === stored) ? stored! : travelers[0]?.id ?? "";

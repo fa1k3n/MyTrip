@@ -40,6 +40,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
             <div className="row" key={e.id}>
               <span>{e.text}<br /><small className="ro">
                 {e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {e.sharedBy.length ? e.sharedBy.map(name).join(", ") : sv.everyone}
+                {e.addedBy && <> · {sv.addedBy.toLowerCase()} {name(e.addedBy)}</>}
               </small></span>
               <span>{kr(e.amount)}</span>
             </div>

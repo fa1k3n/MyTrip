@@ -18,7 +18,7 @@ export function checkTrip(t: Trip): string[] {
   for (const s of t.stops) if (!t.days.some((d) => d.id === s.dayId)) p.push(`Stop ${s.label} refers to unknown day ${s.dayId}`);
   const people = new Set(t.travelers.map((x) => x.id));
   const who = (owner: string, ids: string[]) => { for (const id of ids) if (!people.has(id)) p.push(`${owner} refers to unknown traveler ${id}`); }; // MI-01
-  for (const e of t.expenses ?? []) who(`Expense ${e.id}`, [e.paidBy, ...e.sharedBy]);
+  for (const e of t.expenses ?? []) who(`Expense ${e.id}`, [e.paidBy, ...e.sharedBy, ...(e.addedBy ? [e.addedBy] : [])]); // UP-13
   for (const x of t.payments ?? []) who(`Payment ${x.id}`, [x.from, x.to]);
   const dates = t.days.map((d) => d.date).sort();
   for (const b of t.bookings)

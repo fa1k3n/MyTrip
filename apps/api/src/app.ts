@@ -71,10 +71,13 @@ function same(a: string, b: string) {
 const SESSION_DAYS = 30, MAX_FAILS = 5, FAIL_WINDOW_MS = 15 * 60_000;
 /** 144 random bits as base64url (AU-01). */
 const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18)))).replace(/\+/g, "-").replace(/\//g, "_");
-/** The only changes a share link may make: ticking tasks and packing items (AU-03). */
-const linkMayChange = (ops: Op[]) => ops.length > 0 && ops.every((o) =>
+/** One new expense that names who added it: the only addition a share link may make (AU-10). */
+const linkExpense = (ops: Op[]) => ops.length === 1 && ops[0].op === "add" && ops[0].path === "expenses/-"
+  && typeof (ops[0].value as { addedBy?: unknown } | null)?.addedBy === "string";
+/** The only changes a share link may make: ticking tasks and packing items (AU-03), or adding an expense (AU-10). */
+const linkMayChange = (ops: Op[]) => linkExpense(ops) || (ops.length > 0 && ops.every((o) =>
   o.op === "set" && ((/^tasks\/\d+\/done$/.test(o.path) && typeof o.value === "boolean")
-    || (/^(packed|travelers\/\d+\/packed)$/.test(o.path) && Array.isArray(o.value) && o.value.every((v) => typeof v === "string"))));
+    || (/^(packed|travelers\/\d+\/packed)$/.test(o.path) && Array.isArray(o.value) && o.value.every((v) => typeof v === "string")))));
 
 type Env = { Variables: { role: Role; tripId?: string } };
 
@@ -224,7 +227,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (b.dryRun) return c.json({ ok: problems.length === 0, problems, summary }); // MC-04
     if (problems.length) return c.json({ ok: false, problems }, 422);
     const done = (r: Awaited<ReturnType<typeof apply>>) => ("conflict" in r ? c.json({ error: "conflict" }, 409) : c.json(r));
-    if (isLink(c)) return done(await apply(t, b.ops, "link", b.reason ?? "")); // ticks apply at once (AU-03)
+    if (isLink(c)) return done(await apply(t, b.ops, "link", b.reason ?? "")); // ticks and expenses apply at once (AU-03, AU-10)
     if (c.get("role") !== "admin") {
       const p: Proposal = { id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: b.ops, reason: b.reason ?? "", status: "pending", at: new Date().toISOString() };
       await store.saveProposal(p); // MC-06, MC-07: only an admin applies or approves

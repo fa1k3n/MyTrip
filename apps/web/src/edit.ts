@@ -41,6 +41,13 @@ export function saveTrip(t: Trip, input: { title: string; purpose: string }): Re
   return ok([{ op: "set", path: "title", value: title }, { op: "set", path: "purpose", value: input.purpose.trim() }]);
 }
 
+/** The maximum budget; empty clears it (BG-12). */
+export function saveBudgetMax(t: Trip, input: string): Result {
+  if (!input.trim()) return ok(t.budgetMax === undefined ? [] : [{ op: "remove", path: "budgetMax" }]);
+  const n = parseAmount(input);
+  return Number.isNaN(n) ? fail(sv.badAmount) : ok([{ op: "set", path: "budgetMax", value: n }]);
+}
+
 export type DayInput = {
   date: string; title: string; summary: string; icons: string; start: string; end: string;
   startEstimated: boolean; endEstimated: boolean; location: string;

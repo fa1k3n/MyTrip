@@ -49,6 +49,7 @@ export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
   date: Date_.optional(),
+  addedBy: Id.optional(), addedAt: z.string().datetime().optional(), // who added it, among the travelers, and when (UP-13)
 });
 export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional() })
   .refine((p) => p.from !== p.to, { message: "A payment needs two different travelers", path: ["to"] }); // MI-06
@@ -74,6 +75,7 @@ export const Trip = z.object({
   note: z.string().optional(), inbox: z.string().email().optional(),
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
+  budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
   expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
   info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)

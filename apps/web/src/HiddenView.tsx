@@ -7,7 +7,7 @@ export default function HiddenView({ t, dayId, id }: { t: Trip; dayId: string; i
   return <>
     <h3>{svAdmin.hidden.title}</h3>
     <ul className="hiddenlist">{hiddenRows(t, dayId, id).map((r) => (
-      <li key={r.id}><b>{r.time} {r.text}</b><span>{r.names}</span>{r.like && <small className="ro">{svAdmin.hidden.like(r.like)}</small>}</li>
+      <li key={r.id || "title"}><b>{r.id ? `${r.time} ${r.text}` : `${svAdmin.hidden.dayTitle}: ${r.text}`}</b><span>{r.names}</span>{r.like && <small className="ro">{svAdmin.hidden.like(r.like)}</small>}</li>
     ))}</ul>
   </>;
 }

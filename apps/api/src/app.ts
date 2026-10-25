@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, type AccessRole, type Op, type Part } from "@trip/schema";
+import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, similarTitles, type AccessRole, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 
 export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
@@ -92,14 +92,20 @@ function linkMayChange(t: Trip, ar: AccessRole, ops: Op[]) {
   return ok && (!adds || rules.parts.expenses === "write" || ops.length === 1);
 }
 type Activity = Trip["days"][number]["activities"][number];
-/** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18). */
+/** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18).
+ * A day's title, summary and timeline label that resemble such an activity are emptied too (AU-27). */
 function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity) => boolean): T {
   const secret = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).flatMap((a) => a.placeIds)));
   if (!t.days.some((d) => d.activities.some(hiddenFor))) return t;
-  const days = t.days.map((d) => ({ ...d, activities: d.activities.map((a) => (!hiddenFor(a) ? a
-    : { id: a.id, text: "", placeIds: [], start: a.start, end: a.end, estimated: a.estimated, durationMin: a.durationMin, hidden: true })) }));
+  const gives = (d: Trip["days"][number], text: string) => d.activities.some((a) => hiddenFor(a) && similarTitles(a.text, text));
+  const days = t.days.map((d) => ({
+    ...d, ...(gives(d, d.title) ? { title: "", hiddenTitle: true } : {}), ...(gives(d, d.summary) ? { summary: "" } : {}),
+    activities: d.activities.map((a) => (!hiddenFor(a) ? a
+      : { id: a.id, text: "", placeIds: [], start: a.start, end: a.end, estimated: a.estimated, durationMin: a.durationMin, hidden: true })),
+  }));
+  const stops = t.stops.map((s) => { const d = t.days.find((x) => x.id === s.dayId); return d && gives(d, s.label) ? { ...s, label: "" } : s; });
   const used = new Set([...days.flatMap((d) => d.activities.flatMap((a) => a.placeIds)), ...t.bookings.map((b) => b.placeId), ...t.tasks.map((k) => k.placeId), ...t.info.map((i) => i.placeId)]);
-  return { ...t, days, places: t.places.filter((p) => !secret.has(p.id) || used.has(p.id)) };
+  return { ...t, days, stops, places: t.places.filter((p) => !secret.has(p.id) || used.has(p.id)) };
 }
 /** True when the change hides an activity from the traveler making it, which no one may do (AU-18). */
 function hidesFromSelf(before: Trip, after: Trip, travelerId: string) {

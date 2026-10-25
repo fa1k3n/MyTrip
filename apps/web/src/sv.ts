@@ -4,9 +4,9 @@ export const sv = {
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", admin: "Admin & Inställningar",
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Summera" },
-  today: "Idag", ticketsToday: "Biljetter och bokningar", startsToday: "börjar idag", noBookingsToday: "Inga bokningar den här dagen.",
+  today: "Idag", startsToday: "börjar idag", noBookingsToday: "Inga bokningar den här dagen.",
   noActivities: "Inga aktiviteter inlagda.", noDays: "Resan har inga dagar ännu. Lägg in dem under Nåla.",
-  budgetStatus: "Budgetläge", planned: "Planerat", paidAhead: "Betalt i förväg", leftToPay: "Kvar att betala", spentOnTrip: "Utgifter under resan",
+  planned: "Planerat", paidAhead: "Betalt i förväg", leftToPay: "Kvar att betala", spentOnTrip: "Utgifter under resan",
   balance: "Saldo", owedBack: "får tillbaka", owes: "ska betala", even: "kvitt", settleUp: "Förslag på betalningar", allEven: "Alla är kvitt.",
   register: "Registrera betalning:", expenses: "Utgifter", addExpense: "Lägg till utgift", newExpense: "Ny utgift", noExpenses: "Inga utgifter ännu.",
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
@@ -22,7 +22,7 @@ export const sv = {
   budgetMaxHint: "Planerad budget plus utgifter under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
-  hiddenActivity: "Dold aktivitet", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18
+  hiddenActivity: "Dold aktivitet", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18
   limit: { // BG-13
     near: (used: string, max: string, pct: number, left: string) => `Nära maxbudgeten: ${used} av ${max} (${pct} %). ${left} kvar.`,
     over: (over: string, used: string, max: string) => `Över maxbudgeten med ${over}: ${used} av ${max}.`,

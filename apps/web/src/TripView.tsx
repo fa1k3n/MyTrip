@@ -1,7 +1,7 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
 import { lazy, Suspense } from "react";
 import type { Op, Trip } from "@trip/schema";
-import { activityTime, dateBadge, dayTime, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, toggleAllLabel, tripDates, type Open } from "./format.ts";
+import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
 import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
@@ -90,8 +90,8 @@ export function Weather({ forecast, big }: { forecast?: Forecast; big?: boolean 
 export const PartLock = ({ on, part, toggle, tip = "left" }: { on: boolean; part: string; toggle: () => void; tip?: "left" | "right" }) =>
   <span className="partlock"><IconButton icon={on ? "unlock" : "lock"} look="bare" tip={tip} label={unlockLabel(on, part)} onClick={toggle} pressed={on} /></span>;
 
-function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, editing, toggleLock, run }: {
-  t: Trip; x: Day; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
+function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, toggleLock, run }: {
+  t: Trip; x: Day; today: boolean; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
   editing: boolean; toggleLock?: () => void; run: Run; // no toggleLock: the role may not change the plan (AU-21)
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
@@ -102,7 +102,8 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, e
       <div className="hd" onClick={onToggle}>
         <div className="dcol"><div className="date"><b>{badge.d}</b><span>{badge.w}</span></div><Weather forecast={forecast} /></div>
         <div className="txt">
-          <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{x.title}</button></h3>
+          {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
+          <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button></h3>
           <div className="sum">{x.summary}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
         </div>
@@ -110,15 +111,15 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, e
       </div>
       {open && (
         <div className="tools">
-          <IconButton icon="plus" look="bare" tip="left" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut />
           <IconButton icon="edit" look="bare" tip="left" label={sv.editDay} onClick={() => edit({ kind: "day", id: x.id })} mut />
-          {toggleLock && <PartLock on={editing} part={x.title} toggle={toggleLock} />}
+          {toggleLock && <PartLock on={editing} part={dayTitle(x)} toggle={toggleLock} />}
         </div>
       )}
       <div className="body">
         {editing
           ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} edit={edit} />}><PlanActivities t={t} x={x} onPlace={onPlace} edit={edit} run={run} /></Suspense>
           : <Activities t={t} x={x} onPlace={onPlace} edit={edit} />}
+        <div className="add"><IconButton icon="plus" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut tip="right" /></div> {/* UI-09 */}
         {vehicles.length > 0 && <p><button className="badge linkish" onClick={onTransport}><CatIcons ids={vehicles} /> {sv.travelTime}</button></p>}
       </div>
     </article>
@@ -143,18 +144,19 @@ export function TripView(p: TripViewProps) {
   const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
+  const now = todayId(t.days, p.today); // DC-15
   let main;
   if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} /></Suspense>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
-      <button className="stop" key={`${s.dayId}-${i}`} onClick={() => p.jump(s.dayId)}><b>{s.label}</b><small>{s.sub}</small></button>
+      <button className="stop" key={`${s.dayId}-${i}`} aria-current={s.dayId === now ? "date" : undefined} onClick={() => p.jump(s.dayId)}><b>{stopLabel(s)}</b><small>{s.sub}</small></button>
     ))}</div>
     <div className="bar top0">
       <IconButton icon={anyOpen(p.open) ? "collapse" : "expand"} label={toggleAllLabel(p.open)} onClick={p.toggleAll} tip="right" />
     </div><div style={{ height: 10 }}></div>
     <div className="cols">
       <div>{days.map((x) => (
-        <DayCard key={x.id} t={t} x={x} open={!!p.open[x.id]} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
+        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id]} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
           onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run}
           editing={perms.view.nala.plan === "write" && part(`day:${x.id}`).on} toggleLock={perms.view.nala.plan === "write" ? part(`day:${x.id}`).toggle : undefined} />
       ))}</div>

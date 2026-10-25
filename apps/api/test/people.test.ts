@@ -217,3 +217,24 @@ test("AU-24 similar activities on the same day are hidden too", async () => {
   const planner = await json(call(app, "/api/trips/berlin", await person(app, "bo", "planner")));
   assert.deepEqual(planner.days[0].activities[0].hiddenFrom, undefined, "the stored data is not changed");
 });
+
+// REQ: AU-27 a day's title, summary and timeline label that resemble a hidden activity are emptied for the same viewers
+test("AU-27 day texts that give away a hidden activity are hidden", async () => {
+  const t = trip("berlin");
+  const store = memoryStore([{
+    ...t, stops: [{ label: "Liseberg", sub: "24 lör", dayId: t.days[0].id }],
+    days: [{ ...t.days[0], title: "Liseberg!", summary: "Hela dagen på Liseberg.", activities: [
+      { id: "a1", text: "Liseberg", placeIds: [], start: "10:00", hiddenFrom: ["anna"] },
+    ] }],
+  }]);
+  const app = createApp(store, tokens);
+  const secret = (await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret;
+  for (const auth of [await person(app, "anna", "traveler"), `link.berlin.${secret}`]) {
+    const got = await json(call(app, "/api/trips/berlin", auth));
+    assert.deepEqual([got.days[0].title, got.days[0].summary, got.days[0].hiddenTitle, got.stops[0].label], ["", "", true, ""], auth);
+  }
+  for (const role of ["traveler", "planner"]) {
+    const got = await json(call(app, "/api/trips/berlin", await person(app, "bo", role)));
+    assert.deepEqual([got.days[0].title, got.days[0].hiddenTitle, got.stops[0].label], ["Liseberg!", undefined, "Liseberg"], role);
+  }
+});

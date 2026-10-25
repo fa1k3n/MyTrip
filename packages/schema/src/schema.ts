@@ -33,6 +33,7 @@ export const Day = z.object({
   weather: z.object({ lat: z.number(), lon: z.number() }).optional(),
   legs: z.array(Leg).default([]),
   activities: z.array(Activity),
+  hiddenTitle: z.boolean().optional(), // only in what a Resenär or Följare receives: title and summary give away a hidden activity (AU-27)
 });
 export const Booking = z.object({
   id: Id, name: z.string().min(1), from: Date_, to: Date_,

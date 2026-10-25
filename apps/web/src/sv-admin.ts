@@ -1,7 +1,7 @@
 // Interface texts for the trip's settings only, kept out of the main page file (PF-01). Loaded with the settings page.
 export const svAdmin = {
   hidden: {
-    title: "Dold för", none: "Ingen", pickLabel: "Dölj för",
+    title: "Dold för", none: "Ingen", pickLabel: "Dölj för", dayTitle: "Dagens rubrik",
     hint: "De valda ser bara \u201dDold aktivitet\u201d. Följare ser den som dold så fort den är dold för någon.", like: (text: string) => `Liknar den dolda \u201d${text}\u201d`,
   }, // AU-18, AU-25
   share: {
@@ -13,7 +13,7 @@ export const svAdmin = {
     title: "Personliga länkar", role: "Behörighet", roles: { traveler: "Resenär", planner: "Planerare" }, follower: "Följare",
     hint: "Varje resenär har en egen länk. Resenär: läsa, bocka av och lägga till egna utgifter. Planerare: dessutom ändra allt för resan.",
     copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Byt länk för ${n}`,
-    copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Lägg till resenärer i Summera först.",
+    copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Inga resenärer än. Lägg till dem med plusknappen.",
   },
   perms: { // AU-20
     title: "Behörigheter", hint: "Vad varje roll får se och ändra i den här resan. Du som administratör kan alltid allt.",

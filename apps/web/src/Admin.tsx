@@ -74,7 +74,7 @@ function ShareLink({ t }: { t: Trip }) {
 }
 
 /** AU-11: a personal link per traveler, created with the permission Resenär when missing; the permission is picked in a dropdown. */
-function PeopleLinks({ t }: { t: Trip }) {
+function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
   const [copied, setCopied] = useState("");
   useEffect(() => {
@@ -113,6 +113,7 @@ function PeopleLinks({ t }: { t: Trip }) {
           </div>
         );
       })}
+      <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={add} tip="right" /></div> {/* AU-26, UI-09 */}
       {copied && <p className="ro" role="status">{svAdmin.people.copied(copied)}</p>}
     </div>
   );
@@ -165,8 +166,8 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
 }
 
 /** The trip's settings. A Planerare sees the trip's own settings; the app settings, API key and deleting are for the superuser (AU-14). */
-export function AdminPage({ t, superuser, settings, back, edit, change, run, removeTrip, openSettings }: {
-  t: Trip; superuser: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; run: Run;
+export function AdminPage({ t, superuser, settings, back, edit, addPerson, change, run, removeTrip, openSettings }: {
+  t: Trip; superuser: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
   change: (ops: Op[], reason: string) => void; removeTrip: () => void; openSettings: () => void;
 }) {
   return <>
@@ -174,7 +175,7 @@ export function AdminPage({ t, superuser, settings, back, edit, change, run, rem
     <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
       <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
       <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div></div>
-    <PeopleLinks t={t} />
+    <PeopleLinks t={t} add={addPerson} />
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
     {superuser && (t.inbox || maskedToken()) && (

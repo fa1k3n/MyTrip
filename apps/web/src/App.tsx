@@ -198,8 +198,8 @@ export function App() {
   const saveForm = (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
     const f = new FormData(form), str = (k: string) => String(f.get(k) ?? "").trim();
     if (kind === "person") {
-      if (!str("name")) return;
-      change([{ op: "add", path: "travelers/-", value: { id: newId("p"), name: str("name"), packing: [] } }], "add traveler");
+      const name = str("name"); // the same traveler from Summera and the settings (MI-01, AU-26)
+      import("./edit.ts").then((m) => run((x) => m.addTraveler(x, name), "add traveler"));
     } else if (kind === "expense") {
       const payer = self ?? str("paidBy"); // a personal link pays and adds in its own name; the superuser picks who paid (UP-13, AU-13)
       const input = { text: str("text"), amount: str("amount"), category: str("category"), paidBy: payer, sharedBy: t!.travelers.map((x) => x.id), addedBy: payer }; // shared by all; split in Summera (MI-02)
@@ -249,7 +249,7 @@ export function App() {
   </>;
   else if (view === "admin") page = (
     <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      <AdminPage t={t} superuser={permsFor(role, t).superuser} settings={settings} back={() => setView("trip")} edit={setDlg} change={change} run={run} removeTrip={removeTrip}
+      <AdminPage t={t} superuser={permsFor(role, t).superuser} settings={settings} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} run={run} removeTrip={removeTrip}
         openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
     </Suspense>
   );

@@ -1,6 +1,6 @@
 // Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
 import { useEffect, useRef } from "react";
-import { bookingDates, dateBadge, dayTime, kr, timelineStops } from "./format.ts";
+import { bookingDates, dateBadge, dayTime, dayTitle, kr, stopLabel, timelineStops, todayId } from "./format.ts";
 import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickDay } from "./today.ts";
 import { IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
@@ -26,10 +26,11 @@ export function Uppleva(p: TripViewProps) {
   const parts = p.perms.view.up, side = parts.budget !== "hidden" || parts.bookings !== "hidden"; // Uppleva's components (AU-20)
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
   const spent = p.perms.parts.expenses !== "hidden"; // the sum of expenses only when the role may see expenses somewhere
+  const vehicles = [...new Set(day.legs.map((l) => l.vehicle))], now = todayId(t.days, p.today); // UP-14, DC-15
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   return <>
     <div className="tl" ref={tl}>{timelineStops(t).map((x, i) => (
-      <button className="stop" key={`${x.dayId}-${i}`} aria-pressed={marked.has(x)} onClick={() => p.setUpDay(x.dayId)}><b>{x.label}</b><small>{x.sub}</small></button>
+      <button className="stop" key={`${x.dayId}-${i}`} aria-pressed={marked.has(x)} aria-current={x.dayId === now ? "date" : undefined} onClick={() => p.setUpDay(x.dayId)}><b>{stopLabel(x)}</b><small>{x.sub}</small></button>
     ))}</div>
     <div className={`cols ${side ? "" : "one"}`}>
       <div>
@@ -39,8 +40,8 @@ export function Uppleva(p: TripViewProps) {
               <span className="date" aria-hidden="true"><b>{badge.d}</b><span>{badge.w}</span></span>
               <div>
                 {day.date === p.today && <small className="ro" aria-hidden="true">{sv.today}</small>}
-                <h3><span className="sr">{dayHeading(day.date, p.today)}: </span>{day.title}</h3>
-                <div className="dmeta"><CatIcons ids={dayIcons(day)} /><span className="time"><LineIcon shape="clock" /> {dayTime(day)}</span></div>
+                <h3><span className="sr">{dayHeading(day.date, p.today)}: </span>{dayTitle(day)}</h3>
+                <div className="dmeta"><CatIcons ids={dayIcons(day)} /><button className="time when" onClick={() => p.transport(day.id)} aria-label={`${sv.transport}, ${dayTime(day)}`}><LineIcon shape="clock" /> {dayTime(day)}</button></div>
                 <Weather forecast={p.forecast[day.id]} big />
               </div>
             </div>
@@ -50,12 +51,13 @@ export function Uppleva(p: TripViewProps) {
               {next ? <IconButton icon="next" look="bare" tip="left" label={`${sv.nextDay}: ${dayHeading(next.date, p.today)}`} onClick={() => p.setUpDay(next.id)} /> : <span className="navgap" />}
             </span>
           </div>
-          {day.activities.length ? <Activities t={t} x={day} onPlace={p.place} /> : <p className="ro">{sv.noActivities}</p>}
+          {day.activities.length ? <Activities t={t} x={day} onPlace={p.place} edit={p.edit} /> : <p className="ro">{sv.noActivities}</p>}
+          {vehicles.length > 0 && <p><button className="badge linkish" onClick={() => p.transport(day.id)}><CatIcons ids={vehicles} /> {sv.travelTime}</button></p>} {/* as in Nåla (UP-14) */}
         </section>
       </div>
       {side && <div>{/* budget and bookings, if the role may see them (AU-17, AU-21) */}
         {parts.budget !== "hidden" && <section className={`card ${limitClass(t)}`}>
-          <div className="sechead"><h3>{sv.budgetStatus}</h3><LimitIcon t={t} big /></div>
+          <div className="sechead"><h3>{sv.budget}</h3><LimitIcon t={t} big /></div>
           <Donut t={t} />
           <div className="row"><span>{sv.paidAhead}</span><span>{kr(s.paid)}</span></div>
           <div className="row"><span>{sv.leftToPay}</span><span>{kr(s.left)}</span></div>
@@ -64,7 +66,7 @@ export function Uppleva(p: TripViewProps) {
           {canAdd && t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={p.addExpense} tip="right" /></div>}
         </section>}
         {parts.bookings !== "hidden" && <section className="card">
-          <h3>{sv.ticketsToday}</h3>
+          <h3>{sv.bookings}</h3>
           {bookings.length ? bookings.map((b) => {
             return (
               <div className="row mid" key={b.id}>

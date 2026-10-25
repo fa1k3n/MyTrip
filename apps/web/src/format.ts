@@ -50,6 +50,14 @@ export const vehicleIcons = (d: { legs: { vehicle: Vehicle }[] }) =>
 export const routeLabel = (days: { date: string; location?: string }[]) =>
   [...new Set(days.map((d) => d.location).filter((l): l is string => !!l))].join(" → ");
 
+/** A day title, or "Dold rubrik" when it would give away a hidden activity (AU-27). */
+export const dayTitle = (d: { title: string; hiddenTitle?: boolean }) => (d.hiddenTitle ? sv.hiddenTitle : d.title);
+/** A timeline label; the server empties one that would give away a hidden activity (AU-27). */
+export const stopLabel = (s: { label: string }) => s.label || sv.hiddenTitle;
+
+/** The id of the day whose date is today, for marking its card and timeline stop (DC-15). */
+export const todayId = (days: { id: string; date: string }[], today: string) => days.find((d) => d.date === today)?.id;
+
 export function timelineStops<S extends { dayId: string }>(t: { days: { id: string; date: string }[]; stops: S[] }) {
   const date = new Map(t.days.map((d) => [d.id, d.date]));
   return t.stops.filter((s) => date.has(s.dayId)).sort((a, b) => date.get(a.dayId)!.localeCompare(date.get(b.dayId)!));

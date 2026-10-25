@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hiddenFromIn, similarTitles } from "../src/index.ts";
+import { hiddenFromIn, similarTitles, textHiddenFrom } from "../src/index.ts";
 
 // REQ: AU-24 titles are similar when they share a significant word, ignoring case, accents, punctuation, short and generic words
 test("AU-24 similarTitles", () => {
@@ -29,4 +29,15 @@ test("AU-24 hiddenFromIn", () => {
   assert.deepEqual(got.get("c"), ["bo", "anna"]);
   assert.equal(got.get("d"), undefined);
   assert.equal(hiddenFromIn(day([{ id: "x", text: "Bil till Liseberg" }])).size, 0);
+});
+
+// REQ: AU-27 a day's text is hidden from the travelers of the hidden activities it resembles
+test("AU-27 textHiddenFrom", () => {
+  const d = { activities: [
+    { id: "a", text: "Liseberg", placeIds: [], start: "10:00", hiddenFrom: ["anna"] },
+    { id: "b", text: "Lunch på Lisebergs krog", placeIds: [], start: "12:00", hiddenFrom: ["bo"] },
+    { id: "c", text: "Zoo", placeIds: [], start: "15:00" },
+  ] };
+  assert.deepEqual(textHiddenFrom(d, "Göteborg och Liseberg"), ["anna", "bo"]);
+  assert.deepEqual(textHiddenFrom(d, "Zoo i Göteborg"), []);
 });

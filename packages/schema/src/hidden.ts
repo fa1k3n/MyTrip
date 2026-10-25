@@ -35,3 +35,10 @@ export function hiddenFromIn(day: { activities: Act[] }): Map<string, string[]> 
   }
   return out;
 }
+
+/** Whom a text of the day, such as its title, is hidden from: everyone that a hidden activity it resembles is hidden from (AU-27). */
+export function textHiddenFrom(day: { activities: Act[] }, text: string): string[] {
+  const who = hiddenFromIn(day), out: string[] = [];
+  for (const a of day.activities) if (who.has(a.id) && similarTitles(a.text, text)) out.push(...who.get(a.id)!.filter((id) => !out.includes(id)));
+  return out;
+}

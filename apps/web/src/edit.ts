@@ -33,6 +33,13 @@ const allIds = (t: Trip) => [
   ...t.days.flatMap((d) => d.activities),
 ].map((x) => x.id);
 
+/** A new traveler by name, with a readable id unique in the trip (MI-01, AU-26). */
+export function addTraveler(t: Trip, input: string): Result {
+  const name = input.trim();
+  if (!name) return fail(sv.errors.name);
+  return ok([{ op: "add", path: "travelers/-", value: { id: uniqueId(name, allIds(t)), name, packing: [], packed: [] } }]);
+}
+
 export const splitIcons = (s: string) =>
   [...new Intl.Segmenter("sv", { granularity: "grapheme" }).segment(s.replace(/\s+/g, ""))].map((x) => x.segment);
 

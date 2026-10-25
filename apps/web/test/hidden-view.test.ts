@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Trip } from "@trip/schema";
 import { hiddenRows, pickedLabel } from "../src/hiddenView.ts";
+import { dayTitle, stopLabel } from "../src/format.ts";
 
 const t = Trip.parse({ id: "t", revision: 1, title: "T", timezone: "Europe/Stockholm", stops: [], places: [], bookings: [], tasks: [],
   travelers: [{ id: "anna", name: "Anna", packing: [] }, { id: "bo", name: "Bo", packing: [] }],
@@ -26,4 +27,22 @@ test("AU-25 hiddenRows for a day and for one activity", () => {
 test("AU-25 pickedLabel", () => {
   assert.equal(pickedLabel(t, []), "Ingen");
   assert.equal(pickedLabel(t, ["bo", "anna"]), "Anna, Bo");
+});
+
+// REQ: AU-27 the day's eye dialog lists the day's title when it is hidden
+test("AU-27 hiddenRows lists a hidden day title first", () => {
+  const u = structuredClone(t);
+  u.days[0].title = "Till Liseberg";
+  const rows = hiddenRows(u, "d1");
+  assert.deepEqual(rows[0], { id: "", time: "", text: "Till Liseberg", names: "Anna, Bo", like: "Liseberg" });
+  assert.equal(rows.length, 3);
+  assert.deepEqual(hiddenRows(u, "d1", "lb").map((r) => r.id), ["lb"], "one activity's eye lists only that activity");
+});
+
+// REQ: AU-27 a day whose title is hidden shows "Dold rubrik", and so does an emptied timeline label
+test("AU-27 dayTitle and stopLabel", () => {
+  assert.equal(dayTitle({ title: "", hiddenTitle: true }), "Dold rubrik");
+  assert.equal(dayTitle({ title: "Berlin" }), "Berlin");
+  assert.equal(stopLabel({ label: "" }), "Dold rubrik");
+  assert.equal(stopLabel({ label: "Berlin" }), "Berlin");
 });

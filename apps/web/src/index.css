@@ -148,7 +148,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .btn.fab.icon[data-tip]{position:fixed} /* the tooltip rule must not undo the floating button */
 /* Timeline as on the original page: a dot per stop joined by a line (OV-01, OV-07, OV-08). The stops of the shown day are filled (UP-02). */
 .tl{gap:0;padding:12px 2px 6px;margin-bottom:6px;scrollbar-width:thin}
-.stop{flex:0 0 98px;position:relative;background:none;border:0;border-radius:8px;padding:0 4px 4px;text-align:center;color:var(--mute);font-size:.82rem;line-height:1.3}
+.stop{flex:1 0 76px;position:relative;background:none;border:0;border-radius:8px;padding:0 4px 4px;text-align:center;color:var(--mute);font-size:.82rem;line-height:1.3}
 .stop::before{content:"";display:block;width:18px;height:18px;border-radius:50%;background:var(--card);border:4px solid var(--ink);margin:0 auto 6px;position:relative;z-index:1;box-sizing:border-box}
 .stop::after{content:"";position:absolute;top:7px;left:50%;width:100%;height:4px;background:var(--acc)}
 .stop:last-child::after{display:none}
@@ -157,6 +157,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .stop:hover b{color:var(--acct)}
 .stop[aria-pressed=true]::before{background:var(--sage);border-color:var(--sageT)}
 .stop[aria-pressed=true] b{color:var(--sageT)}
+.stop[aria-current=date] small{color:var(--acct);font-weight:700} /* today (DC-15) */
 @media (min-width:1000px){.tl{justify-content:space-between}.stop{flex:1 1 0;min-width:0}}
 /* Line icons at text size for weather and the clock, muted like the rest of the card (WX-08, UI-08). */
 .li{width:1.05em;height:1.05em;vertical-align:-.17em;flex:0 0 auto}
@@ -193,7 +194,7 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .sec>summary .seclock{margin-left:auto;margin-right:4px}.sec>summary h3{margin:0}
 .act .what,.act .what-col{flex:1 1 auto}.act .grip,.act>.icon{flex:none}.act .place{text-align:left}
 /* Phones (RS-01): the day tools get a row of their own under the header so the title keeps its width. */
-@media (max-width:767px){.day .tools{position:static;justify-content:flex-end;padding:0 8px 4px}.day.open .hd{padding-right:14px}}
+@media (max-width:767px){.day .tools{position:static;justify-content:flex-end;padding:0 40px 0 8px;margin-top:-46px;pointer-events:none}.day .tools > *{pointer-events:auto}.day.open .hd{padding-right:14px}}
 /* The edit mode lock sits at the right of the trip title (ED-13); a section's own lock shows only when it is open (ED-18). */
 .titlerow{display:flex;align-items:center;justify-content:space-between;gap:8px}.titlerow h1{min-width:0}
 .sec:not([open])>summary .seclock{display:none}
@@ -290,3 +291,4 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .pfold::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin-top:-4px}
 .pfold[aria-expanded=true]::after{transform:rotate(225deg);margin-top:4px}
 .pfold:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.lock .add:has(> [data-mut]){display:none} /* an add button for editing leaves no gap while its part is locked (UI-09) */

@@ -44,3 +44,8 @@ test("TR-06 TR-08 map and directions links", () => {
   assert.equal(u.searchParams.get("waypoints"), "Rødbyhavn|Puttgarden|Lübeck");
   assert.equal(u.searchParams.get("travelmode"), "driving");
 });
+
+// REQ: AU-28 no route map for a day whose route is hidden
+test("AU-28 a day with a hidden route has no map", () => {
+  assert.equal(routeOf({ ...(day as object), hiddenRoute: true } as never), null);
+});

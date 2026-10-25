@@ -238,3 +238,25 @@ test("AU-27 day texts that give away a hidden activity are hidden", async () => 
     assert.deepEqual([got.days[0].title, got.days[0].hiddenTitle, got.stops[0].label], ["Liseberg!", undefined, "Liseberg"], role);
   }
 });
+
+// REQ: AU-28 a day with an activity hidden from the viewer has no route: the legs lose their places and the traffic check finds no drive
+test("AU-28 the route of a day with a hidden activity is hidden", async () => {
+  const t = trip("berlin");
+  const store = memoryStore([{
+    ...t, days: [{ ...t.days[0], legs: [{ vehicle: "car", origin: "Hemma", destination: "Liseberg", waypoints: ["Ullared"], departure: "09:00", durationMin: 90 }],
+      activities: [{ id: "a1", text: "Överraskning", placeIds: [], start: "10:00", hiddenFrom: ["anna"] }] }],
+  }]);
+  const app = createApp(store, tokens);
+  const secret = (await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret;
+  for (const auth of [await person(app, "anna", "traveler"), `link.berlin.${secret}`]) {
+    const got = await json(call(app, "/api/trips/berlin", auth));
+    assert.deepEqual(got.days[0].legs, [{ vehicle: "car", origin: "", destination: "", waypoints: [], departure: "09:00", durationMin: 90 }], auth);
+    assert.equal(got.days[0].hiddenRoute, true, auth);
+    assert.deepEqual(await json(call(app, "/api/trips/berlin/days/d1/traffic", auth)), { status: "none" }, auth);
+  }
+  for (const role of ["traveler", "planner"]) {
+    const got = await json(call(app, "/api/trips/berlin", await person(app, "bo", role)));
+    assert.deepEqual([got.days[0].legs[0].destination, got.days[0].hiddenRoute], ["Liseberg", undefined], role);
+    assert.deepEqual(await json(call(app, "/api/trips/berlin/days/d1/traffic", await person(app, "bo", role))), { status: "off" }, role);
+  }
+});

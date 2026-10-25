@@ -93,13 +93,15 @@ function linkMayChange(t: Trip, ar: AccessRole, ops: Op[]) {
 }
 type Activity = Trip["days"][number]["activities"][number];
 /** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18).
- * A day's title, summary and timeline label that resemble such an activity are emptied too (AU-27). */
+ * A day's title, summary and timeline label that resemble such an activity are emptied too (AU-27), and the legs of its
+ * day lose their places, so no route map gives it away (AU-28). */
 function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity) => boolean): T {
   const secret = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).flatMap((a) => a.placeIds)));
   if (!t.days.some((d) => d.activities.some(hiddenFor))) return t;
   const gives = (d: Trip["days"][number], text: string) => d.activities.some((a) => hiddenFor(a) && similarTitles(a.text, text));
   const days = t.days.map((d) => ({
     ...d, ...(gives(d, d.title) ? { title: "", hiddenTitle: true } : {}), ...(gives(d, d.summary) ? { summary: "" } : {}),
+    ...(d.activities.some(hiddenFor) ? { legs: d.legs.map(({ origin, destination, waypoints, ...l }) => ({ ...l, origin: "", destination: "", waypoints: [] })), hiddenRoute: true } : {}),
     activities: d.activities.map((a) => (!hiddenFor(a) ? a
       : { id: a.id, text: "", placeIds: [], start: a.start, end: a.end, estimated: a.estimated, durationMin: a.durationMin, hidden: true })),
   }));
@@ -270,7 +272,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return c.body(bytes, 200, { ...headers, "content-type": mime[name.split(".").pop()!] });
   });
   app.get("/api/trips/:id/days/:dayId/traffic", async (c) => {
-    const t = await load(c.req.param("id"));
+    const t = view(await load(c.req.param("id")), c.get("role"), c.get("travelerId")); // a hidden route is not checked (AU-28)
     const day = t.days.find((d) => d.id === c.req.param("dayId"));
     return day ? c.json(await checkTraffic(t, day, opts)) : c.json({ error: "not found" }, 404);
   });

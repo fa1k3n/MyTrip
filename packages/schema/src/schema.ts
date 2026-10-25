@@ -34,6 +34,7 @@ export const Day = z.object({
   legs: z.array(Leg).default([]),
   activities: z.array(Activity),
   hiddenTitle: z.boolean().optional(), // only in what a Resenär or Följare receives: title and summary give away a hidden activity (AU-27)
+  hiddenRoute: z.boolean().optional(), // only in what a Resenär or Följare receives: the legs lost their places, no route map (AU-28)
 });
 export const Booking = z.object({
   id: Id, name: z.string().min(1), from: Date_, to: Date_,

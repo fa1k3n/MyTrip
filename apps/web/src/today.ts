@@ -34,8 +34,11 @@ export const bookingsOn = <B extends { from: string; to: string; status: string 
   bookings.filter((b) => b.status !== "cancelled" && b.from <= date && date <= b.to).map((b) => ({ ...b, startsToday: b.from === date }));
 
 /** Budget status in Uppleva (UP-06). */
-export function budgetStatus(budget: { amount: number; paid: boolean }[], expenses: { amount: number }[]) {
-  const sum = (xs: { amount: number }[]) => Math.round(xs.reduce((a, x) => a + x.amount * 100, 0)) / 100;
+export function budgetStatus(budget: { amount?: number; paid: boolean }[], expenses: { amount?: number }[]) {
+  const sum = (xs: { amount?: number }[]) => Math.round(xs.reduce((a, x) => a + (x.amount ?? 0) * 100, 0)) / 100;
   const planned = sum(budget), paid = sum(budget.filter((b) => b.paid));
   return { planned, paid, left: Math.round((planned - paid) * 100) / 100, spent: sum(expenses) };
 }
+
+/** A task past its due date that is not done (TK-08). */
+export const isOverdue = (k: { done: boolean; due?: string }, today: string) => !k.done && !!k.due && k.due < today;

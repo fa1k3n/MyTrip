@@ -46,7 +46,19 @@ export const Expense = z.object({
 });
 export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional() })
   .refine((p) => p.from !== p.to, { message: "A payment needs two different travelers", path: ["to"] }); // MI-06
-export const BudgetItem = z.object({ id: Id, category: z.string().min(1), amount: z.number().nonnegative(), paid: z.boolean(), owner: z.string().optional() });
+export const BudgetItem = z.object({
+  id: Id, category: z.string().min(1), paid: z.boolean(), owner: z.string().optional(),
+  amount: z.number().nonnegative().optional(), // missing: not checked yet (BG-06)
+  amountMax: z.number().nonnegative().optional(), // upper end of a range, e.g. 75–100 (BG-03)
+  estimate: z.boolean().optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), // default: the trip's currency (BG-07)
+  note: z.string().optional(),
+});
+/** Practical information such as parking options (PI-01..PI-05). */
+export const Info = z.object({
+  id: Id, title: z.string().min(1), text: z.string().default(""), placeId: Id.optional(),
+  unsuitable: z.string().optional(), // the reason when the option does not suit the trip (PI-03)
+  verify: z.boolean().optional(), // from a source that may be out of date (PI-04)
+});
 
 export const Trip = z.object({
   id: Id, revision: z.number().int().nonnegative(), title: z.string(), timezone: z.string(),
@@ -58,6 +70,7 @@ export const Trip = z.object({
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
   expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
+  info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)
   stops: z.array(Stop), days: z.array(Day), places: z.array(Place),
   bookings: z.array(Booking), tasks: z.array(Task), travelers: z.array(Traveler),
 });

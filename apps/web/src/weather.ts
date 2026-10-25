@@ -1,6 +1,9 @@
 // Daily forecast from Open-Meteo (no key, attribution required: WX-15).
-export type Forecast = { code: number; rain: number; tMax: number; wind: number };
-type Daily = { time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; wind_speed_10m_max: number[] };
+export type Forecast = { code: number; rain: number; tMax: number; wind: number; tMin?: number; precip?: number };
+type Daily = {
+  time: string[]; weather_code: number[]; precipitation_probability_max: number[]; temperature_2m_max: number[]; wind_speed_10m_max: number[];
+  temperature_2m_min?: number[]; precipitation_sum?: number[];
+};
 
 const groups: [number[], string, string][] = [
   [[0], "☀️", "Sol"], [[1, 2], "⛅", "Halvklart"], [[3], "☁️", "Mulet"], [[45, 48], "🌫️", "Dimma"],
@@ -18,7 +21,7 @@ export function forecastUrl(points: { lat: number; lon: number }[]) {
   const u = new URL("https://api.open-meteo.com/v1/forecast");
   u.searchParams.set("latitude", points.map((p) => p.lat).join(","));
   u.searchParams.set("longitude", points.map((p) => p.lon).join(","));
-  u.searchParams.set("daily", "weather_code,precipitation_probability_max,temperature_2m_max,wind_speed_10m_max");
+  u.searchParams.set("daily", "weather_code,precipitation_probability_max,temperature_2m_max,wind_speed_10m_max,temperature_2m_min,precipitation_sum");
   u.searchParams.set("wind_speed_unit", "ms");
   u.searchParams.set("timezone", "auto");
   u.searchParams.set("forecast_days", "16");
@@ -29,10 +32,32 @@ export function forecastUrl(points: { lat: number; lon: number }[]) {
 export function parseForecast(json: unknown): Record<string, Forecast>[] {
   const list = (Array.isArray(json) ? json : [json]) as { daily?: Daily }[];
   if (!list.every((x) => x?.daily)) return [];
+  const isNum = (v: unknown): v is number => typeof v === "number";
   return list.map(({ daily: d }) =>
-    Object.fromEntries(d!.time.map((date, i) => [date, { code: d!.weather_code[i], rain: d!.precipitation_probability_max[i], tMax: d!.temperature_2m_max[i], wind: d!.wind_speed_10m_max[i] }])
-      .filter(([, f]) => Object.values(f as Forecast).every((v) => typeof v === "number"))));
+    Object.fromEntries(d!.time.map((date, i) => {
+      const f: Forecast = { code: d!.weather_code[i], rain: d!.precipitation_probability_max[i], tMax: d!.temperature_2m_max[i], wind: d!.wind_speed_10m_max[i] };
+      if (isNum(d!.temperature_2m_min?.[i])) f.tMin = d!.temperature_2m_min![i];
+      if (isNum(d!.precipitation_sum?.[i])) f.precip = d!.precipitation_sum![i];
+      return [date, f] as const;
+    }).filter(([, f]) => [f.code, f.rain, f.tMax, f.wind].every(isNum))));
 }
+
+/** Precipitation with one decimal below 10 mm, as on the original page (WX-04, WX-12). */
+const mm = (x: number) => (x < 10 ? (Math.round(x * 10) / 10).toLocaleString("sv-SE") : n(x)) + " mm";
+
+/** Three rows of [symbol, value] without words (WX-03..WX-07). Missing values are left out, not guessed (DQ-03). */
+export function wxRows(f: Forecast): [string, string][] {
+  return [
+    [weatherSymbol(f.code), f.precip !== undefined ? mm(f.precip) : `${n(f.rain)} %`],
+    ["🌡️", f.tMin !== undefined ? `${n(f.tMin)}/${n(f.tMax)}°` : `${n(f.tMax)}°`],
+    ["💨", n(f.wind)],
+  ];
+}
+
+/** Full text with units, for the tooltip and screen readers (WX-13). */
+export const wxLabel = (f: Forecast) =>
+  `Väder: ${f.tMin !== undefined ? `${n(f.tMin)} till ${n(f.tMax)}` : n(f.tMax)} °C, ` +
+  `${f.precip !== undefined ? `${mm(f.precip)} nederbörd` : `${n(f.rain)} % risk för regn`}, vind ${n(f.wind)} m/s`;
 
 /** Place search of the same provider, used to give a new day its forecast location (ED-04). */
 export function geocodeUrl(name: string) {

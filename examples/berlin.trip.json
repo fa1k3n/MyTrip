@@ -52,13 +52,15 @@
           "vehicle": "car",
           "origin": "Helsingborg",
           "destination": "Helsingborg färjeläge",
-          "waypoints": []
+          "waypoints": [],
+          "durationMin": 10
         },
         {
           "vehicle": "ferry",
           "origin": "Helsingborg",
           "destination": "Helsingör",
-          "waypoints": []
+          "waypoints": [],
+          "durationMin": 20
         }
       ],
       "activities": [
@@ -114,13 +116,15 @@
           "origin": "Köpenhamn",
           "destination": "Rødby",
           "waypoints": [],
-          "departure": "08:30"
+          "departure": "08:30",
+          "durationMin": 150
         },
         {
           "vehicle": "ferry",
           "origin": "Rødby",
           "destination": "Puttgarden",
-          "waypoints": []
+          "waypoints": [],
+          "durationMin": 45
         },
         {
           "vehicle": "car",
@@ -128,7 +132,8 @@
           "destination": "Berlin",
           "waypoints": [
             "Lübeck"
-          ]
+          ],
+          "durationMin": 270
         }
       ],
       "activities": [
@@ -182,7 +187,8 @@
           "vehicle": "transit",
           "origin": "Hotel am Zoo",
           "destination": "Museumsinsel",
-          "waypoints": []
+          "waypoints": [],
+          "durationMin": 25
         }
       ],
       "activities": [
@@ -238,13 +244,15 @@
           "origin": "Berlin",
           "destination": "Rostock Überseehafen",
           "waypoints": [],
-          "departure": "11:00"
+          "departure": "11:00",
+          "durationMin": 180
         },
         {
           "vehicle": "ferry",
           "origin": "Rostock",
           "destination": "Trelleborg",
-          "waypoints": []
+          "waypoints": [],
+          "durationMin": 360
         }
       ],
       "activities": [

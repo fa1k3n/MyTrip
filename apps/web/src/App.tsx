@@ -1,17 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, maskedToken } from "./api.ts";
-import { EditDialog, editTitle, type EditDlg } from "./NalaForms.tsx";
+import { applyOps } from "@trip/schema/src/ops.ts";
+import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
+
+// Dialog contents load on first use, which keeps the page file under 200 KB (PF-01).
+const EditDialog = lazy(() => import("./NalaForms.tsx").then((m) => ({ default: m.EditDialog })));
+const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.PlaceView })));
+const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
-import { TripView, type Tab } from "./TripView.tsx";
+import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
 import { AiSettings, Gear, TripAi } from "./Settings.tsx";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-type Dlg = null | { kind: "place"; name: string; address: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
 const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 
@@ -61,6 +67,7 @@ export function App() {
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [upDay, setUpDay] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
   const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -68,6 +75,11 @@ export function App() {
 
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
   useEffect(() => { load(); api.settings().then(setSettings, () => {}); }, [load]);
+  useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
+    const id = setInterval(() => { if (document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+  useEffect(() => { if (!notice) return; const id = setTimeout(() => setNotice(""), 6000); return () => clearTimeout(id); }, [notice]);
   const saveSettings = (next: Settings) => {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
     api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
@@ -83,6 +95,7 @@ export function App() {
     setErr("");
     if (dlg && !d.open) { opener.current = document.activeElement as HTMLElement; d.showModal(); }
     if (!dlg && d.open) d.close();
+    document.body.style.overflow = dlg ? "hidden" : ""; // PL-14
   }, [dlg]);
   useEffect(() => {
     if (!scrollTo) return;
@@ -124,6 +137,29 @@ export function App() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) { await load(); return sv.conflict; }
       return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
+    }
+  };
+  /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
+  const run: Run = async (build, reason) => {
+    let cur = t!;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = build(cur);
+      if (!Array.isArray(r) && !r.ok) return setNotice(r.error);
+      const ops = Array.isArray(r) ? r : r.ops;
+      setTrips((ts) => ts && ts.map((x) => (x.id === cur.id ? applyOps(x, ops) : x))); // show at once; the reload brings the server's truth
+      try {
+        await api.change(cur, ops, reason);
+        await load();
+        return;
+      } catch (e) {
+        if (attempt === 0 && e instanceof ApiError && e.status === 409) {
+          const fresh = (await api.trips()).find((x) => x.id === cur.id);
+          if (fresh) { cur = fresh; continue; }
+        }
+        setNotice([sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" "));
+        await load();
+        return;
+      }
     }
   };
   const savePayment = (x: Transfer & { note?: string }) =>
@@ -188,7 +224,7 @@ export function App() {
       t={t} cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
-      place={(name, address) => setDlg({ kind: "place", name, address })}
+      place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
@@ -200,17 +236,21 @@ export function App() {
 
   return <>
     <div className="wrap">{page}</div>
+    {notice && <div className="toast" role="alert">{notice}</div>}
     <dialog
-      ref={dialog} aria-label={!dlg ? undefined : dlg.kind === "place" ? dlg.name : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
+      ref={dialog} aria-label={!dlg ? undefined
+        : dlg.kind === "place" ? t?.places.find((x) => x.id === dlg.id)?.name
+        : dlg.kind === "transport" ? sv.transport
+        : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
       onClose={() => { setDlg(null); opener.current?.focus(); }}
       onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
         const r = e.currentTarget.getBoundingClientRect();
         if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) setDlg(null);
       }}
     >
-      {dlg?.kind === "place" && <>
-        <h3>{dlg.name}</h3><p>{dlg.address}</p><div className="map">{sv.mapLoading}</div><button className="btn" onClick={() => setDlg(null)}>{sv.close}</button>
-      </>}
+      <Suspense fallback={<p className="ro">{sv.loading}</p>}>
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={() => setDlg({ kind: "placeEdit", id: dlg.id })} close={() => setDlg(null)} />}
+      {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} close={() => setDlg(null)} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
           <h3>{sv.newDream}</h3>
@@ -220,9 +260,10 @@ export function App() {
           <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
         </form>
       )}
-      {dlg && t && ["trip", "day", "activity", "booking", "budget"].includes(dlg.kind) && (
+      {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
         <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} />
       )}
+      </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
         <form onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
           <h3>{dlgTitle[dlg.kind]}</h3>

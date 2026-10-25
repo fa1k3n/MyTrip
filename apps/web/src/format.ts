@@ -3,7 +3,7 @@ import { sv } from "./sv.ts";
 
 type DayLike = { id: string; date: string; start: string; end: string; estimated: boolean; startEstimated?: boolean; endEstimated?: boolean; location?: string };
 type Vehicle = "car" | "ferry" | "train" | "transit" | "walk";
-type BudgetLike = { category: string; amount: number; paid: boolean };
+type BudgetLike = { category: string; amount?: number; paid: boolean; estimate?: boolean };
 export type Open = Record<string, boolean>;
 
 const parts = (iso: string) => {
@@ -54,11 +54,11 @@ export function timelineStops<S extends { dayId: string }>(t: { days: { id: stri
   return t.stops.filter((s) => date.has(s.dayId)).sort((a, b) => date.get(a.dayId)!.localeCompare(date.get(b.dayId)!));
 }
 
-export const paidTotal = (items: BudgetLike[]) => items.filter((i) => i.paid).reduce((a, i) => a + i.amount, 0);
+export const paidTotal = (items: BudgetLike[]) => items.filter((i) => i.paid && !i.estimate).reduce((a, i) => a + (i.amount ?? 0), 0);
 
 export function budgetByCategory(items: BudgetLike[]): [string, number][] {
   const g = new Map<string, number>();
-  for (const i of items) g.set(i.category, (g.get(i.category) ?? 0) + i.amount);
+  for (const i of items) if (i.amount !== undefined) g.set(i.category, (g.get(i.category) ?? 0) + i.amount);
   return [...g];
 }
 

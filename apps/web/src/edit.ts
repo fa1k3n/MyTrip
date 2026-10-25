@@ -28,7 +28,7 @@ export function uniqueId(name: string, taken: Iterable<string>) {
 
 /** Every id in the trip; ids must be unique across all lists (DM-09). */
 const allIds = (t: Trip) => [
-  ...t.days, ...t.places, ...t.bookings, ...t.tasks, ...t.travelers, ...t.dreams, ...t.budget, ...t.expenses, ...t.payments,
+  ...t.days, ...t.places, ...t.bookings, ...t.tasks, ...t.travelers, ...t.dreams, ...t.budget, ...t.expenses, ...t.payments, ...t.info,
   ...t.days.flatMap((d) => d.activities),
 ].map((x) => x.id);
 
@@ -128,7 +128,10 @@ export function removeActivity(t: Trip, dayId: string, id: string): Op[] {
   return di < 0 ? [] : [{ op: "set", path: `days/${di}/activities`, value: t.days[di].activities.filter((a) => a.id !== id) }];
 }
 
-export type BookingInput = { name: string; from: string; to: string; status: "paid" | "ready" | "cancelled"; reference: string; placeId: string };
+export type BookingInput = {
+  name: string; from: string; to: string; status: "paid" | "ready" | "cancelled"; reference: string; placeId: string;
+  note?: string; // undefined: keep, "": remove (BK-06)
+};
 
 export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const name = input.name.trim();
@@ -140,23 +143,135 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const booking = clean({
     ...old, id: old?.id ?? uniqueId(name, allIds(t)), name, from: input.from, to: input.to, status: input.status,
     reference: input.reference.trim() || undefined, placeId: input.placeId || undefined,
+    note: input.note === undefined ? old?.note : input.note.trim() || undefined,
   });
   return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking }]);
 }
 
 export const removeBooking = (t: Trip, id: string): Op[] => removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]);
 
-export type BudgetInput = { category: string; amount: string; paid: boolean; owner: string };
+export type BudgetInput = {
+  category: string; amount: string; paid: boolean; owner: string;
+  estimate?: boolean; amountMax?: string; currency?: string; note?: string; // BG-03, BG-06, BG-07
+};
 
 export function saveBudgetItem(t: Trip, input: BudgetInput, id?: string): Result {
   const category = input.category.trim();
   if (!category) return fail(sv.errors.category);
-  const amount = parseAmount(input.amount);
-  if (Number.isNaN(amount)) return fail(sv.badAmount);
+  const estimate = !!input.estimate;
+  const amount = input.amount.trim() ? parseAmount(input.amount) : undefined; // an estimate may be "not checked yet"
+  if (amount === undefined ? !estimate : Number.isNaN(amount)) return fail(sv.badAmount);
+  const amountMax = input.amountMax?.trim() ? parseAmount(input.amountMax) : undefined;
+  if (amountMax !== undefined && (Number.isNaN(amountMax) || amount === undefined || amountMax < amount)) return fail(sv.errors.range);
   const i = id ? t.budget.findIndex((b) => b.id === id) : -1;
   const old = t.budget[i];
-  const item = clean({ id: old?.id ?? uniqueId(category, allIds(t)), category, amount, paid: input.paid, owner: input.owner.trim() || undefined });
+  const currency = input.currency && input.currency !== t.currency ? input.currency : undefined;
+  const item = clean({
+    id: old?.id ?? uniqueId(category, allIds(t)), category, amount, amountMax, paid: input.paid,
+    estimate: estimate || undefined, currency, owner: input.owner.trim() || undefined, note: input.note?.trim() || undefined,
+  });
   return ok([old ? { op: "set", path: `budget/${i}`, value: item } : { op: "add", path: "budget/-", value: item }]);
 }
 
 export const removeBudgetItem = (t: Trip, id: string): Op[] => removeAt("budget", [t.budget.findIndex((b) => b.id === id)]);
+
+// --- Tasks (TK-02, TK-03, TK-09)
+
+export function toggleTask(t: Trip, id: string): Op[] {
+  const i = t.tasks.findIndex((k) => k.id === id);
+  return i < 0 ? [] : [{ op: "set", path: `tasks/${i}/done`, value: !t.tasks[i].done }];
+}
+
+export type TaskInput = { text: string; due: string; placeId: string };
+
+export function saveTask(t: Trip, input: TaskInput, id?: string): Result {
+  const text = input.text.trim();
+  if (!text) return fail(sv.errors.taskText);
+  if (input.due && !isDate(input.due)) return fail(sv.errors.date);
+  const i = id ? t.tasks.findIndex((k) => k.id === id) : -1;
+  const old = t.tasks[i];
+  const task = clean({ id: old?.id ?? uniqueId(text, allIds(t)), text, done: old?.done ?? false, due: input.due || undefined, placeId: input.placeId || undefined });
+  return ok([old ? { op: "set", path: `tasks/${i}`, value: task } : { op: "add", path: "tasks/-", value: task }]);
+}
+
+export const removeTask = (t: Trip, id: string): Op[] => removeAt("tasks", [t.tasks.findIndex((k) => k.id === id)]);
+
+// --- Places (PL-17)
+
+export type PlaceInput = { name: string; address: string; phone: string; notes: string; website: string; bookingUrl: string; bookingLabel: string };
+
+/** "niederegger.de" -> "https://niederegger.de"; null when it is not a web address. */
+function webUrl(s: string): string | undefined | null {
+  const v = s.trim();
+  if (!v) return undefined;
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+    return u.hostname.includes(".") ? u.href.replace(/\/$/, v.endsWith("/") ? "/" : "") : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePlace(t: Trip, input: PlaceInput, id?: string): Result {
+  const name = input.name.trim(), address = input.address.trim();
+  if (!name || !address) return fail(sv.errors.place);
+  const website = webUrl(input.website), bookingUrl = webUrl(input.bookingUrl);
+  if (website === null || bookingUrl === null) return fail(sv.errors.url);
+  const i = id ? t.places.findIndex((p) => p.id === id) : -1;
+  const old = t.places[i];
+  const place = clean({
+    id: old?.id ?? uniqueId(name, allIds(t)), name, address, phone: input.phone.trim() || undefined, notes: input.notes.trim() || undefined,
+    website, bookingUrl, bookingLabel: bookingUrl ? input.bookingLabel.trim() || undefined : undefined,
+  });
+  return ok([old ? { op: "set", path: `places/${i}`, value: place } : { op: "add", path: "places/-", value: place }]);
+}
+
+/** Removes the place and every reference to it, so the plan stays valid (DM-09). */
+export function removePlace(t: Trip, id: string): Op[] {
+  const ops: Op[] = [];
+  t.days.forEach((d, di) => {
+    if (d.activities.some((a) => a.placeIds.includes(id)))
+      ops.push({ op: "set", path: `days/${di}/activities`, value: d.activities.map((a) => ({ ...a, placeIds: a.placeIds.filter((p) => p !== id) })) });
+  });
+  for (const [list, items] of [["bookings", t.bookings], ["tasks", t.tasks], ["info", t.info]] as const)
+    items.forEach((x, n) => { if (x.placeId === id) ops.push({ op: "remove", path: `${list}/${n}/placeId` }); });
+  return [...ops, ...removeAt("places", [t.places.findIndex((p) => p.id === id)])];
+}
+
+// --- Practical information (PI-01..PI-05)
+
+export type InfoInput = { title: string; text: string; placeId: string; unsuitable: string; verify: boolean };
+
+export function saveInfo(t: Trip, input: InfoInput, id?: string): Result {
+  const title = input.title.trim();
+  if (!title) return fail(sv.errors.title);
+  const i = id ? t.info.findIndex((x) => x.id === id) : -1;
+  const old = t.info[i];
+  const info = clean({
+    id: old?.id ?? uniqueId(title, allIds(t)), title, text: input.text.trim(), placeId: input.placeId || undefined,
+    unsuitable: input.unsuitable.trim() || undefined, verify: input.verify || undefined,
+  });
+  return ok([old ? { op: "set", path: `info/${i}`, value: info } : { op: "add", path: "info/-", value: info }]);
+}
+
+export const removeInfo = (t: Trip, id: string): Op[] => removeAt("info", [t.info.findIndex((x) => x.id === id)]);
+
+// --- Packing lists (PK-07): "shared" or a traveler id
+
+const packingPath = (t: Trip, list: string) => {
+  if (list === "shared") return "packing";
+  const i = t.travelers.findIndex((x) => x.id === list);
+  return i < 0 ? null : `travelers/${i}/packing`;
+};
+
+export function addPacking(t: Trip, list: string, text: string): Result {
+  const item = text.trim(), path = packingPath(t, list);
+  if (!item) return fail(sv.errors.item);
+  if (!path) return fail(sv.errors.name);
+  return ok([{ op: "add", path: `${path}/-`, value: item }]);
+}
+
+export function removePacking(t: Trip, list: string, index: number): Op[] {
+  const path = packingPath(t, list);
+  return path ? [{ op: "remove", path: `${path}/${index}` }] : [];
+}

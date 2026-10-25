@@ -50,10 +50,10 @@ export function settle(bal: Record<string, number>): Transfer[] {
 }
 
 /** Planned budget against actual expenses per category, in first-seen order (MI-07). */
-export function budgetVsActual(budget: { category: string; amount: number; paid?: boolean }[], expenses: { category: string; amount: number }[]) {
+export function budgetVsActual(budget: { category: string; amount?: number; paid?: boolean }[], expenses: { category: string; amount: number }[]) {
   const rows = new Map<string, { category: string; planned: number; actual: number; over: boolean }>();
   const row = (c: string) => rows.get(c) ?? rows.set(c, { category: c, planned: 0, actual: 0, over: false }).get(c)!;
-  for (const b of budget) row(b.category).planned += ore(b.amount);
+  for (const b of budget) row(b.category).planned += ore(b.amount ?? 0);
   for (const e of expenses) row(e.category).actual += ore(e.amount);
   return [...rows.values()].map((r) => ({ ...r, planned: r.planned / 100, actual: r.actual / 100, over: r.actual > r.planned }));
 }

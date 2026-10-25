@@ -2,26 +2,19 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import type { Op, Trip } from "@trip/schema";
 import {
-  removeActivity, removeBooking, removeBudgetItem, removeDay, saveActivity, saveBooking, saveBudgetItem, saveDay, saveTrip,
+  removeActivity, removeBooking, removeBudgetItem, removeDay, removeInfo, removePlace, removeTask,
+  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip,
   type BookingInput, type Result,
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-export type EditDlg =
-  | { kind: "trip" } | { kind: "day"; id?: string } | { kind: "activity"; dayId: string; id?: string }
-  | { kind: "booking"; id?: string } | { kind: "budget"; id?: string };
+import type { EditDlg } from "./editKinds.ts";
+export type { EditDlg };
 /** Sends the ops; resolves to an error text, or null when saved. */
 export type Save = (ops: Op[], reason: string) => Promise<string | null>;
 type Props = { t: Trip; save: Save; close: () => void };
-
-export const editTitle = (d: EditDlg) =>
-  d.kind === "trip" ? sv.editTrip
-  : d.kind === "day" ? (d.id ? sv.editDay : sv.newDay)
-  : d.kind === "activity" ? (d.id ? sv.editActivity : sv.newActivity)
-  : d.kind === "booking" ? (d.id ? sv.editBooking : sv.newBooking)
-  : d.id ? sv.editCost : sv.newCost;
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
 function useFields<T extends Record<string, string | boolean>>(init: T) {
@@ -140,6 +133,7 @@ function BookingForm(p: Props & { id?: string }) {
   const first = [...p.t.days].sort((x, y) => x.date.localeCompare(y.date))[0]?.date ?? "";
   const { f, text } = useFields({
     name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
+    note: b?.note ?? "",
   });
   return (
     <Form title={p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close}
@@ -154,10 +148,8 @@ function BookingForm(p: Props & { id?: string }) {
         {(Object.keys(sv.statuses) as (keyof typeof sv.statuses)[]).map((k) => <option key={k} value={k}>{sv.statuses[k]}</option>)}
       </select></label>
       <label>{sv.reference}<input {...text("reference")} /></label>
-      <label>{sv.placeLabel}<select {...text("placeId")}>
-        <option value="">{sv.noPlace}</option>
-        {p.t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-      </select></label>
+      <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
+      <label>{sv.description}<textarea {...text("note")} /></label>
     </Form>
   );
 }
@@ -166,7 +158,8 @@ function BudgetForm(p: Props & { id?: string }) {
   const s = useSave(p);
   const b = p.t.budget.find((x) => x.id === p.id);
   const { f, text, check } = useFields({
-    category: b?.category ?? sv.budgetCategories[0], amount: b ? String(b.amount).replace(".", ",") : "", paid: b?.paid ?? false, owner: b?.owner ?? "",
+    category: b?.category ?? sv.budgetCategories[0], amount: b?.amount !== undefined ? String(b.amount).replace(".", ",") : "", paid: b?.paid ?? false, owner: b?.owner ?? "",
+    estimate: b?.estimate ?? false, amountMax: b?.amountMax !== undefined ? String(b.amountMax).replace(".", ",") : "", currency: b?.currency ?? p.t.currency, note: b?.note ?? "",
   });
   const categories = [...new Set([...sv.budgetCategories, ...p.t.budget.map((x) => x.category)])];
   return (
@@ -174,10 +167,77 @@ function BudgetForm(p: Props & { id?: string }) {
       onSubmit={() => s.submit(saveBudgetItem(p.t, f, p.id), p.id ? "edit budget" : "add budget")}
       onRemove={p.id ? () => s.remove(removeBudgetItem(p.t, p.id!), "remove budget") : undefined}>
       <label>{sv.category}<select {...text("category")} autoFocus>{categories.map((c) => <option key={c}>{c}</option>)}</select></label>
-      <label>{sv.amount}<input inputMode="decimal" {...text("amount")} /></label>
+      <label>{sv.description}<input {...text("note")} /></label>
+      <div className="two">
+        <label>{sv.amount.replace(" (kr)", "")}<input inputMode="decimal" {...text("amount")} /></label>
+        <label>{sv.currency}<select {...text("currency")}>{sv.currencies.map((c) => <option key={c}>{c}</option>)}</select></label>
+      </div>
+      <label className="check"><input type="checkbox" {...check("estimate")} />{sv.estimateLabel}</label>
+      {f.estimate && <label>{sv.amountMax}<input inputMode="decimal" {...text("amountMax")} /></label>}
       <label className="check"><input type="checkbox" {...check("paid")} />{sv.paidMark}</label>
       <label>{sv.owner}<input list="owners" {...text("owner")} /></label>
       <datalist id="owners">{p.t.travelers.map((x) => <option key={x.id} value={x.name} />)}</datalist>
+    </Form>
+  );
+}
+
+const PlaceSelect = ({ t, bind }: { t: Trip; bind: { value: string; onChange: (e: Change) => void } }) => (
+  <select {...bind}>
+    <option value="">{sv.noPlace}</option>
+    {t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+  </select>
+);
+
+function TaskForm(p: Props & { id?: string }) {
+  const s = useSave(p);
+  const k = p.t.tasks.find((x) => x.id === p.id);
+  const { f, text } = useFields({ text: k?.text ?? "", due: k?.due ?? "", placeId: k?.placeId ?? "" });
+  return (
+    <Form title={p.id ? sv.editTask : sv.newTask} {...s} close={p.close}
+      onSubmit={() => s.submit(saveTask(p.t, f, p.id), p.id ? "edit task" : "add task")}
+      onRemove={p.id ? () => s.remove(removeTask(p.t, p.id!), "remove task") : undefined}>
+      <label>{sv.what}<input {...text("text")} autoFocus /></label>
+      <label>{sv.due}<input type="date" {...text("due")} /></label>
+      <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
+    </Form>
+  );
+}
+
+function PlaceForm(p: Props & { id?: string }) {
+  const s = useSave(p);
+  const x = p.t.places.find((y) => y.id === p.id);
+  const { f, text } = useFields({
+    name: x?.name ?? "", address: x?.address ?? "", phone: x?.phone ?? "", notes: x?.notes ?? "",
+    website: x?.website ?? "", bookingUrl: x?.bookingUrl ?? "", bookingLabel: x?.bookingLabel ?? "",
+  });
+  return (
+    <Form title={p.id ? sv.editPlace : sv.placeNew} {...s} close={p.close}
+      onSubmit={() => s.submit(savePlace(p.t, f, p.id), p.id ? "edit place" : "add place")}
+      onRemove={p.id ? () => s.remove(removePlace(p.t, p.id!), "remove place") : undefined}>
+      <label>{sv.placeName}<input {...text("name")} autoFocus /></label>
+      <label>{sv.address}<input {...text("address")} /></label>
+      <label>{sv.phone}<input type="tel" {...text("phone")} /></label>
+      <label>{sv.notes}<textarea {...text("notes")} /></label>
+      <label>{sv.website}<input inputMode="url" {...text("website")} /></label>
+      <label>{sv.bookingUrl}<input inputMode="url" {...text("bookingUrl")} /></label>
+      {f.bookingUrl.trim() && <label>{sv.bookingLabel}<input {...text("bookingLabel")} /></label>}
+    </Form>
+  );
+}
+
+function InfoForm(p: Props & { id?: string }) {
+  const s = useSave(p);
+  const x = p.t.info.find((y) => y.id === p.id);
+  const { f, text, check } = useFields({ title: x?.title ?? "", text: x?.text ?? "", placeId: x?.placeId ?? "", unsuitable: x?.unsuitable ?? "", verify: x?.verify ?? false });
+  return (
+    <Form title={p.id ? sv.editInfo : sv.newInfo} {...s} close={p.close}
+      onSubmit={() => s.submit(saveInfo(p.t, f, p.id), p.id ? "edit info" : "add info")}
+      onRemove={p.id ? () => s.remove(removeInfo(p.t, p.id!), "remove info") : undefined}>
+      <label>{sv.title}<input {...text("title")} autoFocus /></label>
+      <label>{sv.description}<textarea {...text("text")} /></label>
+      <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
+      <label>{sv.unsuitableLabel}<input {...text("unsuitable")} /></label>
+      <label className="check"><input type="checkbox" {...check("verify")} />{sv.verifyLabel}</label>
     </Form>
   );
 }
@@ -189,5 +249,8 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "activity": return <ActivityForm {...p} dayId={dlg.dayId} id={dlg.id} />;
     case "booking": return <BookingForm {...p} id={dlg.id} />;
     case "budget": return <BudgetForm {...p} id={dlg.id} />;
+    case "task": return <TaskForm {...p} id={dlg.id} />;
+    case "placeEdit": return <PlaceForm {...p} id={dlg.id} />;
+    case "info": return <InfoForm {...p} id={dlg.id} />;
   }
 }

@@ -55,5 +55,7 @@ const store: Store = {
 };
 
 // AI_API_KEY is only checked for presence here; it never leaves the server (AI-03, MC-13).
-serve({ fetch: createApp(store, tokens, { aiService: !!process.env.AI_API_KEY }).fetch, port: Number(process.env.PORT ?? 8787) });
+// ROUTES_API_KEY (Google Routes API) turns on the traffic check; TRAFFIC_DELAY_MIN is the warning threshold (TR-15, TR-17).
+const trafficThresholdMin = Number(process.env.TRAFFIC_DELAY_MIN ?? 10);
+serve({ fetch: createApp(store, tokens, { aiService: !!process.env.AI_API_KEY, routesKey: process.env.ROUTES_API_KEY, trafficThresholdMin }).fetch, port: Number(process.env.PORT ?? 8787) });
 console.log(`API on http://localhost:${process.env.PORT ?? 8787}, trips in ${dir}`);

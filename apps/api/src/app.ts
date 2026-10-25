@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { Settings, Trip, applyOps, checkTrip, describeError, type Op } from "@trip/schema";
+import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 
 export interface Store {
   list(): Promise<Trip[]>;
@@ -34,7 +35,7 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "trip";
 
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean } = {}) {
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean } & TrafficOpts = {}) {
   const app = new Hono<{ Variables: { role: Role } }>();
   const proposals: Proposal[] = []; // TODO persist (D1)
   const log: object[] = [];         // TODO persist (D1), MC-08
@@ -101,6 +102,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const bytes = name ? await store.image(name) : undefined;
     if (!name || !bytes) return c.json({ error: "not found" }, 404);
     return c.body(bytes, 200, { "content-type": mime[name.split(".").pop()!], "cache-control": "private, max-age=3600" });
+  });
+  app.get("/api/trips/:id/days/:dayId/traffic", async (c) => {
+    const t = await load(c.req.param("id"));
+    const day = t.days.find((d) => d.id === c.req.param("dayId"));
+    return day ? c.json(await checkTraffic(t, day, opts)) : c.json({ error: "not found" }, 404);
   });
   app.get("/api/trips/:id/check", async (c) => c.json({ problems: checkTrip(await load(c.req.param("id"))) }));
   app.get("/api/trips/:id/proposals", (c) => c.json(proposals.filter((p) => p.tripId === c.req.param("id"))));

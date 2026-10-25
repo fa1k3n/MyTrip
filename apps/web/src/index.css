@@ -99,3 +99,41 @@ dialog{max-height:92vh;overflow:auto}
 .day{position:relative}.day .tools{position:absolute;top:8px;right:8px;display:flex;gap:2px}
 .day.open .hd{padding-right:110px}
 .lock .day .tools{display:none}
+/* Day card like the original page: weather under the date, icons on the right, chevron, summary hidden when open (WX-02, DC-06, DC-08, DC-12). */
+:root{--warn:#c62828}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--warn:#ff8a80}}
+.day .hd{cursor:pointer;position:relative;padding-bottom:22px}
+.day .hd::after{content:"";position:absolute;right:18px;bottom:12px;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg)}
+.day.open .hd::after{transform:rotate(225deg);bottom:8px}
+.day.open .hd .sum{display:none}
+.dcol{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;width:62px}
+.txt{flex:1;min-width:0}.ico{font-size:1.4rem;line-height:1.2;white-space:nowrap;flex:0 0 auto}
+.ttl{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.when{background:none;border:0;padding:0;margin:-10px 0;min-height:44px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;display:inline-flex;align-items:center}
+.ttl:focus-visible,.when:focus-visible,.linkish:focus-visible,.sec>summary:focus-visible,.box>summary:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.wxs{display:grid;gap:1px;font-size:.74rem;font-weight:600;line-height:1.3;white-space:nowrap;color:var(--mute)}
+.wxs .wr{display:grid;grid-template-columns:1.4em auto;gap:3px}
+.linkish{border:0;cursor:pointer;font:inherit;font-size:.8rem;color:inherit}
+/* Collapsible side sections (BG-01, PK-02). */
+.sec>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;min-height:28px}
+.sec>summary::-webkit-details-marker,.box>summary::-webkit-details-marker{display:none}
+.sec>summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin:-4px 6px 0 0}
+.sec[open]>summary::after{transform:rotate(225deg);margin-top:4px}.sec[open]>summary{margin-bottom:8px}
+.row.est{color:var(--mute)}.row.off>span:first-child{text-decoration:line-through;color:var(--mute)}
+.note{margin:10px 0 0}
+.todo .check{flex:1}.todo .done{text-decoration:line-through;color:var(--mute)}
+.todo{min-height:44px}.badge.late{background:var(--warn);color:#fff}
+.box{border-top:1px solid var(--line)}.box>summary{list-style:none;cursor:pointer;padding:10px 0;font-weight:600}
+.box ul{list-style:none;margin:0;padding:0 0 6px}.box li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-left:10px}
+.addrow{display:flex;gap:6px;align-items:center;margin-bottom:10px}.addrow input{margin:0}
+/* Place window and transport panel (PL-*, TR-*). */
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.adr{font-weight:600;margin:6px 0;user-select:all}
+.links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0}.links a{color:var(--acct);font-weight:600}
+a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.mapframe{width:100%;height:230px;border:0;border-radius:10px;display:block;margin:10px 0;background:var(--bg)}
+@media (min-width:768px){.mapframe{height:300px}dialog{max-width:560px}}
+.veh{display:flex;align-items:center;gap:12px;margin:6px 0;font-weight:600}.veh .vi{font-size:1.6rem;min-width:2.6rem}
+.tst{margin:10px 0;color:var(--mute)}.tst.warn div{color:var(--warn);font-weight:600}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,520px);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;box-shadow:var(--sh);z-index:20}

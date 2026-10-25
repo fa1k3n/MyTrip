@@ -1,4 +1,5 @@
 import type { Op, Settings, Trip } from "@trip/schema";
+import type { Traffic } from "./transport.ts";
 
 // Dev only: a real login replaces this token.
 const TOKEN = import.meta.env.VITE_TRIP_TOKEN ?? "";
@@ -28,6 +29,7 @@ export const api = {
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),
   change: (t: Trip, ops: Op[], reason: string) =>
     call<unknown>(`${trip(t.id)}/changes`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops, reason }) }),
+  traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
   image: async (id: string) => {

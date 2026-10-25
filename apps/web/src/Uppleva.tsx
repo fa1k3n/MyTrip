@@ -1,7 +1,7 @@
 // Uppleva: one day of the trip, read-only (UP-01..UP-07).
 import { bookingDates, dayTime, kr, timelineStops } from "./format.ts";
 import { bookingsOn, budgetStatus, dayHeading, pickDay } from "./today.ts";
-import { Activities, Weather, type TripViewProps } from "./TripView.tsx";
+import { Activities, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
 import { sv } from "./sv.ts";
 
 export function Uppleva(p: TripViewProps) {
@@ -25,14 +25,13 @@ export function Uppleva(p: TripViewProps) {
         <section className="card">
           <h3>{sv.ticketsToday}</h3>
           {bookings.length ? bookings.map((b) => {
-            const place = t.places.find((x) => x.id === b.placeId);
             return (
               <div className="row" key={b.id}>
                 <span>
-                  {place ? <button className="place" onClick={() => p.place(b.name, place.address)}>{b.name}</button> : b.name}<br />
+                  <PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><br />
                   <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
                 </span>
-                <span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{b.status}</span>
+                <span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span>
               </div>
             );
           }) : <p className="ro">{sv.noBookingsToday}</p>}

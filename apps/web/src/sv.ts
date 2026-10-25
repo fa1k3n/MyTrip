@@ -23,6 +23,11 @@ export const sv = {
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
+  choose: { // PW-16, PW-17
+    remove: (trip: string) => `Ta bort ${trip} från telefonen`,
+    removeAsk: (trip: string) => `Ta bort ${trip} från telefonen? Du behöver länken igen för att öppna resan.`,
+    gone: "En länk gäller inte längre och togs bort från telefonen.",
+  },
   hiddenActivity: "Dold aktivitet", hiddenText: "Dold text", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18, AU-30
   limit: { // BG-13
     near: (used: string, max: string, pct: number, left: string) => `Nära maxbudgeten: ${used} av ${max} (${pct} %). ${left} kvar.`,

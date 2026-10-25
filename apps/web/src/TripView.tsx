@@ -157,6 +157,7 @@ export type TripViewProps = {
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
+  toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
 };
 
 export function TripView(p: TripViewProps) {
@@ -189,8 +190,8 @@ export function TripView(p: TripViewProps) {
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
     expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)} /></Suspense>;
   return <>
-    {(perms.settings || p.who || p.fullApp) && <div className="top">
-      {perms.scoped ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" />}
+    {(perms.settings || p.who || p.fullApp || p.toChooser) && <div className="top">
+      {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}
       <span className="topend">
         {p.who && (p.who.role === "follower"
           ? <span className="who follower">{p.who.name}</span>

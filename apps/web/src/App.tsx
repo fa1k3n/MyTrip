@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, forgetLink, installed, linkKey, type Me } from "./api.ts";
+import { api, ApiError, askedForAdmin, chooseLink, deviceLinks, forgetLink, installed, linkKey, needsChoice, type Me } from "./api.ts";
 import { forInstalled, permsFor, safariUrl } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
@@ -21,6 +21,7 @@ import { Gear, IconButton } from "./Icons.tsx";
 const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
+const Choose = lazy(() => import("./Choose.tsx"));
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 
@@ -66,6 +67,7 @@ function useForecast(trip: Trip | undefined) {
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined: asking, null: no access (AU-07)
   const [expired, setExpired] = useState(false);
+  const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<"portal" | "trip" | "admin" | "settings">("portal");
@@ -85,12 +87,22 @@ export function App() {
   const opener = useRef<HTMLElement | null>(null);
 
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
-  const start = useCallback(() => api.me().then(setMe, (e) => {
-    if (!(e instanceof ApiError && e.status === 401)) return setFailed(true);
-    setExpired(!askedForAdmin && linkKey() !== null); // a link that no longer works (AU-07)
-    forgetLink();
-    setMe(null);
-  }), []);
+  const start = useCallback(function go(): void {
+    if (needsChoice()) { setChoosing(true); return; } // several links on the phone: the start page asks which trip (PW-16)
+    api.me().then(setMe, (e) => {
+      if (!(e instanceof ApiError && e.status === 401)) return setFailed(true);
+      const had = !askedForAdmin && linkKey() !== null; // a link that no longer works (AU-07)
+      forgetLink(); // it leaves the phone (PW-17)
+      if (had && deviceLinks().length) { setNotice(sv.choose.gone); return go(); }
+      setExpired(had);
+      setMe(null);
+    });
+  }, []);
+  /** Opens the trip of one link on the phone, or goes back to choosing one (PW-16). */
+  const pick = (key: string | null) => {
+    chooseLink(key); setMe(undefined); setTrips(null); setView("portal"); setChoosing(false);
+    if (key) start(); else setChoosing(true);
+  };
   useEffect(() => { start(); }, [start]);
   useEffect(() => {
     if (!me) return;
@@ -229,7 +241,8 @@ export function App() {
   };
 
   let page;
-  if (failed) page = <p className="ro">{sv.error}</p>;
+  if (choosing) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Choose onPick={pick} /></Suspense>;
+  else if (failed) page = <p className="ro">{sv.error}</p>;
   else if (me === null) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Login expired={expired} onDone={() => { setExpired(false); start(); }} /></Suspense>;
   else if (!trips) page = <p className="ro">{sv.loading}</p>;
   else if (view === "settings") page = <>
@@ -262,7 +275,7 @@ export function App() {
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
-      addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
+      addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
       edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}

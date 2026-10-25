@@ -294,3 +294,5 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 .pfold[aria-expanded=true]::after{transform:rotate(225deg);margin-top:4px}
 .pfold:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
 .lock .add:has(> [data-mut]){display:none} /* an add button for editing leaves no gap while its part is locked (UI-09) */
+/* PW-16: the start page with the trips of the links on the phone; each card can be removed (PW-17) */
+.tripwrap{position:relative}.tripwrap .rm{position:absolute;bottom:10px;right:10px}.tripwrap .rm .btn.icon{background:var(--card)}

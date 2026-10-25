@@ -60,3 +60,23 @@ export function linkFromText(text: string): string | null {
   const hash = /#[lp]=[^\s]+/.exec(text)?.[0] ?? "";
   return parseLinkHash(hash)?.kind === "link" ? hash : null;
 }
+
+/** The trip of a stored link. */
+export const tripOfLink = (key: string) => key.split(".")[1];
+/** A link without its secret: a renewed link for the same trip and traveler has the same one. */
+const linkOwner = (key: string) => key.split(".").slice(0, -1).join(".");
+/** The phone keeps every link opened on it; a renewed one takes the old one's place (PW-16). */
+export const addLink = (keys: string[], key: string) =>
+  keys.some((k) => linkOwner(k) === linkOwner(key)) ? keys.map((k) => (linkOwner(k) === linkOwner(key) ? key : k)) : [...keys, key];
+export const removeLink = (keys: string[], key: string) => keys.filter((k) => k !== key); // PW-17
+
+const LINKS = "mytrip.links";
+/** Every link in one cookie, which Safari copies to an app added to the home screen (PW-02, PW-16). The server never reads it. */
+export const linksCookie = (keys: string[]) =>
+  `${LINKS}=${keys.join("~")}; Path=/; Secure; SameSite=Strict; Max-Age=${keys.length ? 400 * 24 * 3600 : 0}`;
+export function cookieLinks(cookie: string): string[] {
+  const v = cookie.split(/;\s*/).find((c) => c.startsWith(`${LINKS}=`))?.slice(LINKS.length + 1) ?? "";
+  const keys = v.split("~").filter((k) => parseLinkHash(linkHash(k)));
+  const single = cookieLink(cookie); // the one link of PW-02, before PW-16
+  return single ? addLink(keys, single) : keys;
+}

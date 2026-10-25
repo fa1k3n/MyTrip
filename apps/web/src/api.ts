@@ -1,36 +1,55 @@
 import type { Op, Settings, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { authHeader, cookieLink, linkCookie, parseLinkHash } from "./access.ts";
+import { addLink, authHeader, cookieLinks, linkCookie, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
 const TOKEN = import.meta.env.DEV ? (import.meta.env.VITE_TRIP_TOKEN ?? "") : "";
-const LINK_KEY = "mytrip.link";
-/** The cookie is the copy that reaches an app added to the home screen, whose storage is separate from Safari's (PW-02). */
-const stored = () => { try { return localStorage.getItem(LINK_KEY) ?? cookieLink(document.cookie); } catch { return cookieLink(document.cookie); } };
-const keep = (key: string | null) => { document.cookie = linkCookie(key); };
+const LINK_KEY = "mytrip.link", LINKS_KEY = "mytrip.links";
+const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+/** Every link kept on the phone, in local storage and in the cookie that reaches the installed app, whose storage is
+ * separate from Safari's (PW-02, PW-16). The one link kept before PW-16 is taken along. */
+function storedLinks(): string[] {
+  let keys: string[] = [];
+  try { keys = (JSON.parse(read(LINKS_KEY) ?? "[]") as string[]).filter((k) => parseLinkHash(linkHash(k))); } catch { /* unreadable: start over */ }
+  for (const k of [read(LINK_KEY), ...cookieLinks(document.cookie)]) if (k && parseLinkHash(linkHash(k))) keys = addLink(keys, k);
+  return keys;
+}
+let links = storedLinks();
+const keep = () => {
+  try { localStorage.setItem(LINKS_KEY, JSON.stringify(links)); localStorage.removeItem(LINK_KEY); } catch { /* private mode: for this visit only */ }
+  document.cookie = linksCookie(links);
+  document.cookie = linkCookie(null);
+};
 /** True in the app opened from the home screen (PW-15). */
 export const installed = (navigator as { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches;
 
-/** A share link in the address is kept on the device and removed from the address bar (AU-02). #admin forgets it (AU-23). */
+/** A share link in the address is kept on the device and removed from the address bar (AU-02, PW-16). #admin forgets them all (AU-23, PW-17). */
 const fromUrl = parseLinkHash(location.hash);
 if (fromUrl?.kind === "link") {
-  try { localStorage.setItem(LINK_KEY, fromUrl.key); } catch { /* private mode: the link works for this visit only */ }
-  keep(fromUrl.key);
+  links = addLink(links, fromUrl.key);
+  keep();
   history.replaceState(null, "", location.pathname + location.search);
 }
-if (fromUrl?.kind === "admin") { try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ } keep(null); }
+if (fromUrl?.kind === "admin") { links = []; keep(); }
 // A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
 addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
-let link = fromUrl?.kind === "link" ? fromUrl.key : stored();
+/** The link in use: the one just opened, or the only one on the phone; with several, the start page asks (PW-16). */
+let link = fromUrl?.kind === "link" ? fromUrl.key : links.length === 1 ? links[0] : null;
 /** True when the page was opened with #admin, to reach the admin login from a device that holds a link. */
 export const askedForAdmin = fromUrl?.kind === "admin";
-export const forgetLink = () => { link = null; keep(null); try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ } };
+/** The link in use no longer works: it leaves the phone, and the only one left, if any, is used (AU-07, PW-17). */
+export const forgetLink = () => { if (link) removeDeviceLink(link); link = links.length === 1 ? links[0] : null; };
 /** The link this device uses, to open the same one in Safari (PW-15). */
 export const linkKey = () => (askedForAdmin ? null : link);
+/** The links on the phone, for the start page (PW-16). */
+export const deviceLinks = () => (askedForAdmin ? [] : links);
+export const needsChoice = () => !askedForAdmin && !link && links.length > 1;
+export const chooseLink = (key: string | null) => { link = key; };
+export const removeDeviceLink = (key: string) => { links = removeLink(links, key); if (link === key) link = null; keep(); }; // PW-17
 
-const headers = () => {
-  const a = askedForAdmin ? authHeader(TOKEN, null) : authHeader(TOKEN, link);
+const headers = (key = link) => {
+  const a = askedForAdmin ? authHeader(TOKEN, null) : authHeader(TOKEN, key);
   return { ...(a ? { authorization: a } : {}), "content-type": "application/json" };
 };
 
@@ -45,8 +64,8 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(path, { ...init, headers: headers() });
+async function call<T>(path: string, init: RequestInit = {}, key = link): Promise<T> {
+  const r = await fetch(path, { ...init, headers: headers(key) });
   if (!r.ok) throw new ApiError(r.status, ((await r.json().catch(() => ({}))) as { problems?: string[] }).problems ?? []);
   return (r.status === 204 ? undefined : await r.json()) as T;
 }
@@ -68,6 +87,7 @@ export const api = {
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => call<Trip[]>("/api/trips"),
+  tripsAs: (key: string) => call<Trip[]>("/api/trips", {}, key), // the trip of one link on the phone (PW-16)
   create: (title: string) => call<Trip>("/api/trips", { method: "POST", body: JSON.stringify({ title }) }),
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),
   change: (t: Trip, ops: Op[], reason: string) =>
@@ -75,8 +95,8 @@ export const api = {
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
-  image: async (id: string) => {
-    const r = await fetch(`${trip(id)}/image`, { headers: headers() });
+  image: async (id: string, key = link) => {
+    const r = await fetch(`${trip(id)}/image`, { headers: headers(key) });
     if (!r.ok) throw new Error(`${r.status} image`);
     return URL.createObjectURL(await r.blob());
   },

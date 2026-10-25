@@ -76,3 +76,11 @@ export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date
 /** Who adds the expense: the traveler remembered on this device if still on the trip, else the first (UP-13). */
 export const pickAdder = (travelers: Person[], stored: string | null) =>
   travelers.some((x) => x.id === stored) ? stored! : travelers[0]?.id ?? "";
+
+/** Unhandled expenses wait for a Planerare's approval and are not settled (MI-09, MI-10). */
+export const settled = <E extends { pending?: boolean }>(expenses: E[]) => expenses.filter((e) => !e.pending);
+export const unhandled = <E extends { pending?: boolean }>(expenses: E[]) => expenses.filter((e) => e.pending);
+const at = (t: { expenses: { id: string }[] }, id: string) => t.expenses.findIndex((e) => e.id === id);
+/** Approving removes the mark; rejecting removes the expense (MI-11). */
+export const approveExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}/pending` }]);
+export const rejectExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}` }]);

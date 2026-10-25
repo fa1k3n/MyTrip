@@ -191,7 +191,8 @@ export function TripView(p: TripViewProps) {
   </>;
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
-    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)} /></Suspense>;
+    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
+    approver={perms.superuser || p.who?.role === "planner"} run={p.run} /></Suspense>;
   return <>
     {(perms.settings || p.who || p.fullApp || p.toChooser) && <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}

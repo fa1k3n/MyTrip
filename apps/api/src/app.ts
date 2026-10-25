@@ -135,6 +135,11 @@ function changedPaths(a: unknown, b: unknown, path = ""): string[] {
 /** True when an operation would change or replace something masked for the viewer; ticking a hidden task is fine (AU-30). */
 const touchesMasked = (o: Op, paths: string[]) => !(/^tasks\/\d+\/done$/.test(o.path) && o.op === "set") &&
   paths.some((p) => p === o.path || p.startsWith(`${o.path}/`) || o.path.startsWith(`${p}/`));
+/** True when the change approves an expense: one that was unhandled, or is new, and is not unhandled after it (MI-12). */
+function approvesExpense(before: Trip, after: Trip) {
+  const was = new Map(before.expenses.map((e) => [e.id, !!e.pending]));
+  return after.expenses.some((e) => !e.pending && (was.get(e.id) ?? true));
+}
 /** True when the change hides an activity from the traveler making it, which no one may do (AU-18). */
 function hidesFromSelf(before: Trip, after: Trip, travelerId: string) {
   const was = new Map(before.days.flatMap((d) => d.activities).map((a) => [a.id, a.hiddenFrom ?? []]));
@@ -360,6 +365,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       if (!own) return c.json({ error: "forbidden" }, 403);
       b.ops = own;
     }
+    if (ar === "traveler") b.ops = b.ops.map((o) => (o.op === "add" && o.path === "expenses/-" ? { ...o, value: { ...(o.value as object), pending: true } } : o)); // MI-09
     // Expenses only add to the list, so they go onto the latest revision (PW-08), and one already recorded is not added again (PW-07).
     const onlyExpenses = b.ops.length > 0 && b.ops.every((o) => o.op === "add" && o.path === "expenses/-");
     if (onlyExpenses) {
@@ -374,6 +380,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ ok: false, problems: describeError(e) }, 422); // MC-03
     }
     if (travelerId && hidesFromSelf(t, next, travelerId)) return c.json({ error: "forbidden" }, 403); // AU-18
+    if (ar === "traveler" && approvesExpense(t, next)) return c.json({ error: "forbidden" }, 403); // MI-12
     const hidden = ar && ar !== "planner" ? changedPaths(view(t, c.get("role"), travelerId, false), view(t, c.get("role"), travelerId)) : [];
     if (b.ops.some((o) => touchesMasked(o, hidden))) return c.json({ error: "forbidden" }, 403); // AU-30: no overwriting what one cannot see
     const summary = b.ops.map((o) => `${o.op} ${o.path}`);

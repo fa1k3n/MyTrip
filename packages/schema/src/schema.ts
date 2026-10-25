@@ -57,6 +57,7 @@ export const Expense = z.object({
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
   date: Date_.optional(),
   addedBy: Id.optional(), addedAt: z.string().datetime().optional(), // who added it, among the travelers, and when (UP-13)
+  pending: z.boolean().optional(), // added by a Resenär and not yet approved by a Planerare: not settled (MI-09, MI-10)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
 export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional(), hidden: z.boolean().optional() }) // hidden: AU-30

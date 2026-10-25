@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { forInstalled, permsFor, safariUrl } from "./access.ts";
+import { forInstalled, permsFor, safariUrl, showInstallHint } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
@@ -29,6 +29,7 @@ import { sv } from "./sv.ts";
 type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
 const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
 const ADDER_KEY = "mytrip.adder";
+const HINT_KEY = "mytrip.installHint";
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 
 /** Cover images need the auth header, so they are fetched as blobs. */
@@ -150,6 +151,12 @@ export function App() {
   const covers = useCovers(trips ?? []);
   const [forecast, forecastAt] = useForecast(view === "trip" ? t : undefined);
   const [off, setOff] = useState(offlineState()); // PW-04
+  const [hint, setHint] = useState(() => { // PW-12: once per phone, until closed
+    let closed = false;
+    try { closed = localStorage.getItem(HINT_KEY) === "closed"; } catch { /* storage blocked: shown each visit */ }
+    return showInstallHint(navigator.userAgent, installed, closed);
+  });
+  const closeHint = () => { setHint(false); try { localStorage.setItem(HINT_KEY, "closed"); } catch { /* storage blocked */ } };
   useEffect(() => onOffline(() => setOff(offlineState())), []);
   const today = t ? todayIn(t.timezone) : "";
 
@@ -316,7 +323,9 @@ export function App() {
   );
 
   return <>
-    <div className="wrap">{off && <div className="offline" role="status">{offlineText(off.at, new Date(), t?.timezone ?? "Europe/Stockholm")}</div>}{page}</div>
+    <div className="wrap">{off && <div className="offline" role="status">{offlineText(off.at, new Date(), t?.timezone ?? "Europe/Stockholm")}</div>}
+      {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
+      {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
     <dialog
       ref={dialog} aria-label={!dlg ? undefined

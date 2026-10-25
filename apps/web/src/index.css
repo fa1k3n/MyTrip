@@ -299,3 +299,5 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 /* PW-04: the banner without a network; PW-10: what needs a network gives way to a short explanation */
 .offline{position:sticky;top:8px;z-index:5;margin:0 0 12px;padding:8px 14px;border-radius:10px;background:var(--line);color:var(--ink);font-size:.9rem;text-align:center}
 .mapoff{padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+/* PW-12: the hint on adding the app to the home screen, closed with its X */
+.hint{display:flex;gap:8px;align-items:flex-start;padding:12px 8px 12px 16px;margin-bottom:12px;border-left:5px solid var(--sage)}.hint p{margin:0;flex:1;font-size:.95rem}

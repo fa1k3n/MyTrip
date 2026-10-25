@@ -23,6 +23,7 @@ export const sv = {
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
+  installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
   queue: { // PW-06, PW-09
     waiting: "Ej skickad", failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
     removeAsk: "Ta bort utgiften? Den har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot den (${status}).`,

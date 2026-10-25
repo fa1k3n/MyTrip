@@ -80,3 +80,6 @@ export function cookieLinks(cookie: string): string[] {
   const single = cookieLink(cookie); // the one link of PW-02, before PW-16
   return single ? addLink(keys, single) : keys;
 }
+/** The hint on adding the app to the home screen: in Safari on an iPhone, not installed, until closed (PW-12). */
+export const showInstallHint = (ua: string, installed: boolean, closed: boolean) =>
+  !installed && !closed && /iPhone/.test(ua) && /Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);

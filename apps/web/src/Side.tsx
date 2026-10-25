@@ -9,7 +9,7 @@ import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleT
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { Icon, IconButton } from "./Icons.tsx";
-import { PartLock, PlaceLink, type Run } from "./TripView.tsx";
+import { InfoText, PartLock, PlaceLink, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 
@@ -99,10 +99,7 @@ function Info({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d: Edi
       {!t.info.length && <p className="ro">{sv.noInfo}</p>}
       {t.info.map((x) => (
         <div className="row mid" key={x.id}>
-          <span><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b>
-            {x.text && <><br /><small className="ro">{x.text}</small></>}
-            {x.unsuitable && <><br /><small className="over">{sv.unsuitable}: {x.unsuitable}</small></>}
-            {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
+          <InfoText t={t} x={x} onPlace={onPlace} />
           <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${x.title}`} onClick={() => edit({ kind: "info", id: x.id })} mut />
         </div>
       ))}

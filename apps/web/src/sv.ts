@@ -22,6 +22,7 @@ export const sv = {
   budgetMaxHint: "Planerad budget plus utgifter under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  fullApp: "Öppna hela appen i Safari", // PW-15
   hiddenActivity: "Dold aktivitet", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18
   limit: { // BG-13
     near: (used: string, max: string, pct: number, left: string) => `Nära maxbudgeten: ${used} av ${max} (${pct} %). ${left} kvar.`,
@@ -59,6 +60,7 @@ export const sv = {
     title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut",
     noLink: "Öppna resan med länken du fått, eller logga in som administratör.",
     expired: "Länken gäller inte längre. Be om en ny länk, eller logga in som administratör.",
+    pasteLink: "Klistra in länken du fått", openLink: "Öppna resan", badLink: "Det där är ingen länk till en resa.", // PW-02
     wrong: "Fel lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
   },
   prevDay: "Föregående dag", nextDay: "Nästa dag",

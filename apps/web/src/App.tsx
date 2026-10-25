@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, forgetLink, type Me } from "./api.ts";
-import { permsFor } from "./access.ts";
+import { api, ApiError, askedForAdmin, forgetLink, installed, linkKey, type Me } from "./api.ts";
+import { forInstalled, permsFor, safariUrl } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
@@ -87,7 +87,7 @@ export function App() {
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
   const start = useCallback(() => api.me().then(setMe, (e) => {
     if (!(e instanceof ApiError && e.status === 401)) return setFailed(true);
-    setExpired(!askedForAdmin && localStorage.getItem("mytrip.link") !== null); // a link that no longer works (AU-07)
+    setExpired(!askedForAdmin && linkKey() !== null); // a link that no longer works (AU-07)
     forgetLink();
     setMe(null);
   }), []);
@@ -98,6 +98,8 @@ export function App() {
     if (!permsFor(me.role, {}).scoped) api.settings().then(setSettings, () => {}); // links see no app settings (AU-03, AU-12, AU-14)
   }, [me, load]);
   const role = me?.role ?? "link";
+  /** The pages shown: only Uppleva in the app on the home screen (PW-15). */
+  const pagePerms = (x: Parameters<typeof permsFor>[1]) => (installed ? forInstalled(permsFor(role, x)) : permsFor(role, x));
   const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
     const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
@@ -132,7 +134,7 @@ export function App() {
     const x = trips?.find((y) => y.id === id);
     setTripId(id); setView("trip"); setOpen({}); setUpDay(null); setUnlock(LOCKED);
     const tab = nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala"); // MT-09
-    const allowed = permsFor(role, x ?? {}).pages;
+    const allowed = pagePerms(x ?? {}).pages;
     setTab(allowed.includes(tab) ? tab : allowed[0] ?? "up"); // only the pages the role may see (AU-20)
     window.scrollTo(0, 0);
   };
@@ -263,7 +265,7 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
-      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={permsFor(role, t)} self={self}
+      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal

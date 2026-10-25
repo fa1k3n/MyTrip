@@ -33,6 +33,14 @@ export function PlaceLink({ t, id, text, onPlace }: { t: Trip; id?: string; text
   return <button className="place" onClick={(e) => { e.stopPropagation(); onPlace(p.id); }}>{text ?? p.name}</button>;
 }
 
+/** The text of one piece of practical information, in Nåla and in Uppleva (PI-01..PI-04, UP-15). */
+export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; onPlace: (id: string) => void }) => (
+  <span><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b>
+    {x.text && <><br /><small className="ro">{x.text}</small></>}
+    {x.unsuitable && <><br /><small className="over">{sv.unsuitable}: {x.unsuitable}</small></>}
+    {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
+);
+
 export type Activity = Day["activities"][number];
 
 /** The time with the category icon under it (ED-15). */
@@ -137,6 +145,7 @@ export type TripViewProps = {
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
+  fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
 };
 
 export function TripView(p: TripViewProps) {
@@ -169,13 +178,14 @@ export function TripView(p: TripViewProps) {
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
     expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)} /></Suspense>;
   return <>
-    {(perms.settings || p.who) && <div className="top">
+    {(perms.settings || p.who || p.fullApp) && <div className="top">
       {perms.scoped ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" />}
       <span className="topend">
         {p.who && (p.who.role === "follower"
           ? <span className="who follower">{p.who.name}</span>
           : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
         {perms.settings && <Gear onClick={p.admin} />}
+        {p.fullApp && <IconButton icon="external" label={sv.fullApp} onClick={p.fullApp} tip="left" />}
       </span>
     </div>}
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}

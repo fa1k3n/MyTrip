@@ -1,26 +1,33 @@
 import type { Op, Settings, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { authHeader, parseLinkHash } from "./access.ts";
+import { authHeader, cookieLink, linkCookie, parseLinkHash } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
 const TOKEN = import.meta.env.DEV ? (import.meta.env.VITE_TRIP_TOKEN ?? "") : "";
 const LINK_KEY = "mytrip.link";
-const stored = () => { try { return localStorage.getItem(LINK_KEY); } catch { return null; } };
+/** The cookie is the copy that reaches an app added to the home screen, whose storage is separate from Safari's (PW-02). */
+const stored = () => { try { return localStorage.getItem(LINK_KEY) ?? cookieLink(document.cookie); } catch { return cookieLink(document.cookie); } };
+const keep = (key: string | null) => { document.cookie = linkCookie(key); };
+/** True in the app opened from the home screen (PW-15). */
+export const installed = (navigator as { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches;
 
 /** A share link in the address is kept on the device and removed from the address bar (AU-02). #admin forgets it (AU-23). */
 const fromUrl = parseLinkHash(location.hash);
 if (fromUrl?.kind === "link") {
   try { localStorage.setItem(LINK_KEY, fromUrl.key); } catch { /* private mode: the link works for this visit only */ }
+  keep(fromUrl.key);
   history.replaceState(null, "", location.pathname + location.search);
 }
-if (fromUrl?.kind === "admin") try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ }
+if (fromUrl?.kind === "admin") { try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ } keep(null); }
 // A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
 addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
 let link = fromUrl?.kind === "link" ? fromUrl.key : stored();
 /** True when the page was opened with #admin, to reach the admin login from a device that holds a link. */
 export const askedForAdmin = fromUrl?.kind === "admin";
-export const forgetLink = () => { link = null; try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ } };
+export const forgetLink = () => { link = null; keep(null); try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ } };
+/** The link this device uses, to open the same one in Safari (PW-15). */
+export const linkKey = () => (askedForAdmin ? null : link);
 
 const headers = () => {
   const a = askedForAdmin ? authHeader(TOKEN, null) : authHeader(TOKEN, link);

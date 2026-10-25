@@ -36,3 +36,27 @@ export function permsFor(role: Role, t: { access?: AccessConfig }): Perms {
 }
 /** True when the role may change some component, so Nåla offers edit mode. */
 export const anyWrite = (p: Perms) => Object.values(p.view).some((page) => Object.values(page).some((l) => l === "write"));
+
+/** The installed app on the home screen is for the trip itself and shows only Uppleva (PW-15). */
+export const forInstalled = (p: Perms): Perms => (p.pages.includes("up") ? { ...p, pages: ["up"], settings: false } : p);
+/** The fragment that a stored link came from, the inverse of parseLinkHash. */
+export function linkHash(key: string | null): string {
+  const [kind, ...rest] = key?.split(".") ?? [];
+  return kind === "link" ? `#l=${rest.join(".")}` : kind === "person" ? `#p=${rest.join(".")}` : "";
+}
+/** The full app in Safari with the same link; iPhone opens x-safari- links in Safari, not in the installed app (PW-15). */
+export const safariUrl = (origin: string, key: string | null) => `x-safari-${origin}/${linkHash(key)}`;
+
+const COOKIE = "mytrip.link";
+/** The link is also kept in a cookie, which Safari copies to an app added to the home screen (PW-02). The server never reads it. */
+export const linkCookie = (key: string | null) =>
+  `${COOKIE}=${key ?? ""}; Path=/; Secure; SameSite=Strict; Max-Age=${key ? 400 * 24 * 3600 : 0}`;
+export function cookieLink(cookie: string): string | null {
+  const v = cookie.split(/;\s*/).find((c) => c.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1) ?? "";
+  return parseLinkHash(linkHash(v)) ? v : null;
+}
+/** The fragment of a link pasted into the installed app, when the cookie did not reach it (PW-02); #admin does not count. */
+export function linkFromText(text: string): string | null {
+  const hash = /#[lp]=[^\s]+/.exec(text)?.[0] ?? "";
+  return parseLinkHash(hash)?.kind === "link" ? hash : null;
+}

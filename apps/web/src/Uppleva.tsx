@@ -5,7 +5,7 @@ import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickD
 import { IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
-import { Activities, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
+import { Activities, InfoText, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
@@ -23,7 +23,8 @@ export function Uppleva(p: TripViewProps) {
   const bookings = bookingsOn(t.bookings, day.date);
   const marked = new Set(coveringStops(t, day.id).map((n) => t.stops[n]));
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
-  const parts = p.perms.view.up, side = parts.budget !== "hidden" || parts.bookings !== "hidden"; // Uppleva's components (AU-20)
+  const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && t.info.length > 0; // practical information as in Nåla (UP-15)
+  const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info; // Uppleva's components (AU-20)
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
   const spent = p.perms.parts.expenses !== "hidden"; // the sum of expenses only when the role may see expenses somewhere
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))], now = todayId(t.days, p.today); // UP-14, DC-15
@@ -79,6 +80,10 @@ export function Uppleva(p: TripViewProps) {
             );
           }) : <p className="ro">{sv.noBookingsToday}</p>}
         </section>}
+        {info && <details className="card sec lock">{/* closed at first, read-only (UP-15) */}
+          <summary><h3>{sv.info}</h3></summary>
+          {t.info.map((x) => <div className="row mid" key={x.id}><InfoText t={t} x={x} onPlace={p.place} /></div>)}
+        </details>}
       </div>}
     </div>
   </>;

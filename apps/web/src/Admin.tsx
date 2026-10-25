@@ -1,8 +1,8 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
 import { useEffect, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, maskedToken, type PersonLinkInfo } from "./api.ts";
-import { missingLinks, personUrl, shareUrl } from "./access.ts";
+import { api, ApiError, installed, maskedToken, type PersonLinkInfo } from "./api.ts";
+import { linkFromText, missingLinks, personUrl, shareUrl } from "./access.ts";
 import { DEFAULT_ACCESS, levelsFor, PAGE_PARTS, PAGES, type Level, type Page } from "@trip/schema/src/rules.ts";
 import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
@@ -38,7 +38,24 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
       {err && <p className="err" role="alert">{err}</p>}
       <button className="btn" type="submit" disabled={busy || !pw}>{sv.login.submit}</button>
     </form>
+    {installed && <PasteLink />}
   </>;
+}
+
+/** PW-02: the app on the home screen has storage of its own; if the link did not come along, it is pasted here once. */
+function PasteLink() {
+  const [text, setText] = useState(""), [err, setErr] = useState("");
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const hash = linkFromText(text);
+    if (hash) location.hash = hash; // kept and used at once, as when the link is opened (AU-02, AU-23)
+    else setErr(sv.login.badLink);
+  };
+  return <form className="card" onSubmit={submit}>
+    <label>{sv.login.pasteLink}<input inputMode="url" autoComplete="off" value={text} onChange={(e) => { setText(e.target.value); setErr(""); }} /></label>
+    {err && <p className="err" role="alert">{err}</p>}
+    <button className="btn" type="submit" disabled={!text.trim()}>{sv.login.openLink}</button>
+  </form>;
 }
 
 /** AU-06: the trip's share link, to copy or replace. Replacing it stops the old link at once. */

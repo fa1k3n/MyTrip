@@ -80,7 +80,8 @@
             "torvehallerne"
           ],
           "start": "12:00",
-          "estimated": true
+          "estimated": true,
+          "category": "Mat"
         },
         {
           "id": "a-3",
@@ -89,7 +90,8 @@
             "nyhavn"
           ],
           "start": "15:00",
-          "estimated": true
+          "estimated": true,
+          "category": "Utsikt"
         }
       ]
     },
@@ -153,7 +155,8 @@
             "holstentor"
           ],
           "start": "12:30",
-          "estimated": true
+          "estimated": true,
+          "category": "Mat"
         },
         {
           "id": "a-6",
@@ -199,7 +202,8 @@
             "pergamon"
           ],
           "start": "10:00",
-          "estimated": false
+          "estimated": false,
+          "category": "Museum"
         },
         {
           "id": "a-8",
@@ -208,7 +212,8 @@
             "reichstag"
           ],
           "start": "14:00",
-          "estimated": true
+          "estimated": true,
+          "category": "Utsikt"
         },
         {
           "id": "a-9",
@@ -217,7 +222,8 @@
             "hackescher-markt"
           ],
           "start": "19:00",
-          "estimated": true
+          "estimated": true,
+          "category": "Mat"
         }
       ]
     },

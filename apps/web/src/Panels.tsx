@@ -6,13 +6,14 @@ import { dayTime } from "./format.ts";
 import { directionsUrl, fmtDuration, mapEmbedUrl, routeOf, vehicleTimes, type Traffic } from "./transport.ts";
 import { IconButton } from "./Icons.tsx";
 import { placeView } from "./place.ts";
+import { CatIcons, LineIcon } from "./CatIcon.tsx";
+
+const VEHICLE_IDS: Record<string, string[]> = { "🚗": ["car"], "🚢": ["ferry"], "🚆": ["train"], "🚇🚶": ["transit", "walk"] };
 import { sv } from "./sv.ts";
 
-const Close = ({ close }: { close: () => void }) => <button className="btn ghost" onClick={close}>{sv.close}</button>;
-
-export function PlaceView({ t, id, edit, close }: { t: Trip; id: string; edit: () => void; close: () => void }) {
+export function PlaceView({ t, id, edit }: { t: Trip; id: string; edit: () => void }) {
   const place = t.places.find((x) => x.id === id);
-  if (!place) return <div className="dlgbar"><Close close={close} /></div>;
+  if (!place) return null;
   const v = placeView(place);
   return <>
     <div className="dh"><h3>{v.name}</h3><IconButton icon="edit" look="bare" tip="left" label={sv.editPlace} onClick={edit} mut /></div>
@@ -30,7 +31,6 @@ export function PlaceView({ t, id, edit, close }: { t: Trip; id: string; edit: (
     )}
     {/* Rendered only while the window is open, so the map loads on demand (PL-07, CP-06). */}
     <iframe className="mapframe" title={sv.mapTitle} src={v.embedUrl} loading="lazy" />
-    <div className="dlgbar"><Close close={close} /></div>
   </>;
 }
 
@@ -42,7 +42,7 @@ function trafficLines(x: Traffic | "loading"): { warn: boolean; lines: string[] 
   return { warn: true, lines: [x.delayMin > 0 ? sv.trafficDelay(x.delayMin) : "", x.jam ? sv.trafficJam : ""].filter(Boolean) };
 }
 
-export function TransportView({ t, dayId, close }: { t: Trip; dayId: string; close: () => void }) {
+export function TransportView({ t, dayId }: { t: Trip; dayId: string }) {
   const day = t.days.find((d) => d.id === dayId);
   const route = day ? routeOf(day) : null;
   const [traffic, setTraffic] = useState<Traffic | "loading">("loading");
@@ -52,21 +52,18 @@ export function TransportView({ t, dayId, close }: { t: Trip; dayId: string; clo
     api.traffic(t.id, dayId).then((r) => live && setTraffic(r), () => live && setTraffic({ status: "error" }));
     return () => { live = false; };
   }, [t.id, dayId]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!day) return <div className="dlgbar"><Close close={close} /></div>;
+  if (!day) return null;
   const { warn, lines } = trafficLines(traffic);
   return <>
-    <div className="dh"><h3>🕐 {dayTime(day)}</h3></div>
+    <div className="dh"><h3><LineIcon shape="clock" /> {dayTime(day)}</h3></div>
     {vehicleTimes(day).map((v) => (
-      <div className="veh" key={v.icon}><span className="vi" aria-hidden="true">{v.icon}</span><span className="sr">{sv.vehicleNames[v.icon]}: </span><span>{v.text}</span></div>
+      <div className="veh" key={v.icon}><span className="vi"><CatIcons ids={VEHICLE_IDS[v.icon] ?? []} /></span><span className="sr">{sv.vehicleNames[v.icon]}: </span><span>{v.text}</span></div>
     ))}
     {route && <>
       <div className={`tst ${warn ? "warn" : ""}`} role="status">{lines.map((l) => <div key={l}>{l}</div>)}</div>
       <iframe className="mapframe" title={sv.trafficMapTitle} src={mapEmbedUrl(route)} loading="lazy" />
       <p className="ro">{sv.noBreaks}</p>
     </>}
-    <div className="dlgbar">
-      {route && <a className="btn" href={directionsUrl(route)} target="_blank" rel="noopener">{sv.openRoute}</a>}
-      <Close close={close} />
-    </div>
+    {route && <div className="dlgbar"><a className="btn" href={directionsUrl(route)} target="_blank" rel="noopener">{sv.openRoute}</a></div>}
   </>;
 }

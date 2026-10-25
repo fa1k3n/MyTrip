@@ -13,8 +13,12 @@ import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
-import { AiSettings, Gear, TripAi } from "./Settings.tsx";
-import { IconButton } from "./Icons.tsx";
+import { Gear, IconButton } from "./Icons.tsx";
+
+// The settings views load when first opened (PF-01).
+const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
+const TripAi = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.TripAi })));
+import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 
 type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
@@ -84,7 +88,7 @@ export function App() {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
     api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
   };
-  const aiCard = settings && <AiSettings s={settings} service={settings.aiService} onChange={saveSettings} />;
+  const aiCard = settings && <Suspense fallback={null}><AiSettings s={settings} service={settings.aiService} onChange={saveSettings} /></Suspense>;
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
   const forecast = useForecast(view === "trip" ? t : undefined);
@@ -125,7 +129,8 @@ export function App() {
     const f = new FormData(form), title = String(f.get("title") ?? "").trim();
     if (!title) return;
     const id = `dream-${Date.now().toString(36)}`;
-    change([{ op: "add", path: "dreams/-", value: { id, title, category: String(f.get("category")), source: sv.manual, icon: "✨", votes: 0 } }], "add dream");
+    const category = String(f.get("category"));
+    change([{ op: "add", path: "dreams/-", value: { id, title, category, source: sv.manual, icon: "✨", votes: 0 } }], "add dream");
     setDlg(null);
   };
   /** Edits from the Nåla forms: the error text or null (ED-10). */
@@ -214,8 +219,8 @@ export function App() {
       <h3>{sv.apiKey}</h3><p>{maskedToken()}</p>
     </div>
     {settings && (
-      <TripAi s={settings} on={t.ai} openSettings={() => { setSettingsBack("admin"); setView("settings"); }}
-        onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />
+      <Suspense fallback={null}><TripAi s={settings} on={t.ai} openSettings={() => { setSettingsBack("admin"); setView("settings"); }}
+        onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} /></Suspense>
     )}
     <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>
   </>;
@@ -248,16 +253,16 @@ export function App() {
         if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) setDlg(null);
       }}
     >
+      {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={() => setDlg({ kind: "placeEdit", id: dlg.id })} close={() => setDlg(null)} />}
-      {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} close={() => setDlg(null)} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={() => setDlg({ kind: "placeEdit", id: dlg.id })} />}
+      {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
           <h3>{sv.newDream}</h3>
           <label>{sv.title}<input name="title" autoFocus /></label>
-          <label>{sv.category}<select name="category">{sv.dreamCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
-          <button className="btn" type="submit">{sv.save}</button>{" "}
-          <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
+          <label>{sv.category}<select name="category">{CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
+          <button className="btn" type="submit">{sv.save}</button>
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
@@ -283,8 +288,7 @@ export function App() {
             <label>{sv.note}<input name="note" /></label>
           </>}
           {err && <p className="err" role="alert">{err}</p>}
-          <button className="btn" type="submit">{sv.save}</button>{" "}
-          <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
+          <button className="btn" type="submit">{sv.save}</button>
         </form>
       )}
     </dialog>

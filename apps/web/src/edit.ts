@@ -88,6 +88,7 @@ export const removeDay = (t: Trip, id: string): Op[] => [
 export type ActivityInput = {
   start: string; estimated: boolean; text: string;
   place: { kind: "none" } | { kind: "existing"; id: string } | { kind: "new"; name: string; address: string };
+  category?: string; // undefined: keep, "": none (ED-12)
 };
 
 /** Timed activities in time order, untimed last (ED-05). */
@@ -117,6 +118,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
   const activity: Activity = clean({
     ...old, id: old?.id ?? uniqueId(text, taken), text, placeIds,
     start: input.start || undefined, estimated: !!input.start && input.estimated,
+    category: input.category === undefined ? old?.category : input.category || undefined,
   });
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];
   ops.push({ op: "set", path: `days/${di}/activities`, value: byTime(next) });

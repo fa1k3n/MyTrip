@@ -2,6 +2,8 @@
 import { bookingDates, dayTime, kr, timelineStops } from "./format.ts";
 import { bookingsOn, budgetStatus, dayHeading, pickDay } from "./today.ts";
 import { Activities, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
+import { dayIcons } from "./categories.ts";
+import { CatIcons, LineIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
 
 export function Uppleva(p: TripViewProps) {
@@ -11,14 +13,14 @@ export function Uppleva(p: TripViewProps) {
   const s = budgetStatus(t.budget, t.expenses);
   const bookings = bookingsOn(t.bookings, day.date);
   return <>
-    <div className="tl">{timelineStops(t).map((x) => (
-      <button className="stop" key={x.dayId} aria-pressed={x.dayId === day.id} onClick={() => p.setUpDay(x.dayId)}><b>{x.label}</b><small>{x.sub}</small></button>
+    <div className="tl">{timelineStops(t).map((x, i) => (
+      <button className="stop" key={`${x.dayId}-${i}`} aria-pressed={x.dayId === day.id} onClick={() => p.setUpDay(x.dayId)}><b>{x.label}</b><small>{x.sub}</small></button>
     ))}</div>
     <div className="cols">
       <div>
         <section className="card">
           <h3>{dayHeading(day.date, p.today)}</h3>
-          <p className="ro">{day.title} {day.icons.join("")} · 🕐 {dayTime(day)}</p>
+          <p className="ro">{day.title} <CatIcons ids={dayIcons(day)} /> · <LineIcon shape="clock" /> {dayTime(day)}</p>
           {day.activities.length ? <Activities t={t} x={day} onPlace={p.place} /> : <p className="ro">{sv.noActivities}</p>}
           <Weather forecast={p.forecast[day.id]} />
         </section>

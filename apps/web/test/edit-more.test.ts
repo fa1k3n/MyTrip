@@ -109,3 +109,12 @@ test("PK-07 addPacking and removePacking", () => {
   t = run(t, removePacking(t, "shared", 0));
   assert.deepEqual([t.packing, t.travelers[0].packing], [[], ["Bok till bilen"]]);
 });
+
+// REQ: ED-12 an activity carries a category from the shared list
+test("ED-12 saveActivity with category", async () => {
+  const { saveActivity } = await import("../src/edit.ts");
+  let t = run(trip(), saveActivity(trip(), "d1", { start: "", estimated: false, text: "Holstentor", place: { kind: "none" }, category: "Museum" }));
+  assert.equal(t.days[0].activities.find((a) => a.text === "Holstentor")?.category, "Museum");
+  t = run(t, saveActivity(t, "d1", { start: "", estimated: false, text: "Lunch", place: { kind: "none" }, category: "" }, "a1"));
+  assert.equal(t.days[0].activities.find((a) => a.id === "a1")?.category, undefined);
+});

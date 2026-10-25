@@ -101,7 +101,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const name = (await load(c.req.param("id"))).image;
     const bytes = name ? await store.image(name) : undefined;
     if (!name || !bytes) return c.json({ error: "not found" }, 404);
-    return c.body(bytes, 200, { "content-type": mime[name.split(".").pop()!], "cache-control": "private, max-age=3600" });
+    // MT-12: an image replaced under the same name must show at once, so the browser revalidates with an ETag of the content.
+    const hash = new Uint8Array(await crypto.subtle.digest("SHA-1", bytes));
+    const etag = `"${[...hash].map((b) => b.toString(16).padStart(2, "0")).join("")}"`;
+    const headers = { etag, "cache-control": "private, no-cache" };
+    if (c.req.header("if-none-match") === etag) return c.body(null, 304, headers);
+    return c.body(bytes, 200, { ...headers, "content-type": mime[name.split(".").pop()!] });
   });
   app.get("/api/trips/:id/days/:dayId/traffic", async (c) => {
     const t = await load(c.req.param("id"));

@@ -12,6 +12,7 @@ export const Place = z.object({
 export const Activity = z.object({
   id: Id, text: z.string().min(1), placeIds: z.array(Id).default([]),
   start: Time.optional(), end: Time.optional(), estimated: z.boolean().default(false),
+  category: z.string().min(1).optional(), // same list as the wishes; gives the day its icons (DC-14)
 });
 export const Leg = z.object({
   vehicle: z.enum(["car", "ferry", "train", "transit", "walk"]), origin: z.string().min(1), destination: z.string().min(1),

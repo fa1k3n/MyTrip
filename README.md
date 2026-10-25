@@ -5,7 +5,7 @@ Generic trip planning platform. No personal data lives here: trips are JSON file
 - `packages/schema`: zod schema, pure change engine (`applyOps`) and plan checks (`checkTrip`).
 - `apps/api`: Hono API (read, propose, approve). Runs on Node now; a Cloudflare Worker entry with a D1 store is the next step.
 - `packages/mcp`: MCP server (stdio) so an LLM can read the plan and propose changes.
-- `apps/web`: React + Tailwind v4 front end: start page (Längta) with all trips, trip page with the tabs Drömma (ideas), Nåla (plan), Uppleva (today during the trip) and Summera (shared costs, payments and budget follow-up), admin view. Weather from Open-Meteo.
+- `apps/web`: React + Tailwind v4 front end: start page (Drömmar) with all trips, trip page with the tabs Önska (wishes and votes), Nåla (plan), Uppleva (today during the trip) and Summera (shared costs, payments and budget follow-up), admin view. Weather from Open-Meteo.
 
 ```
 npm install

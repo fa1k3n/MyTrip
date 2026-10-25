@@ -8,6 +8,8 @@ import {
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
 import { IconButton } from "./Icons.tsx";
+import { CATEGORIES } from "./categories.ts";
+import { suggestPurpose } from "./purpose.ts";
 import { sv } from "./sv.ts";
 
 import type { EditDlg } from "./editKinds.ts";
@@ -21,7 +23,8 @@ function useFields<T extends Record<string, string | boolean>>(init: T) {
   const [f, set] = useState(init);
   const text = (k: keyof T) => ({ value: f[k] as string, onChange: (e: Change) => set((o) => ({ ...o, [k]: e.target.value })) });
   const check = (k: keyof T) => ({ checked: f[k] as boolean, onChange: (e: ChangeEvent<HTMLInputElement>) => set((o) => ({ ...o, [k]: e.target.checked })) });
-  return { f, text, check };
+  const setValue = (k: keyof T, v: string | boolean) => set((o) => ({ ...o, [k]: v }));
+  return { f, text, check, set: setValue };
 }
 
 function useSave({ save, close }: Props) {
@@ -48,7 +51,6 @@ function Form({ title, err, busy, close, onSubmit, onRemove, children }: {
       {err && <p className="err" role="alert">{err}</p>}
       <div className="dlgbar">
         <button className="btn" type="submit" disabled={busy}>{sv.save}</button>
-        <button className="btn ghost" type="button" onClick={close}>{sv.cancel}</button>
         {onRemove && <IconButton icon="trash" look="red" tip="up" label={sv.remove} onClick={onRemove} />}
       </div>
     </form>
@@ -57,11 +59,17 @@ function Form({ title, err, busy, close, onSubmit, onRemove, children }: {
 
 function TripForm(p: Props) {
   const s = useSave(p);
-  const { f, text } = useFields({ title: p.t.title, purpose: p.t.purpose });
+  const { f, text, set } = useFields({ title: p.t.title, purpose: p.t.purpose });
+  const suggestion = suggestPurpose(p.t); // MT-11: the plan proposes the purpose, the user decides
   return (
     <Form title={sv.editTrip} {...s} close={p.close} onSubmit={() => s.submit(saveTrip(p.t, f), "edit trip")}>
       <label>{sv.title}<input {...text("title")} autoFocus /></label>
-      <label>{sv.purpose}<textarea {...text("purpose")} /></label>
+      <div className="lblrow">
+        <label htmlFor="purpose">{sv.purpose}</label>
+        {suggestion && <IconButton icon="sparkle" look="bare" tip="left" label={sv.suggestPurpose} onClick={() => set("purpose", suggestion)} />}
+      </div>
+      <textarea id="purpose" rows={4} {...text("purpose")} />
+      <p className="ro note">{suggestion ? sv.purposeHint : sv.noPurposeYet}</p>
     </Form>
   );
 }
@@ -102,18 +110,23 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   const a = p.t.days.find((x) => x.id === p.dayId)?.activities.find((x) => x.id === p.id);
   const { f, text, check } = useFields({
     start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
+    category: a?.category ?? "",
   });
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
     : f.place ? { kind: "existing" as const, id: f.place } : { kind: "none" as const };
   return (
     <Form title={p.id ? sv.editActivity : sv.newActivity} {...s} close={p.close}
-      onSubmit={() => s.submit(saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place }, p.id), p.id ? "edit activity" : "add activity")}
+      onSubmit={() => s.submit(saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category }, p.id), p.id ? "edit activity" : "add activity")}
       onRemove={p.id ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
       <div className="two">
         <label>{sv.time}<input type="time" {...text("start")} /></label>
         <label className="check"><input type="checkbox" {...check("estimated")} />{sv.estimate}</label>
       </div>
+      <label>{sv.category}<select {...text("category")}>
+        <option value="">{sv.noCategory}</option>
+        {CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
+      </select></label>
       <label>{sv.placeLabel}<select {...text("place")}>
         <option value="">{sv.noPlace}</option>
         {p.t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

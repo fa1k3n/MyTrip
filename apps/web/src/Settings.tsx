@@ -3,9 +3,6 @@ import type { AiArea, Settings } from "@trip/schema";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-export const Gear = ({ onClick }: { onClick: () => void }) =>
-  <IconButton icon="settings" label={sv.settings} onClick={onClick} mut tip="left" />;
-
 /** On/off switch with an explanation shown on hover or keyboard focus, and read by screen readers. */
 export function Switch({ id, label, tip, checked, onChange }: { id: string; label: string; tip: string; checked: boolean; onChange: (on: boolean) => void }) {
   return (

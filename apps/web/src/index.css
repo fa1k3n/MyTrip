@@ -253,6 +253,8 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 /* AU-25: only an eye marks a hidden activity or a closed day with hidden activities; it opens whom it is hidden from */
 .eye{display:inline-flex;vertical-align:middle;margin-left:4px;color:var(--acct)}.eye .btn.icon{min-width:32px;min-height:32px;padding:4px;color:var(--acct)}.eye svg{width:18px;height:18px}
 .ico .eye{margin:0 4px 0 0}
+/* AU-29: the eye of a hidden day title sits to the right of the title, also when the title wraps */
+h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px 0 -4px 2px;flex:none}
 .multi{position:relative;margin:4px 0 6px}.multi summary{list-style:none;cursor:pointer;padding:9px 34px 9px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);position:relative}
 .multi summary::-webkit-details-marker{display:none}.multi summary::after{content:"\25BE";position:absolute;right:12px;color:var(--mute)}
 .multi .menu{position:absolute;z-index:5;left:0;right:0;margin-top:4px;padding:6px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgb(0 0 0/.12)}

@@ -1,7 +1,7 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
 import { lazy, Suspense } from "react";
 import type { Op, Trip } from "@trip/schema";
-import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, toggleAllLabel, tripDates, type Open } from "./format.ts";
+import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
 import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
@@ -49,7 +49,7 @@ export function ActivityWhen({ a }: { a: Activity }) {
 }
 
 /** An eye naming the travelers something is hidden from; it opens the list of whom when it can (AU-25). */
-function Eye({ t, who, open }: { t: Trip; who: string[]; open?: () => void }) {
+export function Eye({ t, who, open }: { t: Trip; who: string[]; open?: () => void }) {
   const label = sv.hiddenMark(t.travelers.filter((x) => who.includes(x.id)).map((x) => x.name).join(", "));
   return open ? <span className="eye" onClick={(e) => e.stopPropagation()}><IconButton icon="eyeoff" look="bare" label={label} onClick={open} /></span>
     : <span className="eye" role="img" aria-label={label} title={label}><Icon name="eyeoff" /></span>;
@@ -104,6 +104,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
   const hid = [...new Set([...hiddenFromIn(x).values()].flat())]; // a closed day shows an eye for its hidden activities (AU-25)
+  const titleWho = titleHiddenFrom(x); // a title that resembles one has the eye instead, opening the same list (AU-29)
   return (
     <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"}`} id={`day-${x.id}`}>
       {/* The whole header toggles on click; the title is the keyboard control (DC-09). The clock opens transport and does not toggle (TM-04). */}
@@ -111,11 +112,12 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
         <div className="dcol"><div className="date"><b>{badge.d}</b><span>{badge.w}</span></div><Weather forecast={forecast} /></div>
         <div className="txt">
           {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
-          <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button></h3>
+          <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button>
+            {titleWho.length > 0 && <Eye t={t} who={titleWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</h3>
           <div className="sum">{x.summary}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
         </div>
-        <span className="ico">{!open && hid.length > 0 && <Eye t={t} who={hid} open={() => edit({ kind: "hidden", dayId: x.id })} />}<CatIcons ids={dayIcons(x)} /></span>
+        <span className="ico">{!open && hid.length > 0 && !titleWho.length && <Eye t={t} who={hid} open={() => edit({ kind: "hidden", dayId: x.id })} />}<CatIcons ids={dayIcons(x)} /></span>
       </div>
       {open && (
         <div className="tools">

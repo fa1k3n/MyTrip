@@ -1,5 +1,6 @@
 // Pure display logic. Kept free of React so it runs under node --test.
 import { sv } from "./sv.ts";
+import { textHiddenFrom } from "@trip/schema/src/hidden.ts";
 
 type DayLike = { id: string; date: string; start: string; end: string; estimated: boolean; startEstimated?: boolean; endEstimated?: boolean; location?: string };
 type Vehicle = "car" | "ferry" | "train" | "transit" | "walk";
@@ -52,6 +53,9 @@ export const routeLabel = (days: { date: string; location?: string }[]) =>
 
 /** A day title, or "Dold rubrik" when it would give away a hidden activity (AU-27). */
 export const dayTitle = (d: { title: string; hiddenTitle?: boolean }) => (d.hiddenTitle ? sv.hiddenTitle : d.title);
+/** Whom the day title is hidden from, for its eye (AU-27, AU-29); none when the title already reached the viewer hidden. */
+export const titleHiddenFrom = (d: Parameters<typeof textHiddenFrom>[0] & { title: string; hiddenTitle?: boolean }) =>
+  (d.hiddenTitle ? [] : textHiddenFrom(d, d.title));
 /** A timeline label; the server empties one that would give away a hidden activity (AU-27). */
 export const stopLabel = (s: { label: string }) => s.label || sv.hiddenTitle;
 

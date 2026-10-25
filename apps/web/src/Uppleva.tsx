@@ -1,11 +1,11 @@
 // Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
 import { useEffect, useRef } from "react";
-import { bookingDates, dateBadge, dayTime, dayTitle, kr, stopLabel, timelineStops, todayId } from "./format.ts";
+import { bookingDates, dateBadge, dayTime, dayTitle, kr, stopLabel, timelineStops, titleHiddenFrom, todayId } from "./format.ts";
 import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickDay } from "./today.ts";
 import { IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
-import { Activities, InfoText, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
+import { Activities, Eye, InfoText, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
@@ -28,6 +28,7 @@ export function Uppleva(p: TripViewProps) {
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
   const spent = p.perms.parts.expenses !== "hidden"; // the sum of expenses only when the role may see expenses somewhere
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))], now = todayId(t.days, p.today); // UP-14, DC-15
+  const titleWho = titleHiddenFrom(day); // AU-29
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   return <>
     <div className="tl" ref={tl}>{timelineStops(t).map((x, i) => (
@@ -41,7 +42,8 @@ export function Uppleva(p: TripViewProps) {
               <span className="date" aria-hidden="true"><b>{badge.d}</b><span>{badge.w}</span></span>
               <div>
                 {day.date === p.today && <small className="ro" aria-hidden="true">{sv.today}</small>}
-                <h3><span className="sr">{dayHeading(day.date, p.today)}: </span>{dayTitle(day)}</h3>
+                <h3><span className="sr">{dayHeading(day.date, p.today)}: </span>{dayTitle(day)}
+                  {titleWho.length > 0 && <Eye t={t} who={titleWho} open={p.edit && (() => p.edit!({ kind: "hidden", dayId: day.id }))} />}</h3>
                 <div className="dmeta"><CatIcons ids={dayIcons(day)} /><button className="time when" onClick={() => p.transport(day.id)} aria-label={`${sv.transport}, ${dayTime(day)}`}><LineIcon shape="clock" /> {dayTime(day)}</button></div>
                 <Weather forecast={p.forecast[day.id]} big />
               </div>

@@ -68,6 +68,16 @@ for (const [name, make] of stores) {
     assert.deepEqual((await s.log()).map((e) => e.reason), ["a", "b"]);
   });
 
+  test(`AU-11 ${name} store keeps personal links`, async () => {
+    const s = await make();
+    assert.deepEqual(await s.personLinks(), []);
+    const l = [{ tripId: "berlin", travelerId: "anna", secret: "s1", role: "planner" as const }, { tripId: "berlin", travelerId: "bo", secret: "s2", role: "traveler" as const }];
+    await s.savePersonLinks(l);
+    assert.deepEqual(await s.personLinks(), l);
+    await s.savePersonLinks([l[1]]);
+    assert.deepEqual(await s.personLinks(), [l[1]]);
+  });
+
   test(`DP-06 ${name} store keeps settings, links and images`, async () => {
     const s = await make();
     assert.equal((await s.loadSettings()).ai.enabled, false);

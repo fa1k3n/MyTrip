@@ -145,6 +145,7 @@ export type ActivityInput = {
   category?: string; // undefined: keep, "": none (ED-12)
   durationMin?: number; // undefined: keep (ED-15)
   note?: string; // undefined: keep, "": remove (ED-19)
+  hiddenFrom?: string[]; // undefined: keep, []: shown to everyone (AU-18)
 };
 
 /** Timed activities in time order, untimed last (ED-05). */
@@ -177,6 +178,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     category: input.category === undefined ? old?.category : input.category || undefined,
     durationMin: input.durationMin ?? old?.durationMin,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
+    hiddenFrom: input.hiddenFrom === undefined ? old?.hiddenFrom : input.hiddenFrom.length ? input.hiddenFrom : undefined,
     end: input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];

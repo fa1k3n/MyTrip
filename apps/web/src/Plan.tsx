@@ -54,7 +54,7 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
         );
         const a = r.a, i = ++n, miss = missing(a);
         return (
-          <div key={a.id} className={`act drag ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
+          <div key={a.id} className={`act drag ${a.hiddenFrom?.length ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
             draggable onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => { dragging = null; setOver(null); }}
             onDragOver={(e) => { accept(e); e.stopPropagation(); setOver(posFor(e, i)); }}

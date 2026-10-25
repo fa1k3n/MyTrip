@@ -1,4 +1,5 @@
 import { z, ZodError } from "zod";
+import { AccessConfig } from "./access.ts";
 
 const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/);
 const Time = z.string().regex(/^\d\d:\d\d$/);
@@ -15,6 +16,8 @@ export const Activity = z.object({
   start: Time.optional(), end: Time.optional(), estimated: z.boolean().default(false),
   durationMin: z.number().int().positive().optional(), // estimated length; a fixed `end` wins (DM-13)
   category: z.string().min(1).optional(), // same list as the wishes; gives the day its icons (DC-14)
+  hiddenFrom: z.array(Id).optional(), // the travelers it is hidden from, e.g. a surprise for the children (AU-18)
+  hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: hidden from them, title and places removed (AU-18)
 });
 export const Leg = z.object({
   vehicle: z.enum(["car", "ferry", "train", "transit", "walk"]), origin: z.string().min(1), destination: z.string().min(1),
@@ -76,6 +79,7 @@ export const Trip = z.object({
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)
+  access: AccessConfig.optional(), // what each role may see and change; missing: the defaults (AU-20)
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
   expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
   info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)

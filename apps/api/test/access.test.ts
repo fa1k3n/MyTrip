@@ -84,27 +84,25 @@ test("AU-03 a link shows only its own trip, without booking references, and no s
   const key = `link.berlin.${await makeLink(app, "berlin")}`;
   const list = await (await call(app, "/api/trips", { auth: key })).json();
   assert.deepEqual(list.map((t: { id: string }) => t.id), ["berlin"]);
-  assert.equal(list[0].bookings[0].reference, undefined);
   assert.equal((await call(app, "/api/trips/skane", { auth: key })).status, 404);
   assert.equal((await call(app, "/api/settings", { auth: key })).status, 403);
   assert.equal((await call(app, "/api/trips/berlin/link", { auth: key })).status, 403);
 });
 
-test("AU-03 a link may tick tasks and packing items and nothing else", async () => {
+test("AU-03 the common link is read-only: the server rejects every change", async () => {
   const { app, store } = setup();
   const key = `link.berlin.${await makeLink(app, "berlin")}`;
-  const change = (baseRevision: number, ops: unknown[]) => call(app, "/api/trips/berlin/changes", { method: "POST", auth: key, body: { baseRevision, ops, reason: "tick" } });
-  assert.equal((await change(1, [{ op: "set", path: "tasks/0/done", value: true }])).status, 200);
-  assert.equal((await change(2, [{ op: "set", path: "packed", value: ["Laddare"] }, { op: "set", path: "travelers/0/packed", value: ["Pass"] }])).status, 200);
-  const t = (await store.load("berlin"))!;
-  assert.deepEqual([t.tasks[0].done, t.packed, t.travelers[0].packed, t.revision], [true, ["Laddare"], ["Pass"], 3]);
+  const change = (ops: unknown[]) => call(app, "/api/trips/berlin/changes", { method: "POST", auth: key, body: { baseRevision: 1, ops, reason: "tick" } });
   for (const ops of [
+    [{ op: "set", path: "tasks/0/done", value: true }],
+    [{ op: "set", path: "packed", value: ["Laddare"] }],
+    [{ op: "set", path: "travelers/0/packed", value: ["Pass"] }],
     [{ op: "set", path: "title", value: "Kapad" }],
-    [{ op: "set", path: "tasks/0/text", value: "Annat" }],
-    [{ op: "set", path: "tasks/0/done", value: true }, { op: "remove", path: "bookings/0" }],
     [{ op: "add", path: "packing/-", value: "Mer" }],
-  ]) assert.equal((await change(3, ops)).status, 403, JSON.stringify(ops));
-  assert.equal((await store.load("berlin"))!.title, "berlin");
+    [{ op: "add", path: "expenses/-", value: { id: "e1", text: "Glass", category: "Övrigt", amount: 60, paidBy: "anna", addedBy: "anna" } }],
+  ]) assert.equal((await change(ops)).status, 403, JSON.stringify(ops));
+  const t = (await store.load("berlin"))!;
+  assert.deepEqual([t.revision, t.tasks[0].done, t.title, t.expenses.length], [1, false, "berlin", 0]);
 });
 
 test("AU-07 no link, an unknown link or a link to another trip gives 401", async () => {
@@ -118,4 +116,30 @@ test("AU-07 no link, an unknown link or a link to another trip gives 401", async
 test("AU-09 the MCP tokens keep working", async () => {
   const { app } = setup();
   assert.deepEqual(await (await call(app, "/api/me", { auth: "p" })).json(), { role: "propose" });
+});
+
+// REQ: AU-17 the common link gets no budget, expenses, payments or bookings from the server
+test("AU-17 a Följare does not see money or bookings", async () => {
+  const store = memoryStore([{ ...trip("berlin"), budgetMax: 9000, budget: [{ id: "b1", category: "Boende", amount: 5000, paid: true }],
+    expenses: [{ id: "e1", text: "Glass", category: "Övrigt", amount: 60, paidBy: "anna" }], payments: [] }]);
+  const app = createApp(store, tokens, { auth });
+  const key = `link.berlin.${await makeLink(app, "berlin")}`;
+  for (const path of ["/api/trips/berlin", "/api/trips"]) {
+    const body = await (await call(app, path, { auth: key })).json();
+    const t = Array.isArray(body) ? body[0] : body;
+    assert.deepEqual([t.bookings, t.budget, t.expenses, t.payments, t.budgetMax], [[], [], [], [], undefined], path);
+    assert.equal(t.days.length, 1);
+  }
+  const admin = await (await call(app, "/api/trips/berlin", { auth: "a" })).json();
+  assert.deepEqual([admin.bookings.length, admin.budget.length, admin.expenses.length, admin.budgetMax], [1, 1, 1, 9000]);
+});
+
+// REQ: AU-19 a Följare only gets what Uppleva shows: no wishes, tasks, practical information or packing lists
+test("AU-19 a Följare gets no wishes, tasks, info or packing", async () => {
+  const store = memoryStore([{ ...trip("berlin"), dreams: [{ id: "w1", title: "Zoo", category: "Natur", source: "x", icon: "🦁", votes: 1 }],
+    info: [{ id: "i1", title: "Parkering" }] }]);
+  const app = createApp(store, tokens, { auth });
+  const t = await (await call(app, "/api/trips/berlin", { auth: `link.berlin.${await makeLink(app, "berlin")}` })).json();
+  assert.deepEqual([t.dreams, t.tasks, t.info, t.packing, t.packed, t.travelers[0].packing, t.travelers[0].packed], [[], [], [], [], [], [], []]);
+  assert.deepEqual([t.days.length, t.travelers[0].name], [1, "Anna"]);
 });

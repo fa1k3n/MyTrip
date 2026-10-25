@@ -1,7 +1,7 @@
-// The store on Cloudflare: trips, settings, links, proposals, the log and cover images in D1 (DP-03..DP-06).
+// The store on Cloudflare: trips, settings, links, personal links, proposals, the log and cover images in D1 (DP-03..DP-06).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import type { LogEntry, Proposal, Store } from "./app.ts";
+import type { LogEntry, PersonLink, Proposal, Store } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -68,6 +68,15 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
     },
     async saveLinks(l) {
       await db.batch([db.prepare("DELETE FROM links"), ...Object.entries(l).map(([id, s]) => db.prepare("INSERT INTO links (trip_id, secret) VALUES (?, ?)").bind(id, s))]);
+    },
+    async personLinks() {
+      const { results } = await db.prepare("SELECT trip_id, traveler_id, secret, role FROM person_links ORDER BY trip_id, traveler_id")
+        .all<{ trip_id: string; traveler_id: string; secret: string; role: PersonLink["role"] }>();
+      return results.map((r) => ({ tripId: r.trip_id, travelerId: r.traveler_id, secret: r.secret, role: r.role }));
+    },
+    async savePersonLinks(l) {
+      await db.batch([db.prepare("DELETE FROM person_links"),
+        ...l.map((x) => db.prepare("INSERT INTO person_links (trip_id, traveler_id, secret, role) VALUES (?, ?, ?, ?)").bind(x.tripId, x.travelerId, x.secret, x.role))]);
     },
     async proposals(tripId) {
       const { results } = await db.prepare("SELECT json FROM proposals WHERE trip_id = ? ORDER BY at, id").bind(tripId).all<{ json: string }>();

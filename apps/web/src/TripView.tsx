@@ -7,7 +7,7 @@ import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
 import type { Transfer } from "./money.ts";
-import { Gear, IconButton } from "./Icons.tsx";
+import { Gear, Icon, IconButton } from "./Icons.tsx";
 import { CatIcon, CatIcons, ICONS, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Summera load when their tab is first opened (PF-01).
@@ -16,6 +16,8 @@ const Summera = lazy(() => import("./Summera.tsx").then((m) => ({ default: m.Sum
 const Side = lazy(() => import("./Side.tsx"));
 const PlanActivities = lazy(() => import("./Plan.tsx")); // edit mode only (ED-16)
 import type { EditDlg } from "./editKinds.ts";
+import { anyWrite, type Perms } from "./access.ts";
+import { atLeast } from "@trip/schema/src/rules.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
@@ -37,12 +39,15 @@ export function ActivityWhen({ a }: { a: Activity }) {
   return <span className="when-col"><time>{activityTime(a)}</time>{a.category && categoryIcon(a.category) && <CatIcon id={a.category} />}</span>;
 }
 
-/** The short title, then the places and the note on lines of their own (ED-19). */
+/** The short title, then the places and the note on lines of their own (ED-19). A hidden activity reaches a Resenär or
+ * Följare without its title and shows as "Dold aktivitet"; a Planerare sees the title marked as hidden (AU-18). */
 export function ActivityText({ t, a, onPlace }: { t: Trip; a: Activity; onPlace: (id: string) => void }) {
+  if (a.hidden && !a.text) return <span className="what"><span className="name hiddenact"><Icon name="eyeoff" />{sv.hiddenActivity}</span></span>;
   const one = a.placeIds.length === 1;
   return (
     <span className="what">
-      <span className="name">{one ? <PlaceLink t={t} id={a.placeIds[0]} text={a.text} onPlace={onPlace} /> : a.text}</span>
+      <span className="name">{one ? <PlaceLink t={t} id={a.placeIds[0]} text={a.text} onPlace={onPlace} /> : a.text}
+        {!!a.hiddenFrom?.length && <span className="badge hidebadge"><Icon name="eyeoff" />{sv.hiddenMark(a.hiddenFrom.map((id) => t.travelers.find((x) => x.id === id)?.name ?? id).join(", "))}</span>}</span>
       {!one && a.placeIds.length > 0 && <small className="places">{a.placeIds.map((id, n) => <span key={id}>{n ? ", " : ""}<PlaceLink t={t} id={id} onPlace={onPlace} /></span>)}</small>}
       {a.note && <small className="ro anote">{a.note}</small>}
     </span>
@@ -51,7 +56,7 @@ export function ActivityText({ t, a, onPlace }: { t: Trip; a: Activity; onPlace:
 
 export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
   return <>{x.activities.map((a) => (
-    <div className="act" key={a.id}>
+    <div className={`act ${a.hiddenFrom?.length ? "hiddenrow" : ""}`} key={a.id}>
       <ActivityWhen a={a} />
       <ActivityText t={t} a={a} onPlace={onPlace} />
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
@@ -77,7 +82,7 @@ export const PartLock = ({ on, part, toggle, tip = "left" }: { on: boolean; part
 
 function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, editing, toggleLock, run }: {
   t: Trip; x: Day; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
-  editing: boolean; toggleLock: () => void; run: Run;
+  editing: boolean; toggleLock?: () => void; run: Run; // no toggleLock: the role may not change the plan (AU-21)
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
   return (
@@ -96,7 +101,7 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, e
         <div className="tools">
           <IconButton icon="plus" look="bare" tip="left" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut />
           <IconButton icon="edit" look="bare" tip="left" label={sv.editDay} onClick={() => edit({ kind: "day", id: x.id })} mut />
-          <PartLock on={editing} part={x.title} toggle={toggleLock} />
+          {toggleLock && <PartLock on={editing} part={x.title} toggle={toggleLock} />}
         </div>
       )}
       <div className="body">
@@ -117,11 +122,14 @@ export type TripViewProps = {
   addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
-  guest?: boolean; // opened with a share link: everything stays locked, no way back to the start page (AU-03)
+  perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
+  self?: string; // the traveler of a personal link
+  who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
 };
 
 export function TripView(p: TripViewProps) {
-  const { t, tab } = p, lock = tab === "up" || !!p.guest; // ED-11, AU-03; otherwise Nåla locks each part on its own (ED-18)
+  const { t, tab, perms } = p, writes = anyWrite(perms);
+  const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
   let main;
@@ -130,11 +138,11 @@ export function TripView(p: TripViewProps) {
       <article className="card dream" key={d.id}>
         <div className="img" style={{ background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : DREAM_BG[i % 3] }}>
           <CatIcon id={categoryIcon(d.category) ?? d.icon} big /></div>
-        <button className="heart" onClick={() => p.vote(i)} aria-label={sv.vote}>♥ {d.votes}</button>
+        <button className="heart" onClick={() => p.vote(i)} aria-label={sv.vote} disabled={perms.view.dr.dreams !== "write"}>♥ {d.votes}</button>
         <div className="in"><h3>{d.title}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div></div>
       </article>
     ))}</div>
-    <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={p.addDream} mut />
+    {perms.view.dr.dreams === "write" && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={p.addDream} />}
   </>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
@@ -147,25 +155,34 @@ export function TripView(p: TripViewProps) {
       <div>{days.map((x) => (
         <DayCard key={x.id} t={t} x={x} open={!!p.open[x.id]} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
           onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run}
-          editing={part(`day:${x.id}`).on} toggleLock={part(`day:${x.id}`).toggle} />
+          editing={perms.view.nala.plan === "write" && part(`day:${x.id}`).on} toggleLock={perms.view.nala.plan === "write" ? part(`day:${x.id}`).toggle : undefined} />
       ))}</div>
       <div><Suspense fallback={null}>
-        <Side t={t} today={p.today} chart={p.chart} toggleChart={p.toggleChart} edit={p.edit} run={p.run} onPlace={p.place} part={part} />
+        <Side t={t} today={p.today} chart={p.chart} toggleChart={p.toggleChart} edit={p.edit} run={p.run} onPlace={p.place} part={part} parts={perms.view.nala} />
       </Suspense></div>
     </div>
   </>;
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
-  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson} /></Suspense>;
+  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
+    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)} /></Suspense>;
   return <>
-    {!p.guest && <div className="top"><IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" /><Gear onClick={p.admin} /></div>}
+    {(perms.settings || p.who) && <div className="top">
+      {perms.scoped ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" />}
+      <span className="topend">
+        {p.who && (p.who.role === "follower"
+          ? <span className="who follower">{p.who.name}</span>
+          : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
+        {perms.settings && <Gear onClick={p.admin} />}
+      </span>
+    </div>}
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
-      {tab === "nala" && !p.guest && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
+      {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
     </div><p className="ro">{tripDates(t)}{t.note ? ` · ${t.note}` : ""}</p><div className="card manifest">{t.purpose || sv.noPurpose}</div>
-    <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).map((k) => (
+    {perms.pages.length > 1 && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
-    ))}</div>
-    <div className={`${lock ? "lock" : ""} ${p.guest ? "guest" : ""}`}>{main}</div>
+    ))}</div>}
+    <div className={`${lock ? "lock" : ""} ${writes ? "" : "guest"}`}>{main}</div>
     {(tab === "nala" || tab === "up") && Object.keys(p.forecast).length > 0 && (
       <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></p>
     )}

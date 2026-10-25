@@ -230,3 +230,57 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .limiticon.big svg{width:22px;height:22px;stroke-width:2.2}
 .sechead{display:flex;align-items:center;margin-bottom:8px}.sechead h3{margin:0}
 .legend i.unused{box-shadow:inset 0 0 0 1px var(--mute)}
+/* Who is looking, in the header: the traveler coloured by permission (Resenär sage, Planerare terracotta), or Följare in grey (AU-16). */
+.topend{display:flex;align-items:center;gap:10px}
+.who{display:inline-flex;align-items:center;min-height:32px;padding:2px 14px;border-radius:16px;border:1.5px solid;font-weight:700}
+.who.traveler{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 18%,var(--card))}
+.who.planner{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
+.who.follower{color:var(--mute);border-color:var(--line);background:var(--card)}
+/* The permission dropdown in the settings: a pill in the colour of the permission, like the name in the header, with the app's chevron (AU-11, AU-16). */
+.rolepick{position:relative;display:inline-flex;align-items:center;margin-right:4px}
+.rolepick select{appearance:none;width:auto;margin:0;min-height:44px;padding:0 34px 0 16px;border-radius:22px;border:1.5px solid;font-weight:700;cursor:pointer}
+.rolepick::after{content:"";position:absolute;right:15px;top:50%;width:7px;height:7px;margin-top:-6px;border-right:2px solid;border-bottom:2px solid;transform:rotate(45deg);pointer-events:none}
+.rolepick.traveler select{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 18%,var(--card))}.rolepick.traveler::after{color:var(--sageT)}
+.rolepick.planner select{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}.rolepick.planner::after{color:var(--acct)}
+.rolepick select:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.rolepick option{color:var(--ink);background:var(--card);font-weight:400}
+/* Uppleva for a Följare: only the day, across the full width (AU-17). */
+@media(min-width:1000px){.cols.one{grid-template-columns:1fr}}
+/* Hidden activities: "Dold aktivitet" in muted italics for Resenär and Följare. The Planerare sees the row framed with a dashed
+   terracotta border and a filled "Dold för resenärer" badge, so hidden and visible activities are told apart at a glance (AU-18). */
+.hiddenact{display:inline-flex;align-items:center;gap:6px;color:var(--mute);font-style:italic}.hiddenact svg{width:16px;height:16px}
+.hidebadge{display:inline-flex;align-items:center;gap:5px;margin-left:8px;background:var(--acct);color:var(--card);font-weight:700;vertical-align:2px}.hidebadge svg{width:13px;height:13px}
+.act.hiddenrow{border:1.5px dashed var(--acc);border-radius:10px;background:color-mix(in srgb,var(--acc) 7%,var(--card));padding-left:8px;padding-right:8px;margin:4px 0}
+.hidefrom{border:1px solid var(--line);border-radius:10px;padding:6px 12px 2px;margin:4px 0 12px}.hidefrom legend{padding:0 4px;font-size:.9rem}
+.hidefrom .note{margin:2px 0 6px}
+.navgap{display:inline-block;width:44px;height:44px} /* the place of a missing previous or next day button (UP-09) */
+/* Permissions (AU-20): a matrix with a column per role; pages as groups with their components under them; a pill per cell coloured
+   by level, from grey (hidden) to terracotta (change); "–" where the page is hidden for the role. */
+.pgrid{margin-top:6px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(86px,128px));gap:6px;align-items:center;padding:3px 0}
+.prow>span:not(:first-child){display:flex;justify-content:center;align-items:center}
+.phead{position:sticky;top:0;background:var(--card);z-index:1;padding-bottom:6px}
+.phead .who{font-size:.85rem;padding:2px 8px;min-height:30px;justify-content:center;gap:2px}.phead .who .icon{width:30px;height:30px}
+.pgroup{border-top:1px solid var(--line);padding:6px 0 4px}
+.ppage>span:first-child{font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:.85rem}
+.prow:not(.ppage):not(.phead)>span:first-child{padding-left:14px;font-size:.92rem}
+.na{color:var(--mute);min-height:44px;display:inline-flex;align-items:center}
+.rolepick.sm{width:100%;margin:0}.rolepick.sm select{width:100%;min-width:0;padding:0 24px 0 10px;font-size:.85rem}.rolepick.sm::after{right:11px}
+.rolepick.lvl-hidden select{color:var(--mute);border-color:var(--line);background:var(--card)}.rolepick.lvl-hidden::after{color:var(--mute)}
+.rolepick.lvl-read select,.rolepick.lvl-shown select{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 14%,var(--card))}
+.rolepick.lvl-read::after,.rolepick.lvl-shown::after{color:var(--sageT)}
+.rolepick.lvl-check select,.rolepick.lvl-add select{color:var(--sageT);border-color:var(--sageT);background:color-mix(in srgb,var(--sage) 30%,var(--card))}
+.rolepick.lvl-check::after,.rolepick.lvl-add::after{color:var(--sageT)}
+.rolepick.lvl-write select{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}.rolepick.lvl-write::after{color:var(--acct)}
+/* Narrow screens: the row's name on a line of its own above the three role cells, so nothing overlaps (AU-20, RS-*). */
+@media (max-width:599px){
+  .prow{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:2px}
+  .prow>span:first-child{grid-column:1/-1}
+  .phead>span:first-child{display:none}
+  .prow:not(.ppage):not(.phead)>span:first-child{padding-left:0;font-size:.88rem;color:var(--mute)}
+}
+/* Each page of the permissions matrix folds, with the same chevron as the side sections (AU-20). */
+.pfold{display:inline-flex;align-items:center;gap:10px;min-height:44px;background:none;border:0;padding:0;font:inherit;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:inherit;cursor:pointer;text-align:left}
+.pfold::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin-top:-4px}
+.pfold[aria-expanded=true]::after{transform:rotate(225deg);margin-top:4px}
+.pfold:focus-visible{outline:3px solid var(--sage);outline-offset:2px}

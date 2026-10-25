@@ -11,18 +11,22 @@ import { sv } from "./sv.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { PartLock, PlaceLink, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
+import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 
 type Part = (id: string) => { on: boolean; toggle: () => void };
+type Lock = ReturnType<Part> | null;
+type LockOf = (id: string) => Lock; // null: the role may not change that section (AU-21)
 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02), with its own lock (ED-18). */
-const Section = ({ title, lock, flag, tint = "", children }: { title: string; lock: ReturnType<Part>; flag?: ReactNode; tint?: string; children: ReactNode }) => (
-  <details className={`card sec ${lock.on ? "" : "lock"} ${tint}`}>
-    <summary><h3>{title}</h3>{flag}<span className="seclock" onClick={(e) => e.preventDefault()}><PartLock on={lock.on} part={title} toggle={lock.toggle} /></span></summary>
+/** A section the role may not change has no lock and stays locked (AU-21). */
+const Section = ({ title, lock, flag, tint = "", children }: { title: string; lock: Lock; flag?: ReactNode; tint?: string; children: ReactNode }) => (
+  <details className={`card sec ${lock?.on ? "" : "lock"} ${tint}`}>
+    <summary><h3>{title}</h3>{flag}{lock && <span className="seclock" onClick={(e) => e.preventDefault()}><PartLock on={lock.on} part={title} toggle={lock.toggle} /></span>}</summary>
     {children}
   </details>
 );
 
-function Budget({ t, chart, onToggle, edit, part }: { part: Part; t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
+function Budget({ t, chart, onToggle, edit, part }: { part: LockOf; t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
   const { paid, totals, other } = budgetRows(t.budget, t.currency);
   const label = (i: Trip["budget"][number]) => `${i.note ?? i.category}${i.owner ? ` · ${i.owner}` : ""}`;
   const row = (i: Trip["budget"][number], est: boolean) => (
@@ -50,7 +54,7 @@ function Budget({ t, chart, onToggle, edit, part }: { part: Part; t: Trip; chart
   );
 }
 
-function Bookings({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Bookings({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
   return (
     <Section title={sv.bookings} lock={part("bookings")}>
       {t.bookings.map((b) => (
@@ -67,14 +71,14 @@ function Bookings({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: E
   );
 }
 
-function Tasks({ t, today, edit, run, onPlace, part }: { part: Part; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void }) {
+function Tasks({ t, today, edit, run, onPlace, part, tick }: { part: LockOf; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void; tick: boolean }) {
   return (
     <Section title={sv.todo} lock={part("tasks")}>
       {!t.tasks.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
           <label className="check">
-            <input type="checkbox" checked={k.done} onChange={() => run((x) => toggleTask(x, k.id), k.done ? "task undone" : "task done")} />
+            <input type="checkbox" checked={k.done} disabled={!tick} onChange={() => run((x) => toggleTask(x, k.id), k.done ? "task undone" : "task done")} />
             <span className={k.done ? "done" : ""}>{k.text}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
@@ -89,7 +93,7 @@ function Tasks({ t, today, edit, run, onPlace, part }: { part: Part; t: Trip; to
   );
 }
 
-function Info({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Info({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
   return (
     <Section title={sv.info} lock={part("info")}>
       {!t.info.length && <p className="ro">{sv.noInfo}</p>}
@@ -107,8 +111,8 @@ function Info({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: EditD
   );
 }
 
-function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck }: {
-  name: string; items: string[]; packed: (item: string) => boolean; count: { packed: number; total: number };
+function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck, tick }: {
+  name: string; items: string[]; packed: (item: string) => boolean; count: { packed: number; total: number }; tick: boolean;
   onAdd: (text: string) => void; onRemove: (i: number) => void; onCheck: (item: string) => void;
 }) {
   const [v, setV] = useState("");
@@ -118,7 +122,7 @@ function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck }: {
       <summary><span>{name} <small className="ro">({count.packed}/{count.total})</small></span></summary>
       <ul>{items.map((it, i) => (
         <li key={`${i}-${it}`}>
-          <label className="check"><input type="checkbox" checked={packed(it)} onChange={() => onCheck(it)} /><span className={packed(it) ? "done" : ""}>{it}</span></label>
+          <label className="check"><input type="checkbox" checked={packed(it)} disabled={!tick} onChange={() => onCheck(it)} /><span className={packed(it) ? "done" : ""}>{it}</span></label>
           <IconButton icon="trash" look="bare" tip="left" label={`${sv.removeItem} ${it}`} onClick={() => onRemove(i)} mut /></li>
       ))}</ul>
       <form className="addrow" data-mut="" onSubmit={submit}>
@@ -129,13 +133,13 @@ function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck }: {
   );
 }
 
-function Packing({ t, run, part }: { part: Part; t: Trip; run: Run }) {
+function Packing({ t, run, part, tick }: { part: LockOf; t: Trip; run: Run; tick: boolean }) {
   const lists = [{ id: "shared", name: sv.sharedList, items: t.packing },
     ...t.travelers.map((x) => ({ id: x.id, name: x.age ? `${x.name}, ${x.age} ${sv.years}` : x.name, items: x.packing }))]; // PK-03
   return (
     <Section title={sv.packing} lock={part("packing")}>
       {lists.map((l) => (
-        <PackingList key={l.id} name={l.name} items={l.items} packed={(it) => isPacked(t, l.id, it)} count={packedCount(t, l.id)}
+        <PackingList key={l.id} tick={tick} name={l.name} items={l.items} packed={(it) => isPacked(t, l.id, it)} count={packedCount(t, l.id)}
           onCheck={(it) => run((x) => togglePacked(x, l.id, it), isPacked(t, l.id, it) ? "unpacked" : "packed")}
           onAdd={(text) => run((x) => addPacking(x, l.id, text), "add packing")}
           onRemove={(i) => run((x) => removePacking(x, l.id, i), "remove packing")} />
@@ -144,15 +148,17 @@ function Packing({ t, run, part }: { part: Part; t: Trip; run: Run }) {
   );
 }
 
-export default function Side({ t, today, chart, toggleChart, edit, run, onPlace, part }: {
-  part: Part;
+/** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
+export default function Side({ t, today, chart, toggleChart, edit, run, onPlace, part: lockOf, parts }: {
+  part: Part; parts: Record<string, Level>; // the role's levels on Nåla's components (AU-20)
   t: Trip; today: string; chart: boolean; toggleChart: () => void; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void;
 }) {
+  const part = (id: string) => (parts[id] === "write" ? lockOf(id) : null);
   return <>
-    <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />
-    <Budget part={part} t={t} chart={chart} onToggle={toggleChart} edit={edit} />
-    <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} />
-    <Info part={part} t={t} edit={edit} onPlace={onPlace} />
-    <Packing part={part} t={t} run={run} />
+    {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />}
+    {parts.budget !== "hidden" && <Budget part={part} t={t} chart={chart} onToggle={toggleChart} edit={edit} />}
+    {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} />}
+    {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}
+    {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}
   </>;
 }

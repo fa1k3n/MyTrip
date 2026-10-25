@@ -21,6 +21,9 @@ export const sv = {
   budgetMax: "Maxbudget", editBudgetMax: "Ändra maxbudget", noBudgetMax: "Ingen maxbudget",
   budgetMaxHint: "Planerad budget plus utgifter under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-14
+  who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  hideActivity: "Dölj för", hiddenActivity: "Dold aktivitet", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18
+  hideActivityHint: "De valda ser bara \u201dDold aktivitet\u201d. Följare ser den som dold så fort den är dold för någon.",
   limit: { // BG-13
     near: (used: string, max: string, pct: number, left: string) => `Nära maxbudgeten: ${used} av ${max} (${pct} %). ${left} kvar.`,
     over: (over: string, used: string, max: string) => `Över maxbudgeten med ${over}: ${used} av ${max}.`,
@@ -58,11 +61,6 @@ export const sv = {
     noLink: "Öppna resan med länken du fått, eller logga in som administratör.",
     expired: "Länken gäller inte längre. Be om en ny länk, eller logga in som administratör.",
     wrong: "Fel lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
-  },
-  share: {
-    title: "Delningslänk", none: "Ingen länk än.", create: "Skapa länk", copy: "Kopiera länken", replace: "Byt länk", copied: "Kopierad.",
-    hint: "Den som har länken kan läsa resan och bocka av uppgifter och packning. Bokningsnummer visas inte.",
-    confirmReplace: "Byta länk? Den gamla länken slutar fungera direkt.",
   },
   prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",

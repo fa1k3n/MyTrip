@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, forgetLink, type Me } from "./api.ts";
+import { permsFor } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
@@ -93,9 +94,10 @@ export function App() {
   useEffect(() => {
     if (!me) return;
     load();
-    if (me.role !== "link") api.settings().then(setSettings, () => {}); // a link sees no settings (AU-03)
+    if (!permsFor(me.role, {}).scoped) api.settings().then(setSettings, () => {}); // links see no app settings (AU-03, AU-12, AU-14)
   }, [me, load]);
-  const guest = me?.role === "link";
+  const role = me?.role ?? "link";
+  const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
     const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
     return () => clearInterval(id);
@@ -128,11 +130,13 @@ export function App() {
   const openTrip = (id: string, nextTab?: Tab) => {
     const x = trips?.find((y) => y.id === id);
     setTripId(id); setView("trip"); setOpen({}); setUpDay(null); setUnlock(LOCKED);
-    setTab(nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala")); // MT-09
+    const tab = nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala"); // MT-09
+    const allowed = permsFor(role, x ?? {}).pages;
+    setTab(allowed.includes(tab) ? tab : allowed[0] ?? "up"); // only the pages the role may see (AU-20)
     window.scrollTo(0, 0);
   };
   useEffect(() => { // a link opens its trip directly, on the tab of the trip's phase (AU-03, MT-09)
-    if (me?.role === "link" && trips && view !== "trip" && trips.some((x) => x.id === me.tripId)) openTrip(me.tripId);
+    if (me && "tripId" in me && trips && view !== "trip" && trips.some((x) => x.id === me.tripId)) openTrip(me.tripId);
   }, [me, trips]); // eslint-disable-line react-hooks/exhaustive-deps -- openTrip is recreated every render
   const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
@@ -196,10 +200,11 @@ export function App() {
       if (!str("name")) return;
       change([{ op: "add", path: "travelers/-", value: { id: newId("p"), name: str("name"), packing: [] } }], "add traveler");
     } else if (kind === "expense") {
-      const input = { text: str("text"), amount: str("amount"), category: str("category"), paidBy: str("paidBy"), sharedBy: f.getAll("sharedBy").map(String), addedBy: str("addedBy") };
-      const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp")); // UP-13: who added it and when
+      const payer = self ?? str("paidBy"); // a personal link pays and adds in its own name; the superuser picks who paid (UP-13, AU-13)
+      const input = { text: str("text"), amount: str("amount"), category: str("category"), paidBy: payer, sharedBy: t!.travelers.map((x) => x.id), addedBy: payer }; // shared by all; split in Summera (MI-02)
+      const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
-      try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, input.addedBy); } catch { /* not remembered in private mode */ }
+      if (!self) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
       change(r.ops, "add expense");
     } else {
       const amount = parseAmount(str("amount"));
@@ -213,7 +218,7 @@ export function App() {
     <select name={field} defaultValue={value}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
   );
 
-  /** The traveler who added the last expense on this device, if still on the trip (UP-13). */
+  /** The traveler the superuser last chose as payer on this device, if still on the trip (UP-13). */
   const adder = () => {
     let stored: string | null = null;
     try { stored = localStorage.getItem(`${ADDER_KEY}.${t?.id}`); } catch { /* storage blocked */ }
@@ -243,7 +248,7 @@ export function App() {
   </>;
   else if (view === "admin") page = (
     <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      <AdminPage t={t} settings={settings} back={() => setView("trip")} edit={setDlg} change={change} removeTrip={removeTrip}
+      <AdminPage t={t} superuser={permsFor(role, t).superuser} settings={settings} back={() => setView("trip")} edit={setDlg} change={change} run={run} removeTrip={removeTrip}
         openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
     </Suspense>
   );
@@ -257,7 +262,9 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
-      edit={setDlg} unlock={unlock} setUnlock={setUnlock} guest={guest}
+      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={permsFor(role, t)} self={self}
+      who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
+        : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
     />
   );
@@ -278,7 +285,7 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={!guest && view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && permsFor(role, t).view.nala.plan === "write" && view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
@@ -289,7 +296,7 @@ export function App() {
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
-        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} />
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} />
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
@@ -300,10 +307,7 @@ export function App() {
             <label>{sv.text}<input name="text" autoFocus /></label>
             <label>{sv.amount}<input name="amount" inputMode="decimal" /></label>
             <label>{sv.category}<select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
-            <label>{sv.addedBy}{people("addedBy", 0, adder())}</label>
-            <label>{sv.paidBy}{people("paidBy", 0, adder())}</label>
-            <div className="ro">{sv.sharedBy}</div>
-            {t?.travelers.map((x) => <label className="check" key={x.id}><input type="checkbox" name="sharedBy" value={x.id} defaultChecked />{x.name}</label>)}
+            {!self && <label>{sv.paidBy}{people("paidBy", 0, adder())}</label>}
           </>}
           {dlg.kind === "payment" && <>
             <label>{sv.from}{people("from")}</label>

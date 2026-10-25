@@ -21,7 +21,7 @@ import type { EditDlg } from "./editKinds.ts";
 export type { EditDlg };
 /** Sends the ops; resolves to an error text, or null when saved. */
 export type Save = (ops: Op[], reason: string) => Promise<string | null>;
-type Props = { t: Trip; save: Save; close: () => void };
+type Props = { t: Trip; save: Save; close: () => void; self?: string }; // self: the traveler of a personal link (AU-18)
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
 function useFields<T extends Record<string, string | boolean>>(init: T) {
@@ -151,6 +151,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
     start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
     category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "",
   });
+  const [hiddenFrom, setHiddenFrom] = useState<string[]>(a?.hiddenFrom ?? []); // AU-18
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
     : f.place ? { kind: "existing" as const, id: f.place } : { kind: "none" as const };
   return (
@@ -158,7 +159,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
       onSubmit={() => {
         const durationMin = Number(f.duration) || undefined;
         const miss = f.text.trim() ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
-        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note }, p.id), p.id ? "edit activity" : "add activity");
+        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)) }, p.id), p.id ? "edit activity" : "add activity");
       }}
       onRemove={p.id ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
@@ -184,6 +185,12 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
         <label>{sv.placeName}<input {...text("placeName")} /></label>
         <label>{sv.address}<input {...text("address")} /></label>
       </>}
+      {p.t.travelers.some((x) => x.id !== p.self) && <fieldset className="hidefrom"> {/* no one hides an activity from themselves (AU-18) */}
+        <legend>{sv.hideActivity}</legend>
+        {p.t.travelers.filter((x) => x.id !== p.self).map((x) => <label className="check" key={x.id}><input type="checkbox" checked={hiddenFrom.includes(x.id)}
+          onChange={(e) => setHiddenFrom((h) => (e.target.checked ? [...h, x.id] : h.filter((id) => id !== x.id)))} />{x.name}</label>)}
+        <p className="ro note">{sv.hideActivityHint}</p>
+      </fieldset>}
     </Form>
   );
 }

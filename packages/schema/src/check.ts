@@ -20,6 +20,7 @@ export function checkTrip(t: Trip): string[] {
   const who = (owner: string, ids: string[]) => { for (const id of ids) if (!people.has(id)) p.push(`${owner} refers to unknown traveler ${id}`); }; // MI-01
   for (const e of t.expenses ?? []) who(`Expense ${e.id}`, [e.paidBy, ...e.sharedBy, ...(e.addedBy ? [e.addedBy] : [])]); // UP-13
   for (const x of t.payments ?? []) who(`Payment ${x.id}`, [x.from, x.to]);
+  for (const a of t.days.flatMap((d) => d.activities)) who(`Activity ${a.id}`, a.hiddenFrom ?? []); // AU-18
   const dates = t.days.map((d) => d.date).sort();
   for (const b of t.bookings)
     if (b.status !== "cancelled" && dates.length && (b.from < dates[0] || b.to > dates[dates.length - 1]))

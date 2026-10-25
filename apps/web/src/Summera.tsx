@@ -3,11 +3,19 @@ import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
 import { balanceText, balances, budgetVsActual, settle, type Transfer } from "./money.ts";
 import { IconButton } from "./Icons.tsx";
+import type { Level } from "@trip/schema/src/rules.ts";
 import { sv } from "./sv.ts";
 
-type Props = { t: Trip; addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void };
+type Props = {
+  t: Trip; addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
+  expenses: Level; budget: Level; people: boolean; canAdd: boolean; // what the role may see and change (AU-21)
+};
 
-export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
+/** Money follows the role's level on expenses and budget; adding travelers belongs to the trip's settings (AU-21, AU-22). */
+export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget, people, canAdd }: Props) {
+  if (expenses === "hidden") return <section className="card"><h3>{sv.balance}</h3>{t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span></div>)}
+    {people && <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={addPerson} tip="right" /></div>}</section>;
+  const pays = expenses === "write";
   const name = (id: string) => t.travelers.find((x) => x.id === id)?.name ?? id;
   const bal = balances(t.travelers, t.expenses, t.payments);
   const transfers = settle(bal);
@@ -21,7 +29,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
           <h3>{sv.balance}</h3>
           {!t.travelers.length && <p className="ro">{sv.noPeople}</p>}
           {t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span><span>{balanceText(bal[x.id] ?? 0)}</span></div>)}
-          <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={addPerson} mut tip="right" /></div>
+          {people && <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={addPerson} tip="right" /></div>}
         </section>
         {group && (
           <section className="card">
@@ -29,7 +37,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
             {transfers.length ? transfers.map((x) => (
               <div className="row mid" key={`${x.from}-${x.to}`}>
                 <span>{name(x.from)} → {name(x.to)}</span>
-                <span className="end">{kr(x.amount)}<IconButton icon="check" look="bare" tip="left" label={`${sv.register} ${name(x.from)} → ${name(x.to)}`} onClick={() => addPayment(x)} mut /></span>
+                <span className="end">{kr(x.amount)}{pays && <IconButton icon="check" look="bare" tip="left" label={`${sv.register} ${name(x.from)} → ${name(x.to)}`} onClick={() => addPayment(x)} />}</span>
               </div>
             )) : <p className="ro">{sv.allEven}</p>}
           </section>
@@ -45,11 +53,11 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
               <span>{kr(e.amount)}</span>
             </div>
           )) : <p className="ro">{sv.noExpenses}</p>}
-          {t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={addExpense} mut tip="right" /></div>}
+          {canAdd && t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={addExpense} tip="right" /></div>}
         </section>
       </div>
       <div>
-        <section className="card">
+        {budget !== "hidden" && <section className="card">
           <h3>{sv.budgetVsActual}</h3>
           {follow.map((r) => (
             <div className="row" key={r.category}>
@@ -58,7 +66,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
             </div>
           ))}
           <div className="row"><b>{sv.sum}</b><b>{kr(total("actual"))} {sv.of} {kr(total("planned"))}</b></div>
-        </section>
+        </section>}
         <section className="card">
           <h3>{sv.payments}</h3>
           {t.payments.length ? t.payments.map((x) => (
@@ -67,7 +75,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
               <span>{kr(x.amount)}</span>
             </div>
           )) : <p className="ro">{sv.noPayments}</p>}
-          {group && <div className="add"><IconButton icon="plus" label={sv.addPayment} onClick={() => addPayment()} mut tip="right" /></div>}
+          {group && pays && <div className="add"><IconButton icon="plus" label={sv.addPayment} onClick={() => addPayment()} tip="right" /></div>}
         </section>
       </div>
     </div>

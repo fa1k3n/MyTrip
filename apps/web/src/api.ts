@@ -8,12 +8,15 @@ const TOKEN = import.meta.env.DEV ? (import.meta.env.VITE_TRIP_TOKEN ?? "") : ""
 const LINK_KEY = "mytrip.link";
 const stored = () => { try { return localStorage.getItem(LINK_KEY); } catch { return null; } };
 
-/** A share link in the address is kept on the device and removed from the address bar (AU-02). */
+/** A share link in the address is kept on the device and removed from the address bar (AU-02). #admin forgets it (AU-23). */
 const fromUrl = parseLinkHash(location.hash);
 if (fromUrl?.kind === "link") {
   try { localStorage.setItem(LINK_KEY, fromUrl.key); } catch { /* private mode: the link works for this visit only */ }
   history.replaceState(null, "", location.pathname + location.search);
 }
+if (fromUrl?.kind === "admin") try { localStorage.removeItem(LINK_KEY); } catch { /* nothing stored */ }
+// A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
+addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
 let link = fromUrl?.kind === "link" ? fromUrl.key : stored();
 /** True when the page was opened with #admin, to reach the admin login from a device that holds a link. */
 export const askedForAdmin = fromUrl?.kind === "admin";
@@ -42,7 +45,9 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 const trip = (id: string) => `/api/trips/${encodeURIComponent(id)}`;
 
-export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string };
+export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string } | { role: "traveler" | "planner"; tripId: string; travelerId: string };
+/** A traveler's personal link as the settings show it (AU-11). */
+export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string };
 
 export const api = {
   me: () => call<Me>("/api/me"),
@@ -50,6 +55,11 @@ export const api = {
   logout: () => call<void>("/api/logout", { method: "POST" }),
   link: (id: string) => call<{ secret: string }>(`${trip(id)}/link`),
   newLink: (id: string) => call<{ secret: string }>(`${trip(id)}/link`, { method: "POST" }),
+  people: (id: string) => call<PersonLinkInfo[]>(`${trip(id)}/people`),
+  setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"]) =>
+    call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify({ role }) }),
+  renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
+  removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => call<Trip[]>("/api/trips"),
   create: (title: string) => call<Trip>("/api/trips", { method: "POST", body: JSON.stringify({ title }) }),
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),

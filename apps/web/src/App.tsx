@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, maskedToken } from "./api.ts";
+import { api, ApiError, askedForAdmin, forgetLink, type Me } from "./api.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
@@ -9,16 +9,16 @@ const EditDialog = lazy(() => import("./NalaForms.tsx").then((m) => ({ default: 
 const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.PlaceView })));
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggleOne, tripDates, type Open, type Unlock } from "./format.ts";
-import { tripRange } from "./edit.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
 import { Gear, IconButton } from "./Icons.tsx";
 
-// The settings views load when first opened (PF-01).
+// The settings views, the trip's settings page and the login load when first opened (PF-01).
 const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
-const TripAi = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.TripAi })));
+const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
+const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 
@@ -61,6 +61,8 @@ function useForecast(trip: Trip | undefined) {
 }
 
 export function App() {
+  const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined: asking, null: no access (AU-07)
+  const [expired, setExpired] = useState(false);
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<"portal" | "trip" | "admin" | "settings">("portal");
@@ -80,11 +82,23 @@ export function App() {
   const opener = useRef<HTMLElement | null>(null);
 
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
-  useEffect(() => { load(); api.settings().then(setSettings, () => {}); }, [load]);
+  const start = useCallback(() => api.me().then(setMe, (e) => {
+    if (!(e instanceof ApiError && e.status === 401)) return setFailed(true);
+    setExpired(!askedForAdmin && localStorage.getItem("mytrip.link") !== null); // a link that no longer works (AU-07)
+    forgetLink();
+    setMe(null);
+  }), []);
+  useEffect(() => { start(); }, [start]);
+  useEffect(() => {
+    if (!me) return;
+    load();
+    if (me.role !== "link") api.settings().then(setSettings, () => {}); // a link sees no settings (AU-03)
+  }, [me, load]);
+  const guest = me?.role === "link";
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
-    const id = setInterval(() => { if (document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
+    const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, me]);
   useEffect(() => { if (!notice) return; const id = setTimeout(() => setNotice(""), 6000); return () => clearTimeout(id); }, [notice]);
   const saveSettings = (next: Settings) => {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
@@ -116,6 +130,10 @@ export function App() {
     setTab(nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala")); // MT-09
     window.scrollTo(0, 0);
   };
+  useEffect(() => { // a link opens its trip directly, on the tab of the trip's phase (AU-03, MT-09)
+    if (me?.role === "link" && trips && view !== "trip" && trips.some((x) => x.id === me.tripId)) openTrip(me.tripId);
+  }, [me, trips]); // eslint-disable-line react-hooks/exhaustive-deps -- openTrip is recreated every render
+  const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
   const newTrip = async () => {
     const n = await api.create(sv.newTripTitle);
@@ -196,13 +214,15 @@ export function App() {
 
   let page;
   if (failed) page = <p className="ro">{sv.error}</p>;
+  else if (me === null) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Login expired={expired} onDone={() => { setExpired(false); start(); }} /></Suspense>;
   else if (!trips) page = <p className="ro">{sv.loading}</p>;
   else if (view === "settings") page = <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView(settingsBack)} tip="right" /></div><h1>{sv.settings}</h1>
     {aiCard}
   </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} /></div></div>
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
+      <IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div></div>
     <div className="grid">
       {trips.map((x) => (
         <button className="card trip" key={x.id} onClick={() => openTrip(x.id)}>
@@ -213,20 +233,12 @@ export function App() {
       <button className="card new" onClick={newTrip}>{sv.newTrip}</button>
     </div>
   </>;
-  else if (view === "admin") page = <>
-    <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView("trip")} tip="right" /></div><h1>{sv.admin}</h1>
-    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => setDlg({ kind: "trip" })} /></div>
-      <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => setDlg({ kind: "dates" })} /></div></div>
-    <div className="card">
-      {t.inbox && <><h3>{sv.inbox}</h3><p>{sv.inboxText} <b>{t.inbox}</b></p></>}
-      <h3>{sv.apiKey}</h3><p>{maskedToken()}</p>
-    </div>
-    {settings && (
-      <Suspense fallback={null}><TripAi s={settings} on={t.ai} openSettings={() => { setSettingsBack("admin"); setView("settings"); }}
-        onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} /></Suspense>
-    )}
-    <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>
-  </>;
+  else if (view === "admin") page = (
+    <Suspense fallback={<p className="ro">{sv.loading}</p>}>
+      <AdminPage t={t} settings={settings} back={() => setView("trip")} edit={setDlg} change={change} removeTrip={removeTrip}
+        openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
+    </Suspense>
+  );
   else page = (
     <TripView
       t={t} cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast}
@@ -237,7 +249,7 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
-      edit={setDlg} unlock={unlock} setUnlock={setUnlock}
+      edit={setDlg} unlock={unlock} setUnlock={setUnlock} guest={guest}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
     />
   );
@@ -258,7 +270,7 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={!guest && view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>

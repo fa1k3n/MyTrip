@@ -46,6 +46,17 @@ export const sv = {
   activityNote: "Notis (visas under rubriken)", editTrip: "Ändra namn och syfte", purpose: "Syfte",
   suggestPurpose: "Föreslå syfte utifrån planen", purposeHint: "Syftet hjälper till att ge bra förslag på aktiviteter. Förslaget bygger på dagarna i Nåla, ändra fritt innan du sparar.", noPurposeYet: "Lägg in dagar i Nåla först, så kan ett syfte föreslås.",
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
+  login: {
+    title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut",
+    noLink: "Öppna resan med länken du fått, eller logga in som administratör.",
+    expired: "Länken gäller inte längre. Be om en ny länk, eller logga in som administratör.",
+    wrong: "Fel lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
+  },
+  share: {
+    title: "Delningslänk", none: "Ingen länk än.", create: "Skapa länk", copy: "Kopiera länken", replace: "Byt länk", copied: "Kopierad.",
+    hint: "Den som har länken kan läsa resan och bocka av uppgifter och packning. Bokningsnummer visas inte.",
+    confirmReplace: "Byta länk? Den gamla länken slutar fungera direkt.",
+  },
   prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",
   missing: { label: "Saknar", time: "tid", duration: "uppskattad tid", category: "kategori" },

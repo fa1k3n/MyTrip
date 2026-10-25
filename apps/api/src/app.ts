@@ -1,30 +1,56 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { Settings, Trip, applyOps, checkTrip, describeError, type Op } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
+
+export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
+export type LogEntry = { at: string; tripId: string; actor: string; reason: string; ops: Op[] };
 
 export interface Store {
   list(): Promise<Trip[]>;
   load(id: string): Promise<Trip | undefined>;
-  save(next: Trip): Promise<void>;
+  /** With `baseRevision`, saves only if the stored trip still has that revision; false when another change came first (DP-03). */
+  save(next: Trip, baseRevision?: number): Promise<boolean>;
   remove(id: string): Promise<boolean>;
   image(name: string): Promise<Uint8Array<ArrayBuffer> | undefined>;
   loadSettings(): Promise<Settings>;
   saveSettings(s: Settings): Promise<void>;
+  /** Share link secrets by trip id (AU-01). */
+  links(): Promise<Record<string, string>>;
+  saveLinks(l: Record<string, string>): Promise<void>;
+  /** Proposals and the change log are kept, so they survive a restart (DP-04, MC-08). */
+  proposals(tripId: string): Promise<Proposal[]>;
+  saveProposal(p: Proposal): Promise<void>;
+  appendLog(e: LogEntry): Promise<void>;
+  log(): Promise<LogEntry[]>;
 }
 export type Tokens = { read: string; propose: string; admin: string };
-type Role = "read" | "propose" | "admin";
-type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
-const rank: Record<Role, number> = { read: 1, propose: 2, admin: 3 };
+/** Admin login (AU-04): off when no password is set. The session key signs the cookie. */
+export type Auth = { adminPassword?: string; sessionKey?: string };
+type Role = "read" | "propose" | "admin" | "link";
+const rank: Record<Role, number> = { link: 1, read: 1, propose: 2, admin: 3 };
 const mime: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 /** In-memory store for tests and demos. */
 export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8Array<ArrayBuffer>> = {}): Store {
   const m = new Map(trips.map((t) => { const p = Trip.parse(t); return [p.id, p] as const; }));
   let settings = Settings.parse({});
+  let links: Record<string, string> = {};
+  const proposals = new Map<string, Proposal>(), log: LogEntry[] = [];
   return {
-    list: async () => [...m.values()].map((t) => structuredClone(t)),
+    links: async () => ({ ...links }),
+    saveLinks: async (l) => { links = { ...l }; },
+    proposals: async (tripId) => [...proposals.values()].filter((p) => p.tripId === tripId).map((p) => structuredClone(p)),
+    saveProposal: async (p) => void proposals.set(p.id, structuredClone(p)),
+    appendLog: async (e) => void log.push(structuredClone(e)),
+    log: async () => structuredClone(log),
+    list: async () => [...m.values()].sort((a, b) => a.id.localeCompare(b.id)).map((t) => structuredClone(t)),
     load: async (id) => (m.has(id) ? structuredClone(m.get(id)) : undefined),
-    save: async (t) => void m.set(t.id, structuredClone(t)),
+    save: async (t, base) => {
+      if (base !== undefined && m.get(t.id)?.revision !== base) return false;
+      m.set(t.id, structuredClone(t));
+      return true;
+    },
     remove: async (id) => m.delete(id),
     image: async (name) => images[name],
     loadSettings: async () => structuredClone(settings),
@@ -35,31 +61,83 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "trip";
 
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean } & TrafficOpts = {}) {
-  const app = new Hono<{ Variables: { role: Role } }>();
-  const proposals: Proposal[] = []; // TODO persist (D1)
-  const log: object[] = [];         // TODO persist (D1), MC-08
+/** Compares secrets without stopping at the first difference. */
+function same(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+const SESSION_DAYS = 30, MAX_FAILS = 5, FAIL_WINDOW_MS = 15 * 60_000;
+/** 144 random bits as base64url (AU-01). */
+const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18)))).replace(/\+/g, "-").replace(/\//g, "_");
+/** The only changes a share link may make: ticking tasks and packing items (AU-03). */
+const linkMayChange = (ops: Op[]) => ops.length > 0 && ops.every((o) =>
+  o.op === "set" && ((/^tasks\/\d+\/done$/.test(o.path) && typeof o.value === "boolean")
+    || (/^(packed|travelers\/\d+\/packed)$/.test(o.path) && Array.isArray(o.value) && o.value.every((v) => typeof v === "string"))));
 
+type Env = { Variables: { role: Role; tripId?: string } };
+
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth } & TrafficOpts = {}) {
+  const app = new Hono<Env>();
+  const { adminPassword, sessionKey } = opts.auth ?? {};
+  const fails = new Map<string, { n: number; since: number }>(); // per address, in memory (AU-05)
+
+  // AU-04, AU-05: admin login with a password, answered with a signed session cookie.
+  app.post("/api/login", async (c) => {
+    if (!adminPassword || !sessionKey) return c.json({ error: "login is off" }, 404);
+    const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "local", now = Date.now();
+    const f = fails.get(ip);
+    if (f && now - f.since > FAIL_WINDOW_MS) fails.delete(ip);
+    if ((fails.get(ip)?.n ?? 0) >= MAX_FAILS) return c.json({ error: "too many attempts" }, 429);
+    const b = await c.req.json<{ password?: string }>().catch(() => ({ password: undefined }));
+    if (typeof b.password !== "string" || !same(b.password, adminPassword)) {
+      const g = fails.get(ip) ?? { n: 0, since: now };
+      fails.set(ip, { ...g, n: g.n + 1 });
+      return c.json({ error: "wrong password" }, 401);
+    }
+    fails.delete(ip);
+    const exp = Math.floor(now / 1000) + SESSION_DAYS * 86400;
+    await setSignedCookie(c, "session", `admin.${exp}`, sessionKey, { httpOnly: true, secure: true, sameSite: "Strict", path: "/api", maxAge: SESSION_DAYS * 86400 });
+    return c.body(null, 204);
+  });
+  app.post("/api/logout", (c) => { deleteCookie(c, "session", { path: "/api", secure: true }); return c.body(null, 204); });
+
+  // Who is calling: an admin session, an MCP token, or a share link (AU-01, AU-04, AU-09).
   app.use("/api/*", async (c, next) => {
+    if (sessionKey) {
+      const v = await getSignedCookie(c, sessionKey, "session");
+      const exp = v ? Number(v.split(".")[1]) : 0;
+      if (v && v.startsWith("admin.") && exp * 1000 > Date.now()) { c.set("role", "admin"); return next(); }
+    }
     const t = (c.req.header("authorization") ?? "").replace(/^Bearer /, "");
-    const role = (Object.keys(tokens) as Role[]).find((r) => tokens[r] && tokens[r] === t);
-    if (!role) return c.json({ error: "unauthorized" }, 401);
-    c.set("role", role);
-    await next();
+    const role = (Object.keys(tokens) as (keyof Tokens)[]).find((r) => tokens[r] && same(tokens[r], t));
+    if (role) { c.set("role", role); return next(); }
+    const m = /^link\.([a-z0-9][a-z0-9-]*)\.([A-Za-z0-9_-]+)$/.exec(t);
+    const secret = m ? (await store.links())[m[1]] : undefined;
+    if (m && secret && same(secret, m[2])) { c.set("role", "link"); c.set("tripId", m[1]); return next(); }
+    return c.json({ error: "unauthorized" }, 401);
   });
   const need = (c: { get(k: "role"): Role }, min: Role) => rank[c.get("role")] >= rank[min];
-  const view = (t: Trip, role: Role) => (role === "read" ? { ...t, bookings: t.bookings.map(({ reference, ...b }) => b) } : t); // MC-11
+  const isLink = (c: Context<Env>) => c.get("role") === "link";
+  const view = (t: Trip, role: Role) => (role === "read" || role === "link" ? { ...t, bookings: t.bookings.map(({ reference, ...b }) => b) } : t); // MC-11
+
+  app.get("/api/me", (c) => c.json(isLink(c) ? { role: "link", tripId: c.get("tripId") } : { role: c.get("role") }));
+  // A link sees one trip only; other trips do not exist for it (AU-03).
+  app.use("/api/trips/:id/*", async (c, next) => (isLink(c) && c.req.param("id") !== c.get("tripId") ? c.json({ error: "not found" }, 404) : next()));
+  app.use("/api/trips/:id", async (c, next) => (isLink(c) && c.req.param("id") !== c.get("tripId") ? c.json({ error: "not found" }, 404) : next()));
+  app.use("/api/settings", async (c, next) => (isLink(c) ? c.json({ error: "forbidden" }, 403) : next()));
 
   async function apply(base: Trip, ops: Op[], actor: string, reason: string) {
     const next = Trip.parse(applyOps(base, ops));
     const problems = checkTrip(next);
     if (problems.length) return { problems };
-    await store.save({ ...next, id: base.id, revision: base.revision + 1 });
-    log.push({ at: new Date().toISOString(), tripId: base.id, actor, reason, ops });
+    if (!(await store.save({ ...next, id: base.id, revision: base.revision + 1 }, base.revision))) return { conflict: true as const }; // DP-03
+    await store.appendLog({ at: new Date().toISOString(), tripId: base.id, actor, reason, ops });
     return { revision: base.revision + 1 };
   }
 
-  app.get("/api/trips", async (c) => c.json((await store.list()).map((t) => view(t, c.get("role")))));
+  app.get("/api/trips", async (c) => c.json((await store.list()).filter((t) => !isLink(c) || t.id === c.get("tripId")).map((t) => view(t, c.get("role")))));
   app.post("/api/trips", async (c) => {
     if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403);
     const b = await c.req.json<{ title?: string; purpose?: string }>().catch(() => ({ title: undefined, purpose: undefined }));
@@ -70,7 +148,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       stops: [], days: [], places: [], bookings: [], tasks: [], travelers: [],
     });
     await store.save(trip);
-    log.push({ at: new Date().toISOString(), tripId: trip.id, actor: "user", reason: "create", ops: [] });
+    await store.appendLog({ at: new Date().toISOString(), tripId: trip.id, actor: "user", reason: "create", ops: [] });
     return c.json(trip, 201);
   });
   app.get("/api/settings", async (c) => c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService })); // AI-08
@@ -81,7 +159,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     await store.saveSettings(parsed.data);
     return c.json(parsed.data);
   });
-  app.get("/api/log", (c) => (need(c, "admin") ? c.json(log) : c.json({ error: "forbidden" }, 403)));
+  app.get("/api/log", async (c) => (need(c, "admin") ? c.json(await store.log()) : c.json({ error: "forbidden" }, 403)));
 
   // Every route below works on one trip, which must exist.
   app.use("/api/trips/:id/*", async (c, next) => ((await store.load(c.req.param("id"))) ? next() : c.json({ error: "not found" }, 404)));
@@ -94,7 +172,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   app.delete("/api/trips/:id", async (c) => {
     if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403); // MC-07
     if (!(await store.remove(c.req.param("id")))) return c.json({ error: "not found" }, 404);
-    log.push({ at: new Date().toISOString(), tripId: c.req.param("id"), actor: "user", reason: "delete", ops: [] });
+    const { [c.req.param("id")]: _gone, ...links } = await store.links();
+    await store.saveLinks(links); // a deleted trip's link must not come back with a new trip of the same id
+    await store.appendLog({ at: new Date().toISOString(), tripId: c.req.param("id"), actor: "user", reason: "delete", ops: [] });
     return c.body(null, 204);
   });
   app.get("/api/trips/:id/image", async (c) => {
@@ -114,11 +194,24 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return day ? c.json(await checkTraffic(t, day, opts)) : c.json({ error: "not found" }, 404);
   });
   app.get("/api/trips/:id/check", async (c) => c.json({ problems: checkTrip(await load(c.req.param("id"))) }));
-  app.get("/api/trips/:id/proposals", (c) => c.json(proposals.filter((p) => p.tripId === c.req.param("id"))));
+  app.get("/api/trips/:id/proposals", async (c) => (isLink(c) ? c.json({ error: "forbidden" }, 403) : c.json(await store.proposals(c.req.param("id")))));
+
+  // AU-06: the admin creates, reads and replaces a trip's share link; replacing it stops the old one at once.
+  app.get("/api/trips/:id/link", async (c) => {
+    if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403);
+    const secret = (await store.links())[c.req.param("id")];
+    return secret ? c.json({ secret }) : c.json({ error: "no link" }, 404);
+  });
+  app.post("/api/trips/:id/link", async (c) => {
+    if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403);
+    const secret = newSecret();
+    await store.saveLinks({ ...(await store.links()), [c.req.param("id")]: secret });
+    return c.json({ secret }, 201);
+  });
 
   app.post("/api/trips/:id/changes", async (c) => {
-    if (!need(c, "propose")) return c.json({ error: "forbidden" }, 403); // MC-10
     const b = await c.req.json<{ baseRevision: number; ops: Op[]; reason?: string; dryRun?: boolean }>();
+    if (isLink(c) ? !linkMayChange(b.ops) : !need(c, "propose")) return c.json({ error: "forbidden" }, 403); // MC-10, AU-03
     const t = await load(c.req.param("id"));
     if (b.baseRevision !== t.revision) return c.json({ error: "conflict", revision: t.revision }, 409); // MC-05
     let problems: string[];
@@ -130,23 +223,26 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const summary = b.ops.map((o) => `${o.op} ${o.path}`);
     if (b.dryRun) return c.json({ ok: problems.length === 0, problems, summary }); // MC-04
     if (problems.length) return c.json({ ok: false, problems }, 422);
+    const done = (r: Awaited<ReturnType<typeof apply>>) => ("conflict" in r ? c.json({ error: "conflict" }, 409) : c.json(r));
+    if (isLink(c)) return done(await apply(t, b.ops, "link", b.reason ?? "")); // ticks apply at once (AU-03)
     if (c.get("role") !== "admin") {
       const p: Proposal = { id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: b.ops, reason: b.reason ?? "", status: "pending", at: new Date().toISOString() };
-      proposals.push(p); // MC-06, MC-07: only an admin applies or approves
+      await store.saveProposal(p); // MC-06, MC-07: only an admin applies or approves
       return c.json({ proposalId: p.id, status: p.status }, 202);
     }
-    return c.json(await apply(t, b.ops, "user", b.reason ?? ""));
+    return done(await apply(t, b.ops, "user", b.reason ?? ""));
   });
 
   app.post("/api/trips/:id/proposals/:pid/:action", async (c) => {
     if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403);
-    const p = proposals.find((x) => x.id === c.req.param("pid") && x.tripId === c.req.param("id") && x.status === "pending");
+    const p = (await store.proposals(c.req.param("id"))).find((x) => x.id === c.req.param("pid") && x.status === "pending");
     if (!p) return c.json({ error: "not found" }, 404);
-    if (c.req.param("action") === "reject") { p.status = "rejected"; return c.json(p); }
+    if (c.req.param("action") === "reject") { p.status = "rejected"; await store.saveProposal(p); return c.json(p); }
     const t = await load(p.tripId);
     if (t.revision !== p.baseRevision) return c.json({ error: "conflict", revision: t.revision }, 409);
     const r = await apply(t, p.ops, "llm", p.reason);
-    if ("revision" in r) p.status = "approved";
+    if ("conflict" in r) return c.json({ error: "conflict" }, 409);
+    if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
   });
   return app;

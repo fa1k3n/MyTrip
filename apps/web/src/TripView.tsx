@@ -72,7 +72,7 @@ export function Weather({ forecast }: { forecast?: Forecast }) {
 
 /** The lock of one part of Nåla (ED-18). */
 export const PartLock = ({ on, part, toggle, tip = "left" }: { on: boolean; part: string; toggle: () => void; tip?: "left" | "right" }) =>
-  <IconButton icon={on ? "unlock" : "lock"} look="bare" tip={tip} label={unlockLabel(on, part)} onClick={toggle} pressed={on} />;
+  <span className="partlock"><IconButton icon={on ? "unlock" : "lock"} look="bare" tip={tip} label={unlockLabel(on, part)} onClick={toggle} pressed={on} /></span>;
 
 function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, editing, toggleLock, run }: {
   t: Trip; x: Day; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
@@ -116,10 +116,11 @@ export type TripViewProps = {
   addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
+  guest?: boolean; // opened with a share link: everything stays locked, no way back to the start page (AU-03)
 };
 
 export function TripView(p: TripViewProps) {
-  const { t, tab } = p, lock = tab === "up"; // ED-11; Nåla locks each part on its own (ED-18)
+  const { t, tab } = p, lock = tab === "up" || !!p.guest; // ED-11, AU-03; otherwise Nåla locks each part on its own (ED-18)
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
   let main;
@@ -155,15 +156,15 @@ export function TripView(p: TripViewProps) {
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson} /></Suspense>;
   return <>
-    <div className="top"><IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" /><Gear onClick={p.admin} /></div>
+    {!p.guest && <div className="top"><IconButton icon="back" label={sv.allTrips} onClick={p.back} tip="right" /><Gear onClick={p.admin} /></div>}
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
-      {tab === "nala" && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
+      {tab === "nala" && !p.guest && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
     </div><p className="ro">{tripDates(t)}{t.note ? ` · ${t.note}` : ""}</p><div className="card manifest">{t.purpose || sv.noPurpose}</div>
     <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>
-    <div className={lock ? "lock" : ""}>{main}</div>
+    <div className={`${lock ? "lock" : ""} ${p.guest ? "guest" : ""}`}>{main}</div>
     {(tab === "nala" || tab === "up") && Object.keys(p.forecast).length > 0 && (
       <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></p>
     )}

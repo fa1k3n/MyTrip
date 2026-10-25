@@ -159,6 +159,7 @@ export type TripViewProps = {
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
+  notices: () => void; // the bell: notices on this phone (NT-03)
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
   waiting: Waiting[]; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
 };
@@ -194,16 +195,17 @@ export function TripView(p: TripViewProps) {
     expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
     approver={perms.superuser || p.who?.role === "planner"} run={p.run} /></Suspense>;
   return <>
-    {(perms.settings || p.who || p.fullApp || p.toChooser) && <div className="top">
+    <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}
       <span className="topend">
         {p.who && (p.who.role === "follower"
           ? <span className="who follower">{p.who.name}</span>
           : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
+        {/* the person's own settings for notices (NT-03) */}<IconButton icon="bell" label={sv.notice.bell} onClick={p.notices} tip="left" />
         {perms.settings && <Gear onClick={p.admin} />}
         {p.fullApp && <IconButton icon="external" label={sv.fullApp} onClick={p.fullApp} tip="left" />}
       </span>
-    </div>}
+    </div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
       {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}

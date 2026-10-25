@@ -83,3 +83,5 @@ export function cookieLinks(cookie: string): string[] {
 /** The hint on adding the app to the home screen: in Safari on an iPhone, not installed, until closed (PW-12). */
 export const showInstallHint = (ua: string, installed: boolean, closed: boolean) =>
   !installed && !closed && /iPhone/.test(ua) && /Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+/** The link the phone keeps for a trip, so a notice opens that trip (NT-04). */
+export const linkForTrip = (keys: string[], tripId: string) => keys.find((k) => tripOfLink(k) === tripId) ?? null;

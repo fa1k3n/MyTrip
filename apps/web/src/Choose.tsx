@@ -3,12 +3,21 @@ import { useEffect, useState } from "react";
 import type { Trip } from "@trip/schema";
 import { api, ApiError, deviceLinks, removeDeviceLink } from "./api.ts";
 import { loadCopy, loadQueue } from "./offline.ts";
+import { noticesKey } from "./notices.ts";
 import { tripOfLink } from "./access.ts";
 import { excerpt, tripDates } from "./format.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
 type Card = { key: string; trip?: Trip; cover?: string };
+
+/** A trip leaving the phone takes its notices along (NT-03, PW-17); best effort, the server also drops them with the link. */
+function stopNotices(key: string) {
+  const tripId = tripOfLink(key);
+  try { if (localStorage.getItem(noticesKey(tripId)) !== "on") return; localStorage.removeItem(noticesKey(tripId)); } catch { return; }
+  navigator.serviceWorker?.ready.then((r) => r.pushManager.getSubscription())
+    .then((sub) => sub && api.unsubscribe(tripId, sub.endpoint, key)).catch(() => {});
+}
 
 export default function Choose({ onPick }: { onPick: (key: string) => void }) {
   const [cards, setCards] = useState<Card[]>(() => deviceLinks().map((key) => ({ key })));
@@ -37,6 +46,7 @@ export default function Choose({ onPick }: { onPick: (key: string) => void }) {
     let n = 0;
     try { n = loadQueue(localStorage, x.key).length; } catch { /* storage blocked */ }
     if (!confirm(sv.choose.removeAsk(x.trip?.title ?? tripOfLink(x.key)) + (n ? ` ${sv.choose.unsent(n)}` : ""))) return; // PW-17
+    stopNotices(x.key);
     removeDeviceLink(x.key);
     setCards((c) => c.filter((y) => y.key !== x.key));
   };

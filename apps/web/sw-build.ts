@@ -1,4 +1,5 @@
-// The service worker, written by the build with the list of the build's files (PW-03, PW-11). Pure, so it runs under node --test.
+// The service worker, written by the build with the list of the build's files (PW-03, PW-11), which also shows notices (NT-01, NT-04).
+// Pure, so it runs under node --test.
 
 /** The page, every built file and the home screen files; source maps are not needed (PW-01, PW-03). */
 export const swFiles = (bundle: string[]) =>
@@ -29,5 +30,18 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   e.respondWith(caches.match(r).then((hit) => hit || fetch(r)));
+});
+// NT-01: a notice from the server; NT-04: a tap opens the app on its trip.
+self.addEventListener("push", (e) => {
+  const n = e.data ? e.data.json() : {};
+  e.waitUntil(self.registration.showNotification(n.title || "MyTrip", { body: n.body || "", data: { tripId: n.tripId }, icon: "/icon-192.png" }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = "/?trip=" + encodeURIComponent((e.notification.data && e.notification.data.tripId) || "");
+  e.waitUntil(self.clients.matchAll({ type: "window" }).then((open) => {
+    const w = open.find((c) => "navigate" in c);
+    return w ? w.navigate(url).then((c) => c && c.focus()) : self.clients.openWindow(url);
+  }));
 });
 `;

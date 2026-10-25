@@ -1,7 +1,7 @@
-// The store on Cloudflare: trips, settings, links, personal links, proposals, the log and cover images in D1 (DP-03..DP-06).
+// The store on Cloudflare: trips, settings, links, personal links, push subscriptions, proposals, the log and cover images in D1 (DP-03..DP-06, NT-03).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import type { LogEntry, PersonLink, Proposal, Store } from "./app.ts";
+import type { LogEntry, PersonLink, Proposal, PushSub, Store } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -92,6 +92,19 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
     async log() {
       const { results } = await db.prepare("SELECT json FROM log ORDER BY seq").all<{ json: string }>();
       return results.map((r) => JSON.parse(r.json) as LogEntry);
+    },
+    async pushSubs(tripId) {
+      const { results } = await db.prepare("SELECT trip_id, who, endpoint, p256dh, auth FROM push_subs WHERE trip_id = ? ORDER BY who, endpoint").bind(tripId)
+        .all<{ trip_id: string; who: string; endpoint: string; p256dh: string; auth: string }>();
+      return results.map((r): PushSub => ({ tripId: r.trip_id, who: r.who, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }));
+    },
+    async savePushSub(x) {
+      await db.prepare("INSERT INTO push_subs (trip_id, endpoint, who, p256dh, auth) VALUES (?, ?, ?, ?, ?) ON CONFLICT (trip_id, endpoint) DO UPDATE SET who = excluded.who, p256dh = excluded.p256dh, auth = excluded.auth")
+        .bind(x.tripId, x.endpoint, x.who, x.p256dh, x.auth).run();
+    },
+    async removePushSubs(tripId, m) {
+      await db.prepare("DELETE FROM push_subs WHERE trip_id = ? AND (? IS NULL OR endpoint = ?) AND (? IS NULL OR who = ?)")
+        .bind(tripId, m.endpoint ?? null, m.endpoint ?? null, m.who ?? null, m.who ?? null).run();
     },
   };
 }

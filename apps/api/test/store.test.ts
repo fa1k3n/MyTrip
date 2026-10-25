@@ -131,3 +131,21 @@ test("DP-05 a cover image larger than one SQL statement is stored in parts and c
   db.db.exec(loadSql({ trips: [], images: [{ name: "big.jpg", bytes: big.slice(0, 50_000) }] })); // a smaller replacement drops the old extra parts
   assert.deepEqual(await d1Store(db).image("big.jpg"), big.slice(0, 50_000));
 });
+
+for (const [name, make] of stores) {
+  // REQ: NT-03 every store keeps the push subscriptions per trip, and removes them by endpoint or person
+  test(`NT-03 ${name} store keeps push subscriptions`, async () => {
+    const s = await make();
+    const sub = (who: string, endpoint: string, tripId = "berlin") => ({ tripId, who, endpoint, p256dh: "p", auth: "a" });
+    await s.savePushSub(sub("anna", "https://push.example.com/1"));
+    await s.savePushSub(sub("bo", "https://push.example.com/2"));
+    await s.savePushSub(sub("anna", "https://push.example.com/1", "skane"));
+    await s.savePushSub({ ...sub("anna", "https://push.example.com/1"), auth: "new" }); // the same phone again
+    assert.deepEqual((await s.pushSubs("berlin")).map((x) => [x.who, x.endpoint, x.auth]), [["anna", "https://push.example.com/1", "new"], ["bo", "https://push.example.com/2", "a"]]);
+    await s.removePushSubs("berlin", { who: "anna" });
+    assert.deepEqual((await s.pushSubs("berlin")).map((x) => x.who), ["bo"]);
+    await s.removePushSubs("berlin", { endpoint: "https://push.example.com/2" });
+    assert.deepEqual(await s.pushSubs("berlin"), []);
+    assert.equal((await s.pushSubs("skane")).length, 1, "other trips keep theirs");
+  });
+}

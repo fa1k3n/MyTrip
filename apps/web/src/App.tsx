@@ -23,11 +23,12 @@ const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 const Choose = lazy(() => import("./Choose.tsx"));
+const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 
-type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
-const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | EditDlg;
+const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
 const ADDER_KEY = "mytrip.adder";
 const HINT_KEY = "mytrip.installHint";
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
@@ -314,7 +315,7 @@ export function App() {
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
-      addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
+      addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
@@ -343,6 +344,7 @@ export function App() {
       {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && permsFor(role, t).view.nala.plan === "write" && view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
+      {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
           <h3>{sv.newDream}</h3>

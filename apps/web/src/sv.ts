@@ -24,6 +24,19 @@ export const sv = {
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
+  notice: { // NT-01..NT-05: the texts of notices, also used by the server
+    expense: (who: string, what: string) => `${who} lade till en utgift: ${what}`, waits: " (väntar på godkännande)",
+    approved: (who: string, text: string) => `${who} godkände utgiften ${text}`, rejected: (who: string, text: string) => `${who} avvisade utgiften ${text}`,
+    added: (who: string, text: string, day: string) => `${who} lade till ${text}, ${day}`, changed: (who: string, text: string, day: string) => `${who} ändrade ${text}, ${day}`,
+    removed: (who: string, text: string, day: string) => `${who} tog bort ${text}, ${day}`,
+    booking: (who: string, name: string) => `${who} lade till bokningen ${name}`, task: (who: string, text: string) => `${who} lade till uppgiften ${text}`,
+    info: (who: string, title: string) => `${who} lade till ${title} under Praktiskt`, dream: (who: string, title: string) => `${who} lade till önskan ${title}`,
+    payment: (who: string, amount: string) => `${who} registrerade en betalning på ${amount}`, more: (n: number) => `och ${n} ändringar till`, admin: "Administratören",
+    title: "Notiser", bell: "Notiser för resan", on: "Notiser på den här telefonen", onText: "Du får en notis när någon annan ändrar i resan.",
+    offText: "Slå på för att få en notis när någon annan ändrar i resan.", denied: "Telefonen tillåter inte notiser från appen. Ändra det i telefonens inställningar.",
+    install: "Lägg först appen på hemskärmen, och öppna den därifrån, så kan den visa notiser.", unsupported: "Den här webbläsaren kan inte visa notiser.",
+    serverOff: "Notiser är inte påslagna på servern.", failed: "Det gick inte att slå på notiser. Försök igen.",
+  },
   unhandled: { // MI-09..MI-11
     title: "Ohanterade utlägg", waiting: "Väntar på godkännande", note: "Räknas in i avräkningen först när de är godkända.",
     approve: (text: string) => `Godkänn ${text}`, reject: (text: string) => `Avvisa ${text}`, rejectAsk: (text: string) => `Avvisa och ta bort ${text}?`,

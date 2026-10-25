@@ -1,9 +1,9 @@
 // The store for the local Node server: one file per trip, <dir>/<id>.trip.json, and cover images in <dir>/img/.
-// settings.json, links.json (share link secrets, AU-01), person-links.json (AU-11), proposals.json and log.jsonl sit beside them (DP-04).
+// settings.json, links.json (share link secrets, AU-01), person-links.json (AU-11), push-subs.json (NT-03), proposals.json and log.jsonl sit beside them (DP-04).
 import { appendFile, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Settings, Trip } from "@trip/schema";
-import type { LogEntry, PersonLink, Proposal, Store } from "./app.ts";
+import { bySubscriber, pushMatch, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -66,6 +66,14 @@ export function fileStore(dir: string): Store {
     saveLinks: (l) => writeJson("links.json", l),
     personLinks: () => readJson<PersonLink[]>("person-links.json", []),
     savePersonLinks: (l) => writeJson("person-links.json", l),
+    pushSubs: async (tripId) => (await readJson<PushSub[]>("push-subs.json", [])).filter((x) => x.tripId === tripId).sort(bySubscriber),
+    savePushSub: (x) => serial(async () => {
+      const all = await readJson<PushSub[]>("push-subs.json", []);
+      await writeJson("push-subs.json", [...all.filter((y) => !(y.tripId === x.tripId && y.endpoint === x.endpoint)), x]);
+    }),
+    removePushSubs: (tripId, m) => serial(async () => {
+      await writeJson("push-subs.json", (await readJson<PushSub[]>("push-subs.json", [])).filter((x) => !(x.tripId === tripId && pushMatch(x, m))));
+    }),
     proposals: async (tripId) => (await readJson<Proposal[]>("proposals.json", [])).filter((p) => p.tripId === tripId),
     saveProposal: (p) => serial(async () => {
       const all = await readJson<Proposal[]>("proposals.json", []);

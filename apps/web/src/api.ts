@@ -3,7 +3,7 @@ import type { Traffic } from "./transport.ts";
 
 import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
-import { addLink, authHeader, cookieLinks, linkCookie, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
+import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
 const TOKEN = import.meta.env.DEV ? (import.meta.env.VITE_TRIP_TOKEN ?? "") : "";
@@ -36,8 +36,12 @@ if (fromUrl?.kind === "link") {
 if (fromUrl?.kind === "admin") { links = []; keep(); try { dropAllCopies(localStorage); } catch { /* nothing stored */ } } // PW-17
 // A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
 addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
-/** The link in use: the one just opened, or the only one on the phone; with several, the start page asks (PW-16). */
-let link = fromUrl?.kind === "link" ? fromUrl.key : links.length === 1 ? links[0] : null;
+/** A tapped notice opens the app with ?trip=, which picks the phone's link for that trip (NT-04). */
+const askedTrip = new URLSearchParams(location.search).get("trip");
+if (askedTrip !== null) history.replaceState(null, "", location.pathname + location.hash);
+/** The link in use: the one just opened, the one of a tapped notice's trip, or the only one on the phone; with several,
+ * the start page asks (PW-16). */
+let link = fromUrl?.kind === "link" ? fromUrl.key : (askedTrip && linkForTrip(links, askedTrip)) || (links.length === 1 ? links[0] : null);
 /** True when the page was opened with #admin, to reach the admin login from a device that holds a link. */
 export const askedForAdmin = fromUrl?.kind === "admin";
 /** The link in use no longer works: it leaves the phone, and the only one left, if any, is used (AU-07, PW-17). */
@@ -158,6 +162,9 @@ export const api = {
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),
   change: (t: Trip, ops: Op[], reason: string) =>
     call<unknown>(`${trip(t.id)}/changes`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops, reason }) }),
+  pushKey: () => call<{ key: string }>("/api/push/key"), // NT-03, NT-05
+  subscribe: (tripId: string, sub: PushSubscriptionJSON) => call<void>(`${trip(tripId)}/push`, { method: "PUT", body: JSON.stringify(sub) }),
+  unsubscribe: (tripId: string, endpoint: string, key = link) => call<void>(`${trip(tripId)}/push`, { method: "DELETE", body: JSON.stringify({ endpoint }) }, key),
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),

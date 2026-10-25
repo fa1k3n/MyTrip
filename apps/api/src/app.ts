@@ -2,11 +2,16 @@ import { Hono, type Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
+import { describeChange, noticeBody } from "./notify.ts";
+import { pushRequest, vapidPublicKey } from "./push.ts";
+import { sv } from "../../web/src/sv.ts";
 
 export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
 export type LogEntry = { at: string; tripId: string; actor: string; reason: string; ops: Op[] };
 /** A traveler's personal link to one trip, with the permission Resenär (traveler) or Planerare (planner) (AU-11). */
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner" };
+/** A phone that wants notices for a trip (NT-03): who is a traveler id, "follower" for the common link, or "admin". */
+export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
 
 export interface Store {
   list(): Promise<Trip[]>;
@@ -27,6 +32,10 @@ export interface Store {
   saveProposal(p: Proposal): Promise<void>;
   appendLog(e: LogEntry): Promise<void>;
   log(): Promise<LogEntry[]>;
+  /** Push subscriptions per trip (NT-03, NT-05); one endpoint has one row per trip. */
+  pushSubs(tripId: string): Promise<PushSub[]>;
+  savePushSub(s: PushSub): Promise<void>;
+  removePushSubs(tripId: string, match: { endpoint?: string; who?: string }): Promise<void>;
 }
 export type Tokens = { read: string; propose: string; admin: string };
 /** Admin login (AU-04): off when no password is set. The session key signs the cookie. */
@@ -42,7 +51,11 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   let links: Record<string, string> = {};
   let people: PersonLink[] = [];
   const proposals = new Map<string, Proposal>(), log: LogEntry[] = [];
+  let subs: PushSub[] = [];
   return {
+    pushSubs: async (tripId) => structuredClone(subs.filter((x) => x.tripId === tripId).sort(bySubscriber)),
+    savePushSub: async (x) => { subs = [...subs.filter((y) => !(y.tripId === x.tripId && y.endpoint === x.endpoint)), structuredClone(x)]; },
+    removePushSubs: async (tripId, m) => { subs = subs.filter((x) => !(x.tripId === tripId && pushMatch(x, m))); },
     links: async () => ({ ...links }),
     saveLinks: async (l) => { links = { ...l }; },
     personLinks: async () => structuredClone(people),
@@ -158,8 +171,12 @@ function ownExpenses(ops: Op[], travelerId: string): Op[] | null {
 }
 
 type Env = { Variables: { role: Role; tripId?: string; travelerId?: string } };
+/** True when a subscription matches every given field. */
+/** The order every store lists subscriptions in. */
+export const bySubscriber = (a: PushSub, b: PushSub) => a.who.localeCompare(b.who) || a.endpoint.localeCompare(b.endpoint);
+export const pushMatch = (x: PushSub, m: { endpoint?: string; who?: string }) => (!m.endpoint || x.endpoint === m.endpoint) && (!m.who || x.who === m.who);
 
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth } & TrafficOpts = {}) {
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth; vapidKey?: string } & TrafficOpts = {}) {
   const app = new Hono<Env>();
   const { adminPassword, sessionKey } = opts.auth ?? {};
   const fails = new Map<string, { n: number; since: number }>(); // per address, in memory (AU-05)
@@ -242,12 +259,34 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   app.use("/api/trips/:id", async (c, next) => (scoped(c) && c.req.param("id") !== c.get("tripId") ? c.json({ error: "not found" }, 404) : next()));
   app.use("/api/settings", async (c, next) => (scoped(c) ? c.json({ error: "forbidden" }, 403) : next()));
 
-  async function apply(base: Trip, ops: Op[], actor: string, reason: string) {
+  /** Work that goes on after the answer: kept alive in the Worker, on its own in Node. */
+  const later = (c: Context<Env>, p: Promise<unknown>) => { const q = p.catch(() => {}); try { c.executionCtx.waitUntil(q); } catch { /* Node */ } };
+  /** Who made a change, as notices compare it with each subscription (NT-01). */
+  const whoOf = (c: Context<Env>) => c.get("travelerId") ?? (c.get("role") === "link" ? "follower" : "admin");
+  /** A notice to every other phone with notices on, each described from its own view of the trip (NT-01, NT-02, NT-05). */
+  async function notify(before: Trip, after: Trip, who: string, name: string, origin: string) {
+    if (!opts.vapidKey) return;
+    const people = await store.personLinks();
+    for (const s of (await store.pushSubs(before.id)).filter((x) => x.who !== who)) {
+      const role: Role | undefined = s.who === "admin" ? "admin" : s.who === "follower" ? "link" : people.find((l) => l.tripId === before.id && l.travelerId === s.who)?.role;
+      if (!role) { await store.removePushSubs(before.id, { who: s.who }); continue; } // the link is gone
+      const id = role === "traveler" || role === "planner" ? s.who : undefined;
+      const lines = describeChange(view(before, role, id), view(after, role, id), name);
+      if (!lines.length) continue;
+      const payload = JSON.stringify({ title: after.title, body: noticeBody(lines), tripId: after.id });
+      const r = await pushRequest({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, opts.vapidKey, origin);
+      const res = await (opts.fetch ?? fetch)(r.url, { method: "POST", headers: r.headers, body: r.body }).catch(() => undefined);
+      if (res && (res.status === 404 || res.status === 410)) await store.removePushSubs(before.id, { endpoint: s.endpoint }); // NT-05
+    }
+  }
+
+  async function apply(base: Trip, ops: Op[], actor: string, reason: string, notice?: { c: Context<Env>; who: string }) {
     const next = Trip.parse(applyOps(base, ops));
     const problems = checkTrip(next);
     if (problems.length) return { problems };
     if (!(await store.save({ ...next, id: base.id, revision: base.revision + 1 }, base.revision))) return { conflict: true as const }; // DP-03
     await store.appendLog({ at: new Date().toISOString(), tripId: base.id, actor, reason, ops });
+    if (notice) later(notice.c, notify(base, next, notice.who, notice.who === "admin" ? sv.notice.admin : actor, new URL(notice.c.req.url).origin));
     return { revision: base.revision + 1 };
   }
 
@@ -321,6 +360,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const secret = newSecret();
     await store.saveLinks({ ...(await store.links()), [c.req.param("id")]: secret });
+    await store.removePushSubs(c.req.param("id"), { who: "follower" }); // the old link's phones (NT-05)
     return c.json({ secret }, 201);
   });
 
@@ -345,6 +385,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!old) return c.json({ error: "not found" }, 404);
     const next = { ...old, secret: newSecret() }; // the old link stops working at once
     await store.savePersonLinks([...all.filter((l) => l !== old), next]);
+    await store.removePushSubs(old.tripId, { who: old.travelerId }); // NT-05
     return c.json(shown(next));
   });
   app.delete("/api/trips/:id/people/:tid", async (c) => {
@@ -352,6 +393,24 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const all = await store.personLinks(), rest = all.filter((l) => !(l.tripId === c.req.param("id") && l.travelerId === c.req.param("tid")));
     if (rest.length === all.length) return c.json({ error: "not found" }, 404);
     await store.savePersonLinks(rest);
+    await store.removePushSubs(c.req.param("id"), { who: c.req.param("tid") }); // NT-05
+    return c.body(null, 204);
+  });
+
+  // NT-03, NT-05: the public key to subscribe with, and each phone's subscription per trip.
+  app.get("/api/push/key", async (c) => (opts.vapidKey ? c.json({ key: await vapidPublicKey(opts.vapidKey) }) : c.json({ error: "off" }, 404)));
+  app.put("/api/trips/:id/push", async (c) => {
+    if (c.get("role") === "read" || c.get("role") === "propose") return c.json({ error: "forbidden" }, 403); // a token is no person
+    const b = await c.req.json<{ endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }>().catch(() => ({} as never));
+    const ok = typeof b.endpoint === "string" && /^https:\/\//.test(b.endpoint) && typeof b.keys?.p256dh === "string" && typeof b.keys?.auth === "string";
+    if (!ok) return c.json({ error: "endpoint and keys needed" }, 400);
+    await store.savePushSub({ tripId: c.req.param("id"), who: whoOf(c), endpoint: b.endpoint as string, p256dh: b.keys!.p256dh as string, auth: b.keys!.auth as string });
+    return c.body(null, 204);
+  });
+  app.delete("/api/trips/:id/push", async (c) => {
+    const b = await c.req.json<{ endpoint?: unknown }>().catch(() => ({} as never));
+    if (typeof b.endpoint !== "string") return c.json({ error: "endpoint needed" }, 400);
+    await store.removePushSubs(c.req.param("id"), { endpoint: b.endpoint, who: whoOf(c) });
     return c.body(null, 204);
   });
 
@@ -388,13 +447,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (problems.length) return c.json({ ok: false, problems }, 422);
     const done = (r: Awaited<ReturnType<typeof apply>>) => ("conflict" in r ? c.json({ error: "conflict" }, 409) : c.json(r));
     // Personal links apply at once, logged with the traveler's name (AU-12, AU-14, AU-15).
-    if (ar) return done(await apply(t, b.ops, travelerId ? t.travelers.find((x) => x.id === travelerId)?.name ?? travelerId : "link", b.reason ?? ""));
+    if (ar) return done(await apply(t, b.ops, travelerId ? t.travelers.find((x) => x.id === travelerId)?.name ?? travelerId : "link", b.reason ?? "", { c, who: whoOf(c) }));
     if (c.get("role") !== "admin") {
       const p: Proposal = { id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: b.ops, reason: b.reason ?? "", status: "pending", at: new Date().toISOString() };
       await store.saveProposal(p); // MC-06, MC-07: only an admin applies or approves
       return c.json({ proposalId: p.id, status: p.status }, 202);
     }
-    return done(await apply(t, b.ops, "user", b.reason ?? ""));
+    return done(await apply(t, b.ops, "user", b.reason ?? "", { c, who: whoOf(c) }));
   });
 
   app.post("/api/trips/:id/proposals/:pid/:action", async (c) => {
@@ -404,7 +463,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (c.req.param("action") === "reject") { p.status = "rejected"; await store.saveProposal(p); return c.json(p); }
     const t = await load(p.tripId);
     if (t.revision !== p.baseRevision) return c.json({ error: "conflict", revision: t.revision }, 409);
-    const r = await apply(t, p.ops, "llm", p.reason);
+    const r = await apply(t, p.ops, "llm", p.reason, { c, who: "admin" });
     if ("conflict" in r) return c.json({ error: "conflict" }, 409);
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });

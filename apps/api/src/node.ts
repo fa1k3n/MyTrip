@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Trip } from "@trip/schema";
+import { Settings, Trip } from "@trip/schema";
 import { createApp, type Store } from "./app.ts";
 
 // One file per trip: <dir>/<id>.trip.json. Cover images live in <dir>/img/.
@@ -10,6 +10,7 @@ const dir = process.env.TRIP_DIR ?? fileURLToPath(new URL("../../../data/", impo
 const tokens = { read: process.env.TRIP_READ_TOKEN ?? "", propose: process.env.TRIP_PROPOSE_TOKEN ?? "", admin: process.env.TRIP_ADMIN_TOKEN ?? "" };
 if (!tokens.admin) throw new Error("Set TRIP_ADMIN_TOKEN (and TRIP_READ_TOKEN, TRIP_PROPOSE_TOKEN)");
 
+const settingsFile = join(dir, "settings.json");
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const file = (id: string) => join(dir, `${id}.trip.json`);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -42,7 +43,17 @@ const store: Store = {
       throw e;
     }
   },
+  async loadSettings() {
+    try {
+      return Settings.parse(JSON.parse(await readFile(settingsFile, "utf8")));
+    } catch (e) {
+      if (missing(e)) return Settings.parse({});
+      throw e;
+    }
+  },
+  saveSettings: (s) => writeFile(settingsFile, JSON.stringify(s, null, 2) + "\n"),
 };
 
-serve({ fetch: createApp(store, tokens).fetch, port: Number(process.env.PORT ?? 8787) });
+// AI_API_KEY is only checked for presence here; it never leaves the server (AI-03, MC-13).
+serve({ fetch: createApp(store, tokens, { aiService: !!process.env.AI_API_KEY }).fetch, port: Number(process.env.PORT ?? 8787) });
 console.log(`API on http://localhost:${process.env.PORT ?? 8787}, trips in ${dir}`);

@@ -33,3 +33,22 @@ export function parseForecast(json: unknown): Record<string, Forecast>[] {
     Object.fromEntries(d!.time.map((date, i) => [date, { code: d!.weather_code[i], rain: d!.precipitation_probability_max[i], tMax: d!.temperature_2m_max[i], wind: d!.wind_speed_10m_max[i] }])
       .filter(([, f]) => Object.values(f as Forecast).every((v) => typeof v === "number"))));
 }
+
+/** Place search of the same provider, used to give a new day its forecast location (ED-04). */
+export function geocodeUrl(name: string) {
+  const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  u.searchParams.set("name", name);
+  u.searchParams.set("count", "1");
+  u.searchParams.set("language", "sv");
+  u.searchParams.set("format", "json");
+  return u.toString();
+}
+
+export function parseGeocode(json: unknown): { lat: number; lon: number } | null {
+  const r = (json as { results?: { latitude: number; longitude: number }[] })?.results?.[0];
+  return r ? { lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100 } : null;
+}
+
+/** null when the place is unknown or the provider cannot be reached. */
+export const geocode = (name: string) =>
+  fetch(geocodeUrl(name)).then((r) => (r.ok ? r.json() : null)).then(parseGeocode, () => null);

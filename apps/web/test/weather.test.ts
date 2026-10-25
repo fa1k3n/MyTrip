@@ -34,3 +34,15 @@ test("WX-14 parseForecast", () => {
   assert.deepEqual(parseForecast(one).length, 1);
   assert.deepEqual(parseForecast({ error: true }), []);
 });
+
+// REQ: ED-04 the place search of the weather provider gives the day's coordinates
+test("ED-04 geocodeUrl and parseGeocode", async () => {
+  const { geocodeUrl, parseGeocode } = await import("../src/weather.ts");
+  const u = new URL(geocodeUrl("Köpenhamn"));
+  assert.equal(u.hostname, "geocoding-api.open-meteo.com");
+  assert.equal(u.searchParams.get("name"), "Köpenhamn");
+  assert.equal(u.searchParams.get("count"), "1");
+  assert.deepEqual(parseGeocode({ results: [{ latitude: 55.67594, longitude: 12.56553 }] }), { lat: 55.68, lon: 12.57 });
+  assert.equal(parseGeocode({}), null);
+  assert.equal(parseGeocode({ results: [] }), null);
+});

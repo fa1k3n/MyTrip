@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { Trip, applyOps, checkTrip, describeError, type Op } from "@trip/schema";
+import { Settings, Trip, applyOps, checkTrip, describeError, type Op } from "@trip/schema";
 
 export interface Store {
   list(): Promise<Trip[]>;
@@ -7,6 +7,8 @@ export interface Store {
   save(next: Trip): Promise<void>;
   remove(id: string): Promise<boolean>;
   image(name: string): Promise<Uint8Array<ArrayBuffer> | undefined>;
+  loadSettings(): Promise<Settings>;
+  saveSettings(s: Settings): Promise<void>;
 }
 export type Tokens = { read: string; propose: string; admin: string };
 type Role = "read" | "propose" | "admin";
@@ -17,19 +19,22 @@ const mime: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", pn
 /** In-memory store for tests and demos. */
 export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8Array<ArrayBuffer>> = {}): Store {
   const m = new Map(trips.map((t) => { const p = Trip.parse(t); return [p.id, p] as const; }));
+  let settings = Settings.parse({});
   return {
     list: async () => [...m.values()].map((t) => structuredClone(t)),
     load: async (id) => (m.has(id) ? structuredClone(m.get(id)) : undefined),
     save: async (t) => void m.set(t.id, structuredClone(t)),
     remove: async (id) => m.delete(id),
     image: async (name) => images[name],
+    loadSettings: async () => structuredClone(settings),
+    saveSettings: async (s) => { settings = structuredClone(s); },
   };
 }
 
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "trip";
 
-export function createApp(store: Store, tokens: Tokens) {
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean } = {}) {
   const app = new Hono<{ Variables: { role: Role } }>();
   const proposals: Proposal[] = []; // TODO persist (D1)
   const log: object[] = [];         // TODO persist (D1), MC-08
@@ -66,6 +71,14 @@ export function createApp(store: Store, tokens: Tokens) {
     await store.save(trip);
     log.push({ at: new Date().toISOString(), tripId: trip.id, actor: "user", reason: "create", ops: [] });
     return c.json(trip, 201);
+  });
+  app.get("/api/settings", async (c) => c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService })); // AI-08
+  app.put("/api/settings", async (c) => {
+    if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403); // AI-09
+    const parsed = Settings.safeParse(await c.req.json().catch(() => undefined));
+    if (!parsed.success) return c.json({ ok: false, problems: describeError(parsed.error) }, 422);
+    await store.saveSettings(parsed.data);
+    return c.json(parsed.data);
   });
   app.get("/api/log", (c) => (need(c, "admin") ? c.json(log) : c.json({ error: "forbidden" }, 403)));
 

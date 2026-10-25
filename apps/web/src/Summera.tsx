@@ -2,6 +2,7 @@
 import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
 import { balanceText, balances, budgetVsActual, settle, type Transfer } from "./money.ts";
+import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
 type Props = { t: Trip; addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void };
@@ -20,15 +21,15 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
           <h3>{sv.balance}</h3>
           {!t.travelers.length && <p className="ro">{sv.noPeople}</p>}
           {t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span><span>{balanceText(bal[x.id] ?? 0)}</span></div>)}
-          <div data-mut=""><button className="btn ghost add" onClick={addPerson}>{sv.addPerson}</button></div>
+          <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={addPerson} mut tip="right" /></div>
         </section>
         {group && (
           <section className="card">
             <h3>{sv.settleUp}</h3>
             {transfers.length ? transfers.map((x) => (
-              <div className="row" key={`${x.from}-${x.to}`}>
+              <div className="row mid" key={`${x.from}-${x.to}`}>
                 <span>{name(x.from)} → {name(x.to)}</span>
-                <span>{kr(x.amount)} <button className="btn ghost sm" data-mut="" onClick={() => addPayment(x)}>{sv.register}</button></span>
+                <span className="end">{kr(x.amount)}<IconButton icon="check" look="bare" tip="left" label={`${sv.register} ${name(x.from)} → ${name(x.to)}`} onClick={() => addPayment(x)} mut /></span>
               </div>
             )) : <p className="ro">{sv.allEven}</p>}
           </section>
@@ -43,7 +44,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
               <span>{kr(e.amount)}</span>
             </div>
           )) : <p className="ro">{sv.noExpenses}</p>}
-          {t.travelers.length > 0 && <div data-mut=""><button className="btn add" onClick={addExpense}>{sv.addExpense}</button></div>}
+          {t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={addExpense} mut tip="right" /></div>}
         </section>
       </div>
       <div>
@@ -65,7 +66,7 @@ export function Summera({ t, addExpense, addPayment, addPerson }: Props) {
               <span>{kr(x.amount)}</span>
             </div>
           )) : <p className="ro">{sv.noPayments}</p>}
-          {group && <div data-mut=""><button className="btn ghost add" onClick={() => addPayment()}>{sv.addPayment}</button></div>}
+          {group && <div className="add"><IconButton icon="plus" label={sv.addPayment} onClick={() => addPayment()} mut tip="right" /></div>}
         </section>
       </div>
     </div>

@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Trip } from "@trip/schema";
-import { api, maskedToken } from "./api.ts";
+import type { Op, Settings, Trip } from "@trip/schema";
+import { api, ApiError, maskedToken } from "./api.ts";
+import { EditDialog, editTitle, type EditDlg } from "./NalaForms.tsx";
 import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { parseAmount, sharedByValue, type Transfer } from "./money.ts";
+import { AiSettings, Gear, TripAi } from "./Settings.tsx";
+import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-type Dlg = null | { kind: "place"; name: string; address: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" };
+type Dlg = null | { kind: "place"; name: string; address: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | EditDlg;
 const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson };
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
 
@@ -42,14 +45,14 @@ function useForecast(trip: Trip | undefined) {
         if (live) setFc(Object.fromEntries(days.flatMap((d, i) => (per[i]?.[d.date] ? [[d.id, per[i][d.date]]] : []))));
       }, () => {});
     return () => { live = false; };
-  }, [trip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trip?.id, JSON.stringify(trip?.days.map((d) => [d.id, d.date, d.weather]))]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when days or places change (ED-04)
   return fc;
 }
 
 export function App() {
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [view, setView] = useState<"portal" | "trip" | "admin">("portal");
+  const [view, setView] = useState<"portal" | "trip" | "admin" | "settings">("portal");
   const [tripId, setTripId] = useState("");
   const [tab, setTab] = useState<Tab>("nala");
   const [open, setOpen] = useState<Open>({});
@@ -58,11 +61,18 @@ export function App() {
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [upDay, setUpDay] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
+  const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
 
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); api.settings().then(setSettings, () => {}); }, [load]);
+  const saveSettings = (next: Settings) => {
+    setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
+    api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
+  };
+  const aiCard = settings && <AiSettings s={settings} service={settings.aiService} onChange={saveSettings} />;
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
   const forecast = useForecast(view === "trip" ? t : undefined);
@@ -105,6 +115,17 @@ export function App() {
     change([{ op: "add", path: "dreams/-", value: { id, title, category: String(f.get("category")), source: sv.manual, icon: "✨", votes: 0 } }], "add dream");
     setDlg(null);
   };
+  /** Edits from the Nåla forms: the error text or null (ED-10). */
+  const apply = async (ops: Op[], reason: string): Promise<string | null> => {
+    try {
+      await api.change(t!, ops, reason);
+      await load();
+      return null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) { await load(); return sv.conflict; }
+      return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
+    }
+  };
   const savePayment = (x: Transfer & { note?: string }) =>
     change([{ op: "add", path: "payments/-", value: { id: newId("pay"), ...x, date: today } }], "payment");
   const saveForm = (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
@@ -133,8 +154,12 @@ export function App() {
   let page;
   if (failed) page = <p className="ro">{sv.error}</p>;
   else if (!trips) page = <p className="ro">{sv.loading}</p>;
+  else if (view === "settings") page = <>
+    <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView(settingsBack)} tip="right" /></div><h1>{sv.settings}</h1>
+    {aiCard}
+  </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><span className="chip">{sv.family}</span></div>
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} /></div></div>
     <div className="grid">
       {trips.map((x) => (
         <button className="card trip" key={x.id} onClick={() => openTrip(x.id)}>
@@ -146,12 +171,17 @@ export function App() {
     </div>
   </>;
   else if (view === "admin") page = <>
-    <div className="top"><button className="btn ghost" onClick={() => setView("trip")}>{sv.back}</button></div><h1>{sv.admin}</h1>
+    <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView("trip")} tip="right" /></div><h1>{sv.admin}</h1>
+    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => setDlg({ kind: "trip" })} /></div></div>
     <div className="card">
       {t.inbox && <><h3>{sv.inbox}</h3><p>{sv.inboxText} <b>{t.inbox}</b></p></>}
       <h3>{sv.apiKey}</h3><p>{maskedToken()}</p>
     </div>
-    <div className="card danger"><h3>{sv.danger}</h3><button className="btn red" onClick={removeTrip}>{sv.deleteTrip}</button></div>
+    {settings && (
+      <TripAi s={settings} on={t.ai} openSettings={() => { setSettingsBack("admin"); setView("settings"); }}
+        onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />
+    )}
+    <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>
   </>;
   else page = (
     <TripView
@@ -163,6 +193,7 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
+      edit={setDlg}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
     />
   );
@@ -170,7 +201,7 @@ export function App() {
   return <>
     <div className="wrap">{page}</div>
     <dialog
-      ref={dialog} aria-label={!dlg ? undefined : dlg.kind === "place" ? dlg.name : dlgTitle[dlg.kind]}
+      ref={dialog} aria-label={!dlg ? undefined : dlg.kind === "place" ? dlg.name : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
       onClose={() => { setDlg(null); opener.current?.focus(); }}
       onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
         const r = e.currentTarget.getBoundingClientRect();
@@ -188,6 +219,9 @@ export function App() {
           <button className="btn" type="submit">{sv.save}</button>{" "}
           <button className="btn ghost" type="button" onClick={() => setDlg(null)}>{sv.cancel}</button>
         </form>
+      )}
+      {dlg && t && ["trip", "day", "activity", "booking", "budget"].includes(dlg.kind) && (
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} />
       )}
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
         <form onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>

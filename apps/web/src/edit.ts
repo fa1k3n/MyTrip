@@ -85,14 +85,63 @@ export const removeDay = (t: Trip, id: string): Op[] => [
   ...removeAt("days", [t.days.findIndex((d) => d.id === id)]),
 ];
 
+// --- The trip's dates (ED-14): days are added and removed by changing the first and last date in the trip's settings
+
+const MAX_DAYS = 60;
+
+/** The first and last date of the trip, or null when it has no days. */
+export function tripRange(t: Trip) {
+  const ds = t.days.map((d) => d.date).sort();
+  return ds.length ? { from: ds[0], to: ds[ds.length - 1] } : null;
+}
+
+/** Every date from `from` to `to`; computed in UTC so summer time does not skip or repeat a day. */
+function datesBetween(from: string, to: string) {
+  const out: string[] = [];
+  for (let d = new Date(`${from}T00:00:00Z`); out.length <= MAX_DAYS; d.setUTCDate(d.getUTCDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10);
+    if (iso > to) break;
+    out.push(iso);
+  }
+  return out;
+}
+
+/** Days that a new date range would remove; the form asks before removing them (ED-09). */
+export const daysOutside = (t: Trip, from: string, to: string) => t.days.filter((d) => d.date < from || d.date > to);
+
+export function setTripDates(t: Trip, input: { from: string; to: string }): Result {
+  if (!isDate(input.from) || !isDate(input.to)) return fail(sv.errors.dates);
+  if (input.to < input.from) return fail(sv.errors.toBeforeFrom);
+  const dates = datesBetween(input.from, input.to);
+  if (dates.length > MAX_DAYS) return fail(sv.errors.tooLong);
+  const taken = allIds(t), have = new Set(t.days.map((d) => d.date));
+  const gone = new Set(daysOutside(t, input.from, input.to).map((d) => d.id));
+  const ops: Op[] = [
+    ...removeAt("stops", t.stops.flatMap((s, n) => (gone.has(s.dayId) ? [n] : []))),
+    ...removeAt("days", t.days.flatMap((d, n) => (gone.has(d.id) ? [n] : []))),
+  ];
+  for (const date of dates.filter((x) => !have.has(x))) {
+    const id = uniqueId(`day-${date}`, taken);
+    taken.push(id);
+    const badge = dateBadge(date);
+    ops.push(
+      { op: "add", path: "days/-", value: { id, date, title: sv.newDay, summary: sv.emptyDay, icons: ["📅"], start: "09:00", end: "18:00", estimated: true, legs: [], activities: [] } },
+      { op: "add", path: "stops/-", value: { label: sv.newDay, sub: `${badge.d} ${badge.w}`, dayId: id } },
+    );
+  }
+  return ok(ops);
+}
+
 export type ActivityInput = {
   start: string; estimated: boolean; text: string;
   place: { kind: "none" } | { kind: "existing"; id: string } | { kind: "new"; name: string; address: string };
   category?: string; // undefined: keep, "": none (ED-12)
+  durationMin?: number; // undefined: keep (ED-15)
+  note?: string; // undefined: keep, "": remove (ED-19)
 };
 
 /** Timed activities in time order, untimed last (ED-05). */
-const byTime = (list: Activity[]) =>
+export const byTime = (list: Activity[]) =>
   [...list].sort((a, b) => (a.start ? (b.start ? a.start.localeCompare(b.start) : -1) : b.start ? 1 : 0));
 
 export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: string): Result {
@@ -119,6 +168,9 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     ...old, id: old?.id ?? uniqueId(text, taken), text, placeIds,
     start: input.start || undefined, estimated: !!input.start && input.estimated,
     category: input.category === undefined ? old?.category : input.category || undefined,
+    durationMin: input.durationMin ?? old?.durationMin,
+    note: input.note === undefined ? old?.note : input.note.trim() || undefined,
+    end: input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];
   ops.push({ op: "set", path: `days/${di}/activities`, value: byTime(next) });
@@ -273,7 +325,34 @@ export function addPacking(t: Trip, list: string, text: string): Result {
   return ok([{ op: "add", path: `${path}/-`, value: item }]);
 }
 
+/** The list's items and which of them are checked; checks are stored by item text beside the list (PK-05). */
+function packingList(t: Trip, list: string) {
+  if (list === "shared") return { items: t.packing, packed: t.packed, path: "packed" };
+  const i = t.travelers.findIndex((x) => x.id === list);
+  return i < 0 ? null : { items: t.travelers[i].packing, packed: t.travelers[i].packed, path: `travelers/${i}/packed` };
+}
+
+export const isPacked = (t: Trip, list: string, item: string) => !!packingList(t, list)?.packed.includes(item);
+
+export function packedCount(t: Trip, list: string) {
+  const l = packingList(t, list);
+  return { packed: l ? l.items.filter((x) => l.packed.includes(x)).length : 0, total: l?.items.length ?? 0 };
+}
+
+export function togglePacked(t: Trip, list: string, item: string): Op[] {
+  const l = packingList(t, list);
+  if (!l) return [];
+  const value = l.packed.includes(item) ? l.packed.filter((x) => x !== item) : [...l.packed, item];
+  return [{ op: "set", path: l.path, value }];
+}
+
 export function removePacking(t: Trip, list: string, index: number): Op[] {
-  const path = packingPath(t, list);
-  return path ? [{ op: "remove", path: `${path}/${index}` }] : [];
+  const path = packingPath(t, list), l = packingList(t, list);
+  if (!path || !l) return [];
+  const item = l.items[index];
+  const stillThere = l.items.some((x, n) => n !== index && x === item); // another item with the same text keeps the check
+  return [
+    { op: "remove", path: `${path}/${index}` },
+    ...(l.packed.includes(item) && !stillThere ? [{ op: "set" as const, path: l.path, value: l.packed.filter((x) => x !== item) }] : []),
+  ];
 }

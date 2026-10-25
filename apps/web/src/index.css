@@ -96,7 +96,7 @@ dialog{max-height:92vh;overflow:auto}
 .day{overflow:visible}.day .hd{border-radius:16px 16px 0 0}
 /* Day tools at the top right of an expanded day card; the header leaves room for them. */
 .day{position:relative}.day .tools{position:absolute;top:8px;right:8px;display:flex;gap:2px}
-.day.open .hd{padding-right:110px}
+.day.open .hd{padding-right:150px}
 .lock .day .tools{display:none}
 /* Day card like the original page: weather under the date, icons on the right, chevron, summary hidden when open (WX-02, DC-06, DC-08, DC-12). */
 :root{--warn:#c62828}
@@ -173,3 +173,33 @@ dialog{position:relative}
 .dlg-x{position:absolute;top:8px;right:8px;z-index:2}
 dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .dh .icon{margin-top:-10px} /* line the edit pencil up with the corner X */
+/* Edit mode on: the lock button is filled terracotta (ED-13). */
+.btn.icon[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+/* Edit mode in Nåla: drag handles, drop line, and gap and clash rows between activities (ED-15..ED-17). */
+.act.drag{position:relative}.act.drag[draggable]{cursor:grab}
+.act .grip{cursor:grab;color:var(--mute);margin:-6px 0 -6px -10px}
+.act.over-top::before,.act.over-bottom::after,.drop.over-top::before{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--acc)}
+.act.over-top::before{top:-2px}.act.over-bottom::after{bottom:-2px}.drop{position:relative;padding:10px 0}
+.slot{margin:4px 0 4px 40px;padding:4px 10px;border-radius:8px;font-size:.85rem;font-weight:600}
+.slot.gap{border:1px dashed var(--sageT);color:var(--sageT);background:color-mix(in srgb,var(--sage) 12%,transparent)}
+.slot.clash{border:2px solid var(--warn);color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.miss{color:var(--warn)}
+/* Activity: time with the category icon under it; title, places and note stacked (ED-15, ED-19). */
+.act .when-col{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:4.6em;flex:none}.act .when-col time{min-width:0}
+.act .what,.act .what-col{display:flex;flex-direction:column;gap:2px;min-width:0}
+.act .what .name{font-weight:600}.act .places,.act .anote{font-size:.85rem;line-height:1.35}
+.act{align-items:flex-start}.act>.icon{align-self:center}
+/* One lock per part of Nåla (ED-18): in the day tools and in each side section's heading. */
+.sec>summary .seclock{margin-left:auto;margin-right:4px}.sec>summary h3{margin:0}
+.act .what,.act .what-col{flex:1 1 auto}.act .grip,.act>.icon{flex:none}.act .place{text-align:left}
+/* Phones (RS-01): the day tools get a row of their own under the header so the title keeps its width. */
+@media (max-width:767px){.day .tools{position:static;justify-content:flex-end;padding:0 8px 4px}.day.open .hd{padding-right:14px}}
+/* The edit mode lock sits at the right of the trip title (ED-13); a section's own lock shows only when it is open (ED-18). */
+.titlerow{display:flex;align-items:center;justify-content:space-between;gap:8px}.titlerow h1{min-width:0}
+.sec:not([open])>summary .seclock{display:none}
+/* Packing lists open and close like the side sections, and their items can be checked (PK-02, PK-05). */
+.box>summary{display:flex;justify-content:space-between;align-items:center;min-height:28px}
+.box>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin:-4px 8px 0 0}
+.box[open]>summary::after{transform:rotate(225deg);margin-top:4px}
+.box li .check{flex:1;margin:0}
+.box .done{text-decoration:line-through;color:var(--mute)}

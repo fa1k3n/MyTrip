@@ -1,4 +1,4 @@
-// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC, sparkle), inline so no image files are loaded (CP-05).
+// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC, sparkle and grip), inline so no image files are loaded (CP-05).
 import type { ReactNode } from "react";
 import { sv } from "./sv.ts";
 
@@ -14,6 +14,9 @@ const paths: Record<string, ReactNode> = {
   close: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
   sparkle: <><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z" /><path d="M20 3v4" /><path d="M22 5h-4" /></>,
   trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>,
+  lock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+  unlock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>,
+  grip: <><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
 };
 export type IconName = keyof typeof paths;
@@ -23,15 +26,16 @@ export const Icon = ({ name }: { name: IconName }) => (
 );
 
 /** A 44 × 44 px icon button with an accessible name and a tooltip on hover and keyboard focus (AC-05, UI-07). */
-export function IconButton({ icon, label, onClick, mut, look = "", tip = "" }: {
+export function IconButton({ icon, label, onClick, mut, pressed, look = "", tip = "" }: {
   icon: IconName; label: string; onClick: () => void;
+  pressed?: boolean; // a toggle button (aria-pressed)
   mut?: boolean; // an editing control, hidden in read-only views (UP-07)
   look?: "" | "bare" | "red" | "primary" | "fab";
   tip?: "" | "left" | "right" | "up"; // tooltip placement near page edges: grows to the left, to the right, or upwards
 }) {
   const base = look === "red" ? "btn red" : look === "primary" ? "btn" : look === "fab" ? "btn fab" : "btn ghost";
   return (
-    <button type="button" className={`${base} icon ${look} ${tip && `tip-${tip}`}`} onClick={onClick} aria-label={label} data-tip={label} {...(mut ? { "data-mut": "" } : {})}>
+    <button type="button" className={`${base} icon ${look} ${tip && `tip-${tip}`}`} onClick={onClick} aria-label={label} data-tip={label} aria-pressed={pressed} {...(mut ? { "data-mut": "" } : {})}>
       <Icon name={icon} />
     </button>
   );

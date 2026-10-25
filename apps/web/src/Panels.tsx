@@ -11,12 +11,12 @@ import { CatIcons, LineIcon } from "./CatIcon.tsx";
 const VEHICLE_IDS: Record<string, string[]> = { "🚗": ["car"], "🚢": ["ferry"], "🚆": ["train"], "🚇🚶": ["transit", "walk"] };
 import { sv } from "./sv.ts";
 
-export function PlaceView({ t, id, edit }: { t: Trip; id: string; edit: () => void }) {
+export function PlaceView({ t, id, edit }: { t: Trip; id: string; edit?: () => void }) {
   const place = t.places.find((x) => x.id === id);
   if (!place) return null;
   const v = placeView(place);
   return <>
-    <div className="dh"><h3>{v.name}</h3><IconButton icon="edit" look="bare" tip="left" label={sv.editPlace} onClick={edit} mut /></div>
+    <div className="dh"><h3>{v.name}</h3>{edit && <IconButton icon="edit" look="bare" tip="left" label={sv.editPlace} onClick={edit} mut />}</div>
     <p className="adr">{v.address}</p>
     {v.notes && <p className="ro">{v.notes}</p>}
     <p className="links">

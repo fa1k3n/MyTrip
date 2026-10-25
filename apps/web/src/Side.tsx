@@ -4,18 +4,23 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { bookingDates, budgetByCategory, kr, shortDate } from "./format.ts";
 import { amountText, budgetRows, money } from "./budget.ts";
-import { addPacking, removePacking, toggleTask } from "./edit.ts";
+import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { Icon, IconButton } from "./Icons.tsx";
-import { PlaceLink, type Run } from "./TripView.tsx";
+import { PartLock, PlaceLink, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 
 const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" };
 
-/** A collapsible section of the side column, closed by default (BG-01, PK-02). */
-const Section = ({ title, children }: { title: string; children: ReactNode }) => (
-  <details className="card sec"><summary><h3>{title}</h3></summary>{children}</details>
+type Part = (id: string) => { on: boolean; toggle: () => void };
+
+/** A collapsible section of the side column, closed by default (BG-01, PK-02), with its own lock (ED-18). */
+const Section = ({ title, lock, children }: { title: string; lock: ReturnType<Part>; children: ReactNode }) => (
+  <details className={`card sec ${lock.on ? "" : "lock"}`}>
+    <summary><h3>{title}</h3><span className="seclock" onClick={(e) => e.preventDefault()}><PartLock on={lock.on} part={title} toggle={lock.toggle} /></span></summary>
+    {children}
+  </details>
 );
 
 function Donut({ items }: { items: { category: string; amount?: number; paid: boolean }[] }) {
@@ -39,7 +44,7 @@ function Donut({ items }: { items: { category: string; amount?: number; paid: bo
   );
 }
 
-function Budget({ t, chart, onToggle, edit }: { t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
+function Budget({ t, chart, onToggle, edit, part }: { part: Part; t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
   const { paid, totals, other } = budgetRows(t.budget, t.currency);
   const label = (i: Trip["budget"][number]) => `${i.note ?? i.category}${i.owner ? ` · ${i.owner}` : ""}`;
   const row = (i: Trip["budget"][number], est: boolean) => (
@@ -51,9 +56,9 @@ function Budget({ t, chart, onToggle, edit }: { t: Trip; chart: boolean; onToggl
   );
   const sum = totals.map((x) => money(x.sum, x.currency)).join(" + ") || kr(0);
   return (
-    <Section title={sv.budget}>
+    <Section title={sv.budget} lock={part("budget")}>
       <div className="row mid"><span className="ro">{sv.paidSoFar} {sum}</span>
-        <span data-mut=""><IconButton icon={chart ? "list" : "chart"} label={chart ? sv.showList : sv.showChart} onClick={onToggle} tip="left" /></span></div>
+        <IconButton icon={chart ? "list" : "chart"} label={chart ? sv.showList : sv.showChart} onClick={onToggle} tip="left" /></div>
       {chart
         ? <Donut items={t.budget.filter((i) => !i.currency || i.currency === t.currency)} />
         : <>
@@ -67,9 +72,9 @@ function Budget({ t, chart, onToggle, edit }: { t: Trip; chart: boolean; onToggl
   );
 }
 
-function Bookings({ t, edit, onPlace }: { t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Bookings({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
   return (
-    <Section title={sv.bookings}>
+    <Section title={sv.bookings} lock={part("bookings")}>
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>
           <span><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><br />
@@ -84,9 +89,9 @@ function Bookings({ t, edit, onPlace }: { t: Trip; edit: (d: EditDlg) => void; o
   );
 }
 
-function Tasks({ t, today, edit, run, onPlace }: { t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void }) {
+function Tasks({ t, today, edit, run, onPlace, part }: { part: Part; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void }) {
   return (
-    <Section title={sv.todo}>
+    <Section title={sv.todo} lock={part("tasks")}>
       {!t.tasks.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
@@ -106,9 +111,9 @@ function Tasks({ t, today, edit, run, onPlace }: { t: Trip; today: string; edit:
   );
 }
 
-function Info({ t, edit, onPlace }: { t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Info({ t, edit, onPlace, part }: { part: Part; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
   return (
-    <Section title={sv.info}>
+    <Section title={sv.info} lock={part("info")}>
       {!t.info.length && <p className="ro">{sv.noInfo}</p>}
       {t.info.map((x) => (
         <div className="row mid" key={x.id}>
@@ -124,14 +129,19 @@ function Info({ t, edit, onPlace }: { t: Trip; edit: (d: EditDlg) => void; onPla
   );
 }
 
-function PackingList({ name, items, onAdd, onRemove }: { name: string; items: string[]; onAdd: (text: string) => void; onRemove: (i: number) => void }) {
+function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck }: {
+  name: string; items: string[]; packed: (item: string) => boolean; count: { packed: number; total: number };
+  onAdd: (text: string) => void; onRemove: (i: number) => void; onCheck: (item: string) => void;
+}) {
   const [v, setV] = useState("");
   const submit = (e: FormEvent) => { e.preventDefault(); if (v.trim()) { onAdd(v); setV(""); } };
   return (
     <details className="box">
-      <summary>{name} <small className="ro">({items.length})</small></summary>
+      <summary><span>{name} <small className="ro">({count.packed}/{count.total})</small></span></summary>
       <ul>{items.map((it, i) => (
-        <li key={`${i}-${it}`}><span>{it}</span><IconButton icon="trash" look="bare" tip="left" label={`${sv.removeItem} ${it}`} onClick={() => onRemove(i)} mut /></li>
+        <li key={`${i}-${it}`}>
+          <label className="check"><input type="checkbox" checked={packed(it)} onChange={() => onCheck(it)} /><span className={packed(it) ? "done" : ""}>{it}</span></label>
+          <IconButton icon="trash" look="bare" tip="left" label={`${sv.removeItem} ${it}`} onClick={() => onRemove(i)} mut /></li>
       ))}</ul>
       <form className="addrow" data-mut="" onSubmit={submit}>
         <input value={v} onChange={(e) => setV(e.target.value)} aria-label={`${sv.itemLabel}, ${name}`} placeholder={sv.itemLabel} />
@@ -141,13 +151,14 @@ function PackingList({ name, items, onAdd, onRemove }: { name: string; items: st
   );
 }
 
-function Packing({ t, run }: { t: Trip; run: Run }) {
+function Packing({ t, run, part }: { part: Part; t: Trip; run: Run }) {
   const lists = [{ id: "shared", name: sv.sharedList, items: t.packing },
     ...t.travelers.map((x) => ({ id: x.id, name: x.age ? `${x.name}, ${x.age} ${sv.years}` : x.name, items: x.packing }))]; // PK-03
   return (
-    <Section title={sv.packing}>
+    <Section title={sv.packing} lock={part("packing")}>
       {lists.map((l) => (
-        <PackingList key={l.id} name={l.name} items={l.items}
+        <PackingList key={l.id} name={l.name} items={l.items} packed={(it) => isPacked(t, l.id, it)} count={packedCount(t, l.id)}
+          onCheck={(it) => run((x) => togglePacked(x, l.id, it), isPacked(t, l.id, it) ? "unpacked" : "packed")}
           onAdd={(text) => run((x) => addPacking(x, l.id, text), "add packing")}
           onRemove={(i) => run((x) => removePacking(x, l.id, i), "remove packing")} />
       ))}
@@ -155,14 +166,15 @@ function Packing({ t, run }: { t: Trip; run: Run }) {
   );
 }
 
-export default function Side({ t, today, chart, toggleChart, edit, run, onPlace }: {
+export default function Side({ t, today, chart, toggleChart, edit, run, onPlace, part }: {
+  part: Part;
   t: Trip; today: string; chart: boolean; toggleChart: () => void; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void;
 }) {
   return <>
-    <Bookings t={t} edit={edit} onPlace={onPlace} />
-    <Budget t={t} chart={chart} onToggle={toggleChart} edit={edit} />
-    <Tasks t={t} today={today} edit={edit} run={run} onPlace={onPlace} />
-    <Info t={t} edit={edit} onPlace={onPlace} />
-    <Packing t={t} run={run} />
+    <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />
+    <Budget part={part} t={t} chart={chart} onToggle={toggleChart} edit={edit} />
+    <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} />
+    <Info part={part} t={t} edit={edit} onPlace={onPlace} />
+    <Packing part={part} t={t} run={run} />
   </>;
 }

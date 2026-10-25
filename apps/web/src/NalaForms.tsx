@@ -2,14 +2,19 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import type { Op, Trip } from "@trip/schema";
 import {
-  removeActivity, removeBooking, removeBudgetItem, removeDay, removeInfo, removePlace, removeTask,
-  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip,
+  daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
+  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, setTripDates, tripRange,
   type BookingInput, type Result,
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
 import { IconButton } from "./Icons.tsx";
 import { CATEGORIES } from "./categories.ts";
 import { suggestPurpose } from "./purpose.ts";
+import { shortDate } from "./format.ts";
+import { activityMissing } from "./schedule.ts";
+import { fmtDuration } from "./transport.ts";
+
+const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
 
 import type { EditDlg } from "./editKinds.ts";
@@ -74,6 +79,29 @@ function TripForm(p: Props) {
   );
 }
 
+/** First and last date of the trip; days follow the dates (ED-14). Removing days asks first (ED-09). */
+function DatesForm(p: Props) {
+  const s = useSave(p);
+  const r = tripRange(p.t);
+  const { f, text } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
+  const submit = () => {
+    const res = setTripDates(p.t, f);
+    const gone = res.ok ? daysOutside(p.t, f.from, f.to) : [];
+    if (gone.length && !confirm([sv.confirmRemoveDays, ...gone.map((d) => `${shortDate(d.date)} ${d.title}`)].join("\n"))) return;
+    s.submit(res, "trip dates");
+  };
+  return (
+    <Form title={sv.editDates} {...s} close={p.close} onSubmit={submit}>
+      <div className="two">
+        <label>{sv.firstDay}<input type="date" {...text("from")} autoFocus /></label>
+        <label>{sv.lastDay}<input type="date" {...text("to")} /></label>
+      </div>
+      <p className="ro note">{sv.datesHint}</p>
+    </Form>
+  );
+}
+
+/** Changes an existing day; its date is set by the trip's dates (ED-02, ED-14). */
 function DayForm(p: Props & { id?: string }) {
   const s = useSave(p);
   const d = p.t.days.find((x) => x.id === p.id);
@@ -90,10 +118,9 @@ function DayForm(p: Props & { id?: string }) {
     s.submit(saveDay(p.t, { ...f, weather }, p.id), p.id ? "edit day" : "add day");
   };
   return (
-    <Form title={p.id ? sv.editDay : sv.newDay} {...s} close={p.close} onSubmit={submit}
-      onRemove={p.id ? () => s.remove(removeDay(p.t, p.id!), "remove day") : undefined}>
-      <label>{sv.date}<input type="date" {...text("date")} autoFocus /></label>
-      <label>{sv.title}<input {...text("title")} /></label>
+    <Form title={sv.editDay} {...s} close={p.close} onSubmit={submit}>
+      {d && <p className="ro">{sv.date}: {shortDate(d.date)}</p>}
+      <label>{sv.title}<input {...text("title")} autoFocus /></label>
       <label>{sv.summaryLabel}<input {...text("summary")} /></label>
       <label>{sv.icons}<input {...text("icons")} /></label>
       <div className="two">
@@ -110,19 +137,28 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   const a = p.t.days.find((x) => x.id === p.dayId)?.activities.find((x) => x.id === p.id);
   const { f, text, check } = useFields({
     start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
-    category: a?.category ?? "",
+    category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "",
   });
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
     : f.place ? { kind: "existing" as const, id: f.place } : { kind: "none" as const };
   return (
     <Form title={p.id ? sv.editActivity : sv.newActivity} {...s} close={p.close}
-      onSubmit={() => s.submit(saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category }, p.id), p.id ? "edit activity" : "add activity")}
+      onSubmit={() => {
+        const durationMin = Number(f.duration) || undefined;
+        const miss = f.text.trim() ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
+        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note }, p.id), p.id ? "edit activity" : "add activity");
+      }}
       onRemove={p.id ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
+      <label>{sv.activityNote}<input {...text("note")} /></label>
       <div className="two">
         <label>{sv.time}<input type="time" {...text("start")} /></label>
         <label className="check"><input type="checkbox" {...check("estimated")} />{sv.estimate}</label>
       </div>
+      <label>{sv.duration}<select {...text("duration")}>
+        <option value="">{sv.chooseDuration}</option>
+        {[...new Set([...DURATIONS, ...(a?.durationMin ? [a.durationMin] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
+      </select></label>
       <label>{sv.category}<select {...text("category")}>
         <option value="">{sv.noCategory}</option>
         {CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
@@ -258,6 +294,7 @@ function InfoForm(p: Props & { id?: string }) {
 export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
   switch (dlg.kind) {
     case "trip": return <TripForm {...p} />;
+    case "dates": return <DatesForm {...p} />;
     case "day": return <DayForm {...p} id={dlg.id} />;
     case "activity": return <ActivityForm {...p} dayId={dlg.dayId} id={dlg.id} />;
     case "booking": return <BookingForm {...p} id={dlg.id} />;

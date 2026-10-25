@@ -8,7 +8,8 @@ import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 const EditDialog = lazy(() => import("./NalaForms.tsx").then((m) => ({ default: m.EditDialog })));
 const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.PlaceView })));
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
-import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
+import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggleOne, tripDates, type Open, type Unlock } from "./format.ts";
+import { tripRange } from "./edit.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
@@ -70,6 +71,7 @@ export function App() {
   const [dlg, setDlg] = useState<Dlg>(null);
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [upDay, setUpDay] = useState<string | null>(null);
+  const [unlock, setUnlock] = useState<Unlock>(LOCKED); // ED-13, ED-18: a trip opens with every part locked
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
@@ -110,7 +112,7 @@ export function App() {
 
   const openTrip = (id: string, nextTab?: Tab) => {
     const x = trips?.find((y) => y.id === id);
-    setTripId(id); setView("trip"); setOpen({}); setUpDay(null);
+    setTripId(id); setView("trip"); setOpen({}); setUpDay(null); setUnlock(LOCKED);
     setTab(nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala")); // MT-09
     window.scrollTo(0, 0);
   };
@@ -213,7 +215,8 @@ export function App() {
   </>;
   else if (view === "admin") page = <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView("trip")} tip="right" /></div><h1>{sv.admin}</h1>
-    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => setDlg({ kind: "trip" })} /></div></div>
+    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => setDlg({ kind: "trip" })} /></div>
+      <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => setDlg({ kind: "dates" })} /></div></div>
     <div className="card">
       {t.inbox && <><h3>{sv.inbox}</h3><p>{sv.inboxText} <b>{t.inbox}</b></p></>}
       <h3>{sv.apiKey}</h3><p>{maskedToken()}</p>
@@ -234,7 +237,7 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })}
-      edit={setDlg}
+      edit={setDlg} unlock={unlock} setUnlock={setUnlock}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
     />
   );
@@ -255,7 +258,7 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={() => setDlg({ kind: "placeEdit", id: dlg.id })} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>

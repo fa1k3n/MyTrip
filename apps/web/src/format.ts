@@ -18,6 +18,7 @@ export const dateBadge = (iso: string) => { const p = parts(iso); return { d: St
 export const dayTime = (d: DayLike) =>
   `${ca(d.start, d.startEstimated ?? d.estimated)}–${ca(d.end, d.endEstimated ?? d.estimated)}`;
 
+/** Only the start: the next activity's start shows when this one ends (TM-05). */
 export const activityTime = (a: { start?: string; estimated: boolean }) => (a.start ? ca(a.start, a.estimated) : "");
 
 export const kr = (n: number) =>
@@ -65,6 +66,17 @@ export function budgetByCategory(items: BudgetLike[]): [string, number][] {
 export const anyOpen = (open: Open) => Object.values(open).some(Boolean);
 export const toggleOne = (open: Open, id: string): Open => ({ ...open, [id]: !open[id] });
 export const toggleAll = (open: Open, ids: string[]): Open => (anyOpen(open) ? {} : Object.fromEntries(ids.map((id) => [id, true])));
+/** Which parts of Nåla are unlocked for editing: everything (`all`), with per-part exceptions (ED-13, ED-18). */
+export type Unlock = { all: boolean; ids: Record<string, boolean> };
+export const LOCKED: Unlock = { all: false, ids: {} };
+export const isUnlocked = (u: Unlock, id: string) => u.ids[id] ?? u.all;
+export const anyUnlocked = (u: Unlock) => u.all || Object.values(u.ids).some(Boolean);
+export const toggleUnlock = (u: Unlock, id: string): Unlock => ({ ...u, ids: { ...u.ids, [id]: !isUnlocked(u, id) } });
+/** The edit mode button: unlocks everything, or locks everything when anything is unlocked. */
+export const toggleAllUnlock = (u: Unlock): Unlock => ({ all: !anyUnlocked(u), ids: {} });
+export const unlockLabel = (on: boolean, part: string) => `${on ? sv.lockPart : sv.unlockPart} ${part}`;
+/** The lock button in Nåla turns edit mode on and off (ED-13). */
+export const editModeLabel = (on: boolean) => (on ? sv.editModeOff : sv.editModeOn);
 export const toggleAllLabel = (open: Open) => (anyOpen(open) ? sv.collapseAll : sv.expandAll);
 export const jumpTo = (id: string): Open => ({ [id]: true });
 export const scrollBehavior = (reducedMotion: boolean): ScrollBehavior => (reducedMotion ? "auto" : "smooth");

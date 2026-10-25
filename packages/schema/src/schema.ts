@@ -11,7 +11,9 @@ export const Place = z.object({
 });
 export const Activity = z.object({
   id: Id, text: z.string().min(1), placeIds: z.array(Id).default([]),
+  note: z.string().optional(), // shown under the short title (ED-19)
   start: Time.optional(), end: Time.optional(), estimated: z.boolean().default(false),
+  durationMin: z.number().int().positive().optional(), // estimated length; a fixed `end` wins (DM-13)
   category: z.string().min(1).optional(), // same list as the wishes; gives the day its icons (DC-14)
 });
 export const Leg = z.object({
@@ -37,7 +39,10 @@ export const Booking = z.object({
   placeId: Id.optional(), note: z.string().optional(),
 });
 export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional() });
-export const Traveler = z.object({ id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()) });
+export const Traveler = z.object({
+  id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()),
+  packed: z.array(z.string()).default([]), // the items in `packing` that are checked (PK-05)
+});
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });
 export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative() });
 export const Expense = z.object({
@@ -72,6 +77,7 @@ export const Trip = z.object({
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
   expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
   info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)
+  packed: z.array(z.string()).default([]), // checked items of the shared list (PK-05)
   stops: z.array(Stop), days: z.array(Day), places: z.array(Place),
   bookings: z.array(Booking), tasks: z.array(Task), travelers: z.array(Traveler),
 });

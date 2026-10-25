@@ -23,6 +23,22 @@ export function defaultTab(days: DayLike[], today: string): "nala" | "up" | "mi"
   return today > s[s.length - 1].date ? "mi" : "up";
 }
 
+/** Indexes of the stops that mark the day in the timeline: its own, else those of the closest earlier day with stops (UP-08). */
+export function coveringStops(t: { days: DayLike[]; stops: { dayId: string }[] }, dayId: string): number[] {
+  const s = sorted(t.days), i = s.findIndex((d) => d.id === dayId);
+  for (let j = i; j >= 0; j--) {
+    const hit = t.stops.flatMap((x, n) => (x.dayId === s[j].id ? [n] : []));
+    if (hit.length) return hit;
+  }
+  return [];
+}
+
+/** The day before (-1) or after (1) in date order (UP-09). */
+export function adjacentDay<D extends DayLike>(days: D[], dayId: string, step: -1 | 1): D | undefined {
+  const s = sorted(days), i = s.findIndex((d) => d.id === dayId);
+  return i < 0 ? undefined : s[i + step];
+}
+
 export function dayHeading(date: string, today: string) {
   const { d, w } = dateBadge(date);
   const text = `${w} ${d} ${sv.months[Number(date.slice(5, 7)) - 1]}`;

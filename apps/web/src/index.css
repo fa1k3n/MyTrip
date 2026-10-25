@@ -203,3 +203,5 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .box[open]>summary::after{transform:rotate(225deg);margin-top:4px}
 .box li .check{flex:1;margin:0}
 .box .done{text-decoration:line-through;color:var(--mute)}
+/* Uppleva: previous and next day beside the day heading (UP-09). */
+.dayhead{display:flex;align-items:center;justify-content:space-between;gap:8px}.dayhead h3{margin:0}.daynav{display:flex;gap:2px;flex:none}

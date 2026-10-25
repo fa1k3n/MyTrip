@@ -46,6 +46,7 @@ export const sv = {
   activityNote: "Notis (visas under rubriken)", editTrip: "Ändra namn och syfte", purpose: "Syfte",
   suggestPurpose: "Föreslå syfte utifrån planen", purposeHint: "Syftet hjälper till att ge bra förslag på aktiviteter. Förslaget bygger på dagarna i Nåla, ändra fritt innan du sparar.", noPurposeYet: "Lägg in dagar i Nåla först, så kan ett syfte föreslås.",
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
+  prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",
   missing: { label: "Saknar", time: "tid", duration: "uppskattad tid", category: "kategori" },
   duration: "Uppskattad tid", chooseDuration: "Välj…",

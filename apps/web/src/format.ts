@@ -1,6 +1,6 @@
 // Pure display logic. Kept free of React so it runs under node --test.
 import { sv } from "./sv.ts";
-import { textHiddenFrom } from "@trip/schema/src/hidden.ts";
+import { secretsOf, textHiddenFrom, whoFor } from "@trip/schema/src/hidden.ts";
 
 type DayLike = { id: string; date: string; start: string; end: string; estimated: boolean; startEstimated?: boolean; endEstimated?: boolean; location?: string };
 type Vehicle = "car" | "ferry" | "train" | "transit" | "walk";
@@ -53,9 +53,23 @@ export const routeLabel = (days: { date: string; location?: string }[]) =>
 
 /** A day title, or "Dold rubrik" when it would give away a hidden activity (AU-27). */
 export const dayTitle = (d: { title: string; hiddenTitle?: boolean }) => (d.hiddenTitle ? sv.hiddenTitle : d.title);
-/** Whom the day title is hidden from, for its eye (AU-27, AU-29); none when the title already reached the viewer hidden. */
-export const titleHiddenFrom = (d: Parameters<typeof textHiddenFrom>[0] & { title: string; hiddenTitle?: boolean }) =>
-  (d.hiddenTitle ? [] : textHiddenFrom(d, d.title));
+type Secrets = Parameters<typeof secretsOf>[0];
+type Placed = Secrets & { places: { id: string; name: string; notes?: string }[] };
+/** Whom texts are hidden from, for their eye: an activity hidden anywhere in the trip that they resemble, also through the
+ * name and notes of a place they link (AU-30). */
+export function textWho(t: Placed, texts: (string | undefined)[], placeId?: string) {
+  const p = t.places.find((x) => x.id === placeId);
+  return whoFor(secretsOf(t), [...texts, p?.name, p?.notes]);
+}
+/** Whom a text of a day is hidden from: the hidden activities of that day (AU-27) and of the whole trip (AU-30). */
+export function dayTextWho(t: Secrets | undefined, d: Parameters<typeof textHiddenFrom>[0], text: string) {
+  const out = textHiddenFrom(d, text);
+  for (const id of t ? whoFor(secretsOf(t), [text]) : []) if (!out.includes(id)) out.push(id);
+  return out;
+}
+/** Whom the day title is hidden from, for its eye (AU-27, AU-29, AU-30); none when the title already reached the viewer hidden. */
+export const titleHiddenFrom = (d: Parameters<typeof textHiddenFrom>[0] & { title: string; hiddenTitle?: boolean }, t?: Secrets) =>
+  (d.hiddenTitle ? [] : dayTextWho(t, d, d.title));
 /** A timeline label; the server empties one that would give away a hidden activity (AU-27). */
 export const stopLabel = (s: { label: string }) => s.label || sv.hiddenTitle;
 

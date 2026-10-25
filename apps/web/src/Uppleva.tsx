@@ -5,7 +5,7 @@ import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickD
 import { IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
-import { Activities, Eye, InfoText, PlaceLink, Weather, type TripViewProps } from "./TripView.tsx";
+import { Activities, Eye, HiddenText, InfoText, PlaceLink, TextEye, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
@@ -28,7 +28,7 @@ export function Uppleva(p: TripViewProps) {
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
   const spent = p.perms.parts.expenses !== "hidden"; // the sum of expenses only when the role may see expenses somewhere
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))], now = todayId(t.days, p.today); // UP-14, DC-15
-  const titleWho = titleHiddenFrom(day); // AU-29
+  const titleWho = titleHiddenFrom(day, t); // AU-29, AU-30
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   return <>
     <div className="tl" ref={tl}>{timelineStops(t).map((x, i) => (
@@ -74,7 +74,7 @@ export function Uppleva(p: TripViewProps) {
             return (
               <div className="row mid" key={b.id}>
                 <span>
-                  <PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><br />
+                  {b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
                   <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
                 </span>
                 <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span></span>

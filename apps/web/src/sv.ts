@@ -23,7 +23,7 @@ export const sv = {
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
-  hiddenActivity: "Dold aktivitet", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18
+  hiddenActivity: "Dold aktivitet", hiddenText: "Dold text", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18, AU-30
   limit: { // BG-13
     near: (used: string, max: string, pct: number, left: string) => `Nära maxbudgeten: ${used} av ${max} (${pct} %). ${left} kvar.`,
     over: (over: string, used: string, max: string) => `Över maxbudgeten med ${over}: ${used} av ${max}.`,

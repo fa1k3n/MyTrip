@@ -43,7 +43,10 @@ type Slice = { label: string; value: number; kind: "cat" | "spent" | "unused" };
 export function donutSlices(t: LimitTrip & { budget: { category: string }[] }) {
   const cents = (n: number) => Math.round(n * 100);
   const cats = new Map<string, number>();
-  for (const i of t.budget) if (i.amount !== undefined && (!i.currency || i.currency === t.currency)) cats.set(i.category, (cats.get(i.category) ?? 0) + cents(i.amount));
+  for (const i of t.budget) if (i.amount !== undefined && (!i.currency || i.currency === t.currency)) {
+    const label = i.category || sv.hiddenText; // a hidden budget item reaches the viewer without its category (AU-30)
+    cats.set(label, (cats.get(label) ?? 0) + cents(i.amount));
+  }
   const slices: Slice[] = [...cats].map(([label, v]) => ({ label, value: v, kind: "cat" }));
   const planned = [...cats.values()].reduce((a, v) => a + v, 0);
   let used = planned;

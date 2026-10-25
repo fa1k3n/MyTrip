@@ -20,17 +20,17 @@ export function similarTitles(a: string, b: string): boolean {
   return words(a).some((x) => wb.some((y) => same(x, y)));
 }
 
-type Act = { id: string; text: string; hiddenFrom?: string[] };
+type Act = { id: string; text: string; note?: string; hiddenFrom?: string[] };
 
-/** Whom each activity of a day is hidden from, its own choice plus that of every similar hidden activity. Activities hidden
- * from no one are left out. */
+/** Whom each activity of a day is hidden from, its own choice plus that of every hidden activity its title or note resembles
+ * (AU-24, AU-30). Activities hidden from no one are left out. */
 export function hiddenFromIn(day: { activities: Act[] }): Map<string, string[]> {
   const out = new Map<string, string[]>();
   const hidden = day.activities.filter((h) => h.hiddenFrom?.length);
   if (!hidden.length) return out;
   for (const a of day.activities) {
     const who = [...(a.hiddenFrom ?? [])];
-    for (const h of hidden) if (h !== a && similarTitles(h.text, a.text)) who.push(...h.hiddenFrom!.filter((id) => !who.includes(id)));
+    for (const h of hidden) if (h !== a && (similarTitles(h.text, a.text) || (!!a.note && similarTitles(h.text, a.note)))) who.push(...h.hiddenFrom!.filter((id) => !who.includes(id)));
     if (who.length) out.set(a.id, who);
   }
   return out;
@@ -40,5 +40,18 @@ export function hiddenFromIn(day: { activities: Act[] }): Map<string, string[]> 
 export function textHiddenFrom(day: { activities: Act[] }, text: string): string[] {
   const who = hiddenFromIn(day), out: string[] = [];
   for (const a of day.activities) if (who.has(a.id) && similarTitles(a.text, text)) out.push(...who.get(a.id)!.filter((id) => !out.includes(id)));
+  return out;
+}
+
+/** An activity hidden by choice anywhere in the trip and whom it is hidden from (AU-30). */
+export type Secret = { text: string; who: string[] };
+export const secretsOf = (t: { days: { activities: Act[] }[] }): Secret[] =>
+  t.days.flatMap((d) => d.activities.filter((a) => a.hiddenFrom?.length).map((a) => ({ text: a.text, who: a.hiddenFrom! })));
+
+/** Whom texts are hidden from: everyone that a secret they resemble is hidden from (AU-30). An item that links a place passes
+ * the place's name and notes among its texts. */
+export function whoFor(secrets: Secret[], texts: (string | undefined)[]): string[] {
+  const out: string[] = [];
+  for (const s of secrets) if (texts.some((x) => !!x && similarTitles(s.text, x))) out.push(...s.who.filter((id) => !out.includes(id)));
   return out;
 }

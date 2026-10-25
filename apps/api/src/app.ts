@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, similarTitles, type AccessRole, type Op, type Part } from "@trip/schema";
+import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 
 export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
@@ -94,21 +94,47 @@ function linkMayChange(t: Trip, ar: AccessRole, ops: Op[]) {
 type Activity = Trip["days"][number]["activities"][number];
 /** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18).
  * A day's title, summary and timeline label that resemble such an activity are emptied too (AU-27), and the legs of its
- * day lose their places, so no route map gives it away (AU-28). */
-function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity) => boolean): T {
-  const secret = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).flatMap((a) => a.placeIds)));
+ * day lose their places, so no route map gives it away (AU-28). Every other text that resembles an activity hidden from the
+ * viewer anywhere in the trip, or links a place whose name does, is emptied and its item marked hidden (AU-30). */
+function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity) => boolean, hides: (who: string[]) => boolean): T {
   if (!t.days.some((d) => d.activities.some(hiddenFor))) return t;
-  const gives = (d: Trip["days"][number], text: string) => d.activities.some((a) => hiddenFor(a) && similarTitles(a.text, text));
+  const mine = secretsOf(t).filter((x) => hides(x.who));
+  const place = (id?: string) => t.places.find((x) => x.id === id);
+  const gives = (texts: (string | undefined)[], placeId?: string) => whoFor(mine, [...texts, place(placeId)?.name, place(placeId)?.notes]).length > 0;
+  const named = new Set(t.places.filter((x) => gives([x.name, x.notes])).map((x) => x.id)); // never sent (AU-30)
+  const dayGives = (d: Trip["days"][number], text: string) => d.activities.some((a) => hiddenFor(a) && similarTitles(a.text, text)) || gives([text]);
   const days = t.days.map((d) => ({
-    ...d, ...(gives(d, d.title) ? { title: "", hiddenTitle: true } : {}), ...(gives(d, d.summary) ? { summary: "" } : {}),
+    ...d, ...(dayGives(d, d.title) ? { title: "", hiddenTitle: true } : {}), ...(dayGives(d, d.summary) ? { summary: "", hiddenSummary: true } : {}),
     ...(d.activities.some(hiddenFor) ? { legs: d.legs.map(({ origin, destination, waypoints, ...l }) => ({ ...l, origin: "", destination: "", waypoints: [] })), hiddenRoute: true } : {}),
-    activities: d.activities.map((a) => (!hiddenFor(a) ? a
+    activities: d.activities.map((a) => (!hiddenFor(a) ? { ...a, placeIds: a.placeIds.filter((id) => !named.has(id)) }
       : { id: a.id, text: "", placeIds: [], start: a.start, end: a.end, estimated: a.estimated, durationMin: a.durationMin, hidden: true })),
   }));
-  const stops = t.stops.map((s) => { const d = t.days.find((x) => x.id === s.dayId); return d && gives(d, s.label) ? { ...s, label: "" } : s; });
-  const used = new Set([...days.flatMap((d) => d.activities.flatMap((a) => a.placeIds)), ...t.bookings.map((b) => b.placeId), ...t.tasks.map((k) => k.placeId), ...t.info.map((i) => i.placeId)]);
-  return { ...t, days, stops, places: t.places.filter((p) => !secret.has(p.id) || used.has(p.id)) };
+  const stops = t.stops.map((s) => { const d = t.days.find((x) => x.id === s.dayId); return d && dayGives(d, s.label) ? { ...s, label: "" } : s; });
+  const budget = t.budget.map(({ note, ...b }) => (gives([b.category, note]) ? { ...b, category: "", hidden: true } : { ...b, ...(note !== undefined ? { note } : {}) }));
+  const bookings = t.bookings.map(({ note, placeId, ...b }) => (gives([b.name, note], placeId) ? { ...b, name: "", hidden: true } : { ...b, ...(note !== undefined ? { note } : {}), ...(placeId ? { placeId } : {}) }));
+  const tasks = t.tasks.map(({ placeId, ...k }) => (gives([k.text], placeId) ? { ...k, text: "", hidden: true } : { ...k, ...(placeId ? { placeId } : {}) }));
+  const info = t.info.map(({ unsuitable, placeId, ...i }) => (gives([i.title, i.text, unsuitable], placeId) ? { ...i, title: "", text: "", hidden: true }
+    : { ...i, ...(unsuitable !== undefined ? { unsuitable } : {}), ...(placeId ? { placeId } : {}) }));
+  const expenses = t.expenses.map((e) => (gives([e.text]) ? { ...e, text: "", hidden: true } : e));
+  const payments = t.payments.map(({ note, ...x }) => (gives([note]) ? { ...x, hidden: true } : { ...x, ...(note !== undefined ? { note } : {}) }));
+  const dreams = t.dreams.map((w) => (gives([w.title, w.source]) ? { ...w, title: "", source: "", hidden: true } : w));
+  const trip = { ...(gives([t.purpose]) ? { purpose: "", hiddenPurpose: true } : {}), ...(t.note && gives([t.note]) ? { note: "", hiddenNote: true } : {}) };
+  const secret = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).flatMap((a) => a.placeIds)));
+  const used = new Set([...days.flatMap((d) => d.activities.flatMap((a) => a.placeIds)), ...bookings.map((b) => b.placeId), ...tasks.map((k) => k.placeId), ...info.map((i) => i.placeId)]);
+  return { ...t, ...trip, days, stops, budget, bookings, tasks, info, expenses, payments, dreams,
+    places: t.places.filter((x) => !named.has(x.id) && (!secret.has(x.id) || used.has(x.id))) } as T;
 }
+/** The paths where two versions of a trip differ: what the masking changed for the viewer (AU-30). */
+function changedPaths(a: unknown, b: unknown, path = ""): string[] {
+  if (a === b) return [];
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return [path];
+  if (Array.isArray(a) !== Array.isArray(b) || (Array.isArray(a) && a.length !== (b as unknown[]).length)) return [path];
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].flatMap((k) => changedPaths((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], path ? `${path}/${k}` : k));
+}
+/** True when an operation would change or replace something masked for the viewer; ticking a hidden task is fine (AU-30). */
+const touchesMasked = (o: Op, paths: string[]) => !(/^tasks\/\d+\/done$/.test(o.path) && o.op === "set") &&
+  paths.some((p) => p === o.path || p.startsWith(`${o.path}/`) || o.path.startsWith(`${p}/`));
 /** True when the change hides an activity from the traveler making it, which no one may do (AU-18). */
 function hidesFromSelf(before: Trip, after: Trip, travelerId: string) {
   const was = new Map(before.days.flatMap((d) => d.activities).map((a) => [a.id, a.hiddenFrom ?? []]));
@@ -182,7 +208,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   /** What a role on a link may see: components hidden by the trip's permissions are left out (AU-17, AU-19, AU-21), booking
    * references never reach a Följare (AU-22), activities hidden from the viewer are masked (AU-18), and the link gets only its
    * own role's rules (AU-20). Read-only tokens get no booking references (MC-11). */
-  const view = (t: Trip, role: Role, travelerId?: string): Trip => {
+  const view = (t: Trip, role: Role, travelerId?: string, mask = true): Trip => {
     if (role === "read") return { ...t, bookings: t.bookings.map(({ reference, ...b }) => b) };
     const ar = accessRole(role);
     if (!ar) return t;
@@ -198,9 +224,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (hide("info")) out.info = [];
     if (hide("dreams")) out.dreams = [];
     if (hide("packing")) { out.packing = []; out.packed = []; out.travelers = t.travelers.map((x) => ({ ...x, packing: [], packed: [] })); }
-    if (ar === "planner") return out;
+    if (ar === "planner" || !mask) return out;
     const who = new Map(t.days.flatMap((d) => [...hiddenFromIn(d)])); // including activities that resemble a hidden one (AU-24)
-    return masked(out, ar === "follower" ? (a) => who.has(a.id) : (a) => !!travelerId && !!who.get(a.id)?.includes(travelerId));
+    const hides = ar === "follower" ? (w: string[]) => w.length > 0 : (w: string[]) => !!travelerId && w.includes(travelerId); // AU-18
+    return masked(out, (a) => hides(who.get(a.id) ?? []), hides);
   };
 
   app.get("/api/me", (c) => c.json(!scoped(c) ? { role: c.get("role") }
@@ -342,6 +369,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ ok: false, problems: describeError(e) }, 422); // MC-03
     }
     if (travelerId && hidesFromSelf(t, next, travelerId)) return c.json({ error: "forbidden" }, 403); // AU-18
+    const hidden = ar && ar !== "planner" ? changedPaths(view(t, c.get("role"), travelerId, false), view(t, c.get("role"), travelerId)) : [];
+    if (b.ops.some((o) => touchesMasked(o, hidden))) return c.json({ error: "forbidden" }, 403); // AU-30: no overwriting what one cannot see
     const summary = b.ops.map((o) => `${o.op} ${o.path}`);
     if (b.dryRun) return c.json({ ok: problems.length === 0, problems, summary }); // MC-04
     if (problems.length) return c.json({ ok: false, problems }, 422);

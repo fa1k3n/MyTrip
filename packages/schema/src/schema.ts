@@ -34,6 +34,7 @@ export const Day = z.object({
   legs: z.array(Leg).default([]),
   activities: z.array(Activity),
   hiddenTitle: z.boolean().optional(), // only in what a Resenär or Följare receives: title and summary give away a hidden activity (AU-27)
+  hiddenSummary: z.boolean().optional(), // only in what a Resenär or Följare receives: the summary gives away a hidden activity (AU-30)
   hiddenRoute: z.boolean().optional(), // only in what a Resenär or Följare receives: the legs lost their places, no route map (AU-28)
 });
 export const Booking = z.object({
@@ -42,21 +43,23 @@ export const Booking = z.object({
   reference: z.string().optional(), // sensitive: removed for read-only tokens
   amount: z.object({ value: z.number(), currency: z.string().length(3) }).optional(),
   placeId: Id.optional(), note: z.string().optional(),
+  hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
-export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional() });
+export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional(), hidden: z.boolean().optional() }); // hidden: AU-30
 export const Traveler = z.object({
   id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()),
   packed: z.array(z.string()).default([]), // the items in `packing` that are checked (PK-05)
 });
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });
-export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative() });
+export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative(), hidden: z.boolean().optional() }); // hidden: AU-30
 export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
   date: Date_.optional(),
   addedBy: Id.optional(), addedAt: z.string().datetime().optional(), // who added it, among the travelers, and when (UP-13)
+  hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
-export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional() })
+export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional(), hidden: z.boolean().optional() }) // hidden: AU-30
   .refine((p) => p.from !== p.to, { message: "A payment needs two different travelers", path: ["to"] }); // MI-06
 export const BudgetItem = z.object({
   id: Id, category: z.string().min(1), paid: z.boolean(), owner: z.string().optional(),
@@ -64,12 +67,14 @@ export const BudgetItem = z.object({
   amountMax: z.number().nonnegative().optional(), // upper end of a range, e.g. 75–100 (BG-03)
   estimate: z.boolean().optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), // default: the trip's currency (BG-07)
   note: z.string().optional(),
+  hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
 /** Practical information such as parking options (PI-01..PI-05). */
 export const Info = z.object({
   id: Id, title: z.string().min(1), text: z.string().default(""), placeId: Id.optional(),
   unsuitable: z.string().optional(), // the reason when the option does not suit the trip (PI-03)
   verify: z.boolean().optional(), // from a source that may be out of date (PI-04)
+  hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
 
 export const Trip = z.object({
@@ -78,6 +83,7 @@ export const Trip = z.object({
   image: z.string().regex(/^[a-z0-9][a-z0-9-]*\.(jpg|jpeg|png|webp)$/).optional(), imageAlt: z.string().optional(),
   dateLabel: z.string().optional(), // shown when the trip has no days, e.g. "jul 2026 · avslutad"
   note: z.string().optional(), inbox: z.string().email().optional(),
+  hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)

@@ -1,7 +1,7 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
 import { lazy, Suspense } from "react";
 import type { Op, Trip } from "@trip/schema";
-import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, toggleAllLabel, tripDates, type Open } from "./format.ts";
+import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
 import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
@@ -33,9 +33,17 @@ export function PlaceLink({ t, id, text, onPlace }: { t: Trip; id?: string; text
   return <button className="place" onClick={(e) => { e.stopPropagation(); onPlace(p.id); }}>{text ?? p.name}</button>;
 }
 
+/** "Dold text" in place of a text that gives away an activity hidden from the viewer (AU-30). */
+export const HiddenText = () => <span className="hiddenact"><Icon name="eyeoff" />{sv.hiddenText}</span>;
+/** The eye beside a text that gives away a hidden activity, for those who see it, naming whom it is hidden from (AU-30). */
+export function TextEye({ t, texts, placeId }: { t: Trip; texts: (string | undefined)[]; placeId?: string }) {
+  const who = textWho(t, texts, placeId);
+  return who.length ? <Eye t={t} who={who} /> : null;
+}
+
 /** The text of one piece of practical information, in Nåla and in Uppleva (PI-01..PI-04, UP-15). */
-export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; onPlace: (id: string) => void }) => (
-  <span><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b>
+export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; onPlace: (id: string) => void }) => x.hidden ? <span><HiddenText /></span> : (
+  <span><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b><TextEye t={t} texts={[x.title, x.text, x.unsuitable]} placeId={x.placeId} />
     {x.text && <><br /><small className="ro">{x.text}</small></>}
     {x.unsuitable && <><br /><small className="over">{sv.unsuitable}: {x.unsuitable}</small></>}
     {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
@@ -104,7 +112,8 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
   const hid = [...new Set([...hiddenFromIn(x).values()].flat())]; // a closed day shows an eye for its hidden activities (AU-25)
-  const titleWho = titleHiddenFrom(x); // a title that resembles one has the eye instead, opening the same list (AU-29)
+  const titleWho = titleHiddenFrom(x, t); // a title that resembles one has the eye instead, opening the same list (AU-29)
+  const sumWho = x.hiddenSummary ? [] : dayTextWho(t, x, x.summary); // AU-30
   return (
     <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"}`} id={`day-${x.id}`}>
       {/* The whole header toggles on click; the title is the keyboard control (DC-09). The clock opens transport and does not toggle (TM-04). */}
@@ -114,7 +123,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
           {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
           <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button>
             {titleWho.length > 0 && <Eye t={t} who={titleWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</h3>
-          <div className="sum">{x.summary}</div>
+          <div className="sum">{x.hiddenSummary ? <HiddenText /> : x.summary}{sumWho.length > 0 && <Eye t={t} who={sumWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
         </div>
         <span className="ico">{!open && hid.length > 0 && !titleWho.length && <Eye t={t} who={hid} open={() => edit({ kind: "hidden", dayId: x.id })} />}<CatIcons ids={dayIcons(x)} /></span>
@@ -193,7 +202,8 @@ export function TripView(p: TripViewProps) {
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
       {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
-    </div><p className="ro">{tripDates(t)}{t.note ? ` · ${t.note}` : ""}</p><div className="card manifest">{t.purpose || sv.noPurpose}</div>
+    </div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
+    <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <>{t.purpose || sv.noPurpose}<TextEye t={t} texts={[t.purpose]} /></>}</div> {/* AU-30 */}
     {perms.pages.length > 1 && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>}

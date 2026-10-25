@@ -4,6 +4,7 @@ import { categoryIcon } from "./categories.ts";
 import { sv } from "./sv.ts";
 import { IconButton } from "./Icons.tsx";
 import { CatIcon, ICONS } from "./CatIcon.tsx";
+import { HiddenText, TextEye } from "./TripView.tsx";
 
 const DREAM_BG = ["#E8D5C4", "#D5E0D8", "#EFE2BF"];
 
@@ -14,7 +15,7 @@ export default function Dreams({ t, write, vote, addDream }: { t: Trip; write: b
         <div className="img" style={{ background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : DREAM_BG[i % 3] }}>
           <CatIcon id={categoryIcon(d.category) ?? d.icon} big /></div>
         <button className="heart" onClick={() => vote(i)} aria-label={sv.vote} disabled={!write}>♥ {d.votes}</button>
-        <div className="in"><h3>{d.title}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div></div>
+        <div className="in"><h3>{d.hidden ? <HiddenText /> : <>{d.title}<TextEye t={t} texts={[d.title, d.source]} /></>}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div></div>
       </article>
     ))}</div>
     {write && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={addDream} />}

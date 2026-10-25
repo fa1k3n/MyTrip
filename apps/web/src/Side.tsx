@@ -9,7 +9,7 @@ import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleT
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { Icon, IconButton } from "./Icons.tsx";
-import { InfoText, PartLock, PlaceLink, type Run } from "./TripView.tsx";
+import { HiddenText, InfoText, PartLock, PlaceLink, TextEye, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 
@@ -31,9 +31,9 @@ function Budget({ t, chart, onToggle, edit, part }: { part: LockOf; t: Trip; cha
   const label = (i: Trip["budget"][number]) => `${i.note ?? i.category}${i.owner ? ` · ${i.owner}` : ""}`;
   const row = (i: Trip["budget"][number], est: boolean) => (
     <div className={`row mid ${est ? "est" : ""}`} key={i.id}>
-      <span>{label(i)}</span>
+      <span>{i.hidden ? <HiddenText /> : <>{label(i)}<TextEye t={t} texts={[i.category, i.note]} /></>}</span>
       <span className="end">{amountText(i, t.currency)}
-        <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut /></span>
+        {!i.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut />}</span>
     </div>
   );
   const sum = totals.map((x) => money(x.sum, x.currency)).join(" + ") || kr(0);
@@ -59,11 +59,11 @@ function Bookings({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d:
     <Section title={sv.bookings} lock={part("bookings")}>
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>
-          <span><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><br />
+          <span>{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
             <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}</small>
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
           <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span>
-            <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut /></span>
+            {!b.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut />}</span>
         </div>
       ))}
       <div className="add"><IconButton icon="plus" label={sv.addBooking} onClick={() => edit({ kind: "booking" })} mut tip="right" /></div>
@@ -79,12 +79,12 @@ function Tasks({ t, today, edit, run, onPlace, part, tick }: { part: LockOf; t: 
         <div className="row mid todo" key={k.id}>
           <label className="check">
             <input type="checkbox" checked={k.done} disabled={!tick} onChange={() => run((x) => toggleTask(x, k.id), k.done ? "task undone" : "task done")} />
-            <span className={k.done ? "done" : ""}>{k.text}
+            <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
               {isOverdue(k, today) && <> <span className="badge late">{sv.overdue}</span></>}</span>
           </label>
-          <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${k.text}`} onClick={() => edit({ kind: "task", id: k.id })} mut />
+          {!k.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${k.text}`} onClick={() => edit({ kind: "task", id: k.id })} mut />}
         </div>
       ))}
       <p className="ro note">{sv.tasksShared}</p>
@@ -100,7 +100,7 @@ function Info({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d: Edi
       {t.info.map((x) => (
         <div className="row mid" key={x.id}>
           <InfoText t={t} x={x} onPlace={onPlace} />
-          <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${x.title}`} onClick={() => edit({ kind: "info", id: x.id })} mut />
+          {!x.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${x.title}`} onClick={() => edit({ kind: "info", id: x.id })} mut />}
         </div>
       ))}
       <div className="add"><IconButton icon="plus" label={sv.addInfo} onClick={() => edit({ kind: "info" })} mut tip="right" /></div>

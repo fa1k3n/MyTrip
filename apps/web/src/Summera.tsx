@@ -5,6 +5,7 @@ import { balanceText, balances, budgetVsActual, settle, type Transfer } from "./
 import { IconButton } from "./Icons.tsx";
 import type { Level } from "@trip/schema/src/rules.ts";
 import { sv } from "./sv.ts";
+import { HiddenText, TextEye } from "./TripView.tsx";
 
 type Props = {
   t: Trip; addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
@@ -46,7 +47,7 @@ export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget
           <h3>{sv.expenses}</h3>
           {t.expenses.length ? t.expenses.map((e) => (
             <div className="row" key={e.id}>
-              <span>{e.text}<br /><small className="ro">
+              <span>{e.hidden ? <HiddenText /> : <>{e.text}<TextEye t={t} texts={[e.text]} /></>}<br /><small className="ro">
                 {e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {e.sharedBy.length ? e.sharedBy.map(name).join(", ") : sv.everyone}
                 {e.addedBy && <> · {sv.addedBy.toLowerCase()} {name(e.addedBy)}</>}
               </small></span>
@@ -61,7 +62,7 @@ export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget
           <h3>{sv.budgetVsActual}</h3>
           {follow.map((r) => (
             <div className="row" key={r.category}>
-              <span>{r.category}</span>
+              <span>{r.category || sv.hiddenText}</span>
               <span>{kr(r.actual)} {sv.of} {kr(r.planned)}{r.over && <span className="over"> · {sv.overPlan}</span>}</span>
             </div>
           ))}
@@ -71,7 +72,8 @@ export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget
           <h3>{sv.payments}</h3>
           {t.payments.length ? t.payments.map((x) => (
             <div className="row" key={x.id}>
-              <span>{name(x.from)} → {name(x.to)}{(x.date || x.note) && <><br /><small className="ro">{[x.date && shortDate(x.date), x.note].filter(Boolean).join(" · ")}</small></>}</span>
+              <span>{name(x.from)} → {name(x.to)}{(x.date || x.note || x.hidden) && <><br /><small className="ro">{[x.date && shortDate(x.date), x.note].filter(Boolean).join(" · ")}
+                {x.hidden && <>{x.date ? " · " : ""}<HiddenText /></>}<TextEye t={t} texts={[x.note]} /></small></>}</span>
               <span>{kr(x.amount)}</span>
             </div>
           )) : <p className="ro">{sv.noPayments}</p>}

@@ -42,6 +42,7 @@ export const ICONS: Record<string, { shape: string; color: string; label: string
   Shopping: { shape: "bag", color: TERRACOTTA, label: "Shopping" },
   Natur: { shape: "trees", color: SAGE, label: "Natur" },
   Resa: { shape: "map", color: SAND, label: "Resa" },
+  Klockslag: { shape: "clock", color: TAUPE, label: "Klockslag" },
   car: { shape: "car", color: TAUPE, label: "Bil" },
   ferry: { shape: "ship", color: TAUPE, label: "Färja" },
   train: { shape: "train", color: TAUPE, label: "Tåg" },

@@ -3,6 +3,7 @@ import type { Op, Trip } from "@trip/schema";
 import { byTime, type Result } from "./edit.ts";
 import { activityEnd, fromMin, toMin } from "./time.ts";
 import { sv } from "./sv.ts";
+import { TIME_POINT } from "./categories.ts";
 
 export { activityEnd };
 type Activity = Trip["days"][number]["activities"][number];
@@ -13,9 +14,10 @@ export const GAP_MIN = 30;
 const DEFAULT_MIN = 60; // used for placing an activity that has no duration yet
 
 /** What the activity form still needs before it can be saved (ED-15), or null. */
+/** A Klockslag needs no duration (ED-20). */
 export function activityMissing(input: { start: string; durationMin?: number; category: string }) {
   if (!input.start) return sv.errors.activityStart;
-  if (!input.durationMin) return sv.errors.duration;
+  if (!input.durationMin && input.category !== TIME_POINT) return sv.errors.duration;
   if (!input.category) return sv.errors.category;
   return null;
 }

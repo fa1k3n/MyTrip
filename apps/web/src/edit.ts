@@ -3,6 +3,7 @@ import type { Op, Trip } from "@trip/schema";
 import { dateBadge } from "./format.ts";
 import { parseAmount } from "./money.ts";
 import { sv } from "./sv.ts";
+import { TIME_POINT } from "./categories.ts";
 
 export type Result = { ok: true; ops: Op[] } | { ok: false; error: string };
 type Day = Trip["days"][number];
@@ -172,14 +173,16 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
   }
   const list = t.days[di].activities;
   const old = list.find((a) => a.id === id);
+  const category = input.category === undefined ? old?.category : input.category || undefined;
+  const point = category === TIME_POINT && !!input.start; // a moment: no duration, ends at its start (ED-20)
   const activity: Activity = clean({
     ...old, id: old?.id ?? uniqueId(text, taken), text, placeIds,
     start: input.start || undefined, estimated: !!input.start && input.estimated,
-    category: input.category === undefined ? old?.category : input.category || undefined,
-    durationMin: input.durationMin ?? old?.durationMin,
+    category,
+    durationMin: point ? undefined : input.durationMin ?? old?.durationMin,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     hiddenFrom: input.hiddenFrom === undefined ? old?.hiddenFrom : input.hiddenFrom.length ? input.hiddenFrom : undefined,
-    end: input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
+    end: point ? input.start : input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];
   ops.push({ op: "set", path: `days/${di}/activities`, value: byTime(next) });

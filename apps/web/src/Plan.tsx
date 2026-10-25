@@ -4,6 +4,7 @@ import type { Trip } from "@trip/schema";
 import { moveActivity, scheduleRows } from "./schedule.ts";
 import { fmtDuration } from "./transport.ts";
 import { Icon, IconButton } from "./Icons.tsx";
+import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { ActivityText, ActivityWhen, type Activity, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { sv } from "./sv.ts";
@@ -43,6 +44,7 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
   };
   const accept = (e: DragEvent) => { if (dragging || e.dataTransfer.types.includes(DRAG_TYPE)) e.preventDefault(); };
   let n = -1;
+  const who = hiddenFromIn(x); // AU-18, AU-24
   return (
     <div className="plan" onDragOver={(e) => { accept(e); if (!x.activities.length) setOver(0); }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null); }}
       onDrop={(e) => drop(e, over ?? x.activities.length)}>
@@ -54,14 +56,14 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
         );
         const a = r.a, i = ++n, miss = missing(a);
         return (
-          <div key={a.id} className={`act drag ${a.hiddenFrom?.length ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
+          <div key={a.id} className={`act drag ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
             draggable onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => { dragging = null; setOver(null); }}
             onDragOver={(e) => { accept(e); e.stopPropagation(); setOver(posFor(e, i)); }}
             onDrop={(e) => drop(e, posFor(e, i))}>
             <button type="button" className="btn ghost icon bare grip tip-right" aria-label={`${sv.moveActivity} ${a.text}`} data-tip={sv.moveHint} onKeyDown={(e) => onKey(e, i, a)}><Icon name="grip" /></button>
             <ActivityWhen a={a} />
-            <span className="what-col"><ActivityText t={t} a={a} onPlace={onPlace} />{miss && <small className="miss">{sv.missing.label}: {miss}</small>}</span>
+            <span className="what-col"><ActivityText t={t} a={a} who={who.get(a.id)} eye={() => edit({ kind: "hidden", dayId: x.id, id: a.id })} onPlace={onPlace} />{miss && <small className="miss">{sv.missing.label}: {miss}</small>}</span>
             <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />
           </div>
         );

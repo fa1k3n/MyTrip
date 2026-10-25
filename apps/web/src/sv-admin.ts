@@ -1,5 +1,9 @@
 // Interface texts for the trip's settings only, kept out of the main page file (PF-01). Loaded with the settings page.
 export const svAdmin = {
+  hidden: {
+    title: "Dold för", none: "Ingen", pickLabel: "Dölj för",
+    hint: "De valda ser bara \u201dDold aktivitet\u201d. Följare ser den som dold så fort den är dold för någon.", like: (text: string) => `Liknar den dolda \u201d${text}\u201d`,
+  }, // AU-18, AU-25
   share: {
     title: "Följarlänk", none: "Ingen länk än.", create: "Skapa länk", copy: "Kopiera länken", replace: "Byt länk", copied: "Kopierad.",
     hint: "För vänner som inte följer med: den som har länken är Följare och kan bara läsa resan. Bokningsnummer visas inte.",

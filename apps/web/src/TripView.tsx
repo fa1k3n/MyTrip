@@ -8,22 +8,23 @@ import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
 import type { Transfer } from "./money.ts";
 import { Gear, Icon, IconButton } from "./Icons.tsx";
-import { CatIcon, CatIcons, ICONS, LineIcon } from "./CatIcon.tsx";
+import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Summera load when their tab is first opened (PF-01).
 const Uppleva = lazy(() => import("./Uppleva.tsx").then((m) => ({ default: m.Uppleva })));
 const Summera = lazy(() => import("./Summera.tsx").then((m) => ({ default: m.Summera })));
 const Side = lazy(() => import("./Side.tsx"));
+const Dreams = lazy(() => import("./Dreams.tsx"));
 const PlanActivities = lazy(() => import("./Plan.tsx")); // edit mode only (ED-16)
 import type { EditDlg } from "./editKinds.ts";
 import { anyWrite, type Perms } from "./access.ts";
 import { atLeast } from "@trip/schema/src/rules.ts";
+import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
 /** Inline edits without a dialog; `build` gets the latest trip so a retry after a conflict uses fresh data. */
 export type Run = (build: (t: Trip) => Op[] | Result, reason: string) => void;
-const DREAM_BG = ["#E8D5C4", "#D5E0D8", "#EFE2BF"];
 
 /** A place name as a link that opens the place window (PL-01, PL-02). */
 export function PlaceLink({ t, id, text, onPlace }: { t: Trip; id?: string; text?: string; onPlace: (id: string) => void }) {
@@ -39,15 +40,23 @@ export function ActivityWhen({ a }: { a: Activity }) {
   return <span className="when-col"><time>{activityTime(a)}</time>{a.category && categoryIcon(a.category) && <CatIcon id={a.category} />}</span>;
 }
 
+/** An eye naming the travelers something is hidden from; it opens the list of whom when it can (AU-25). */
+function Eye({ t, who, open }: { t: Trip; who: string[]; open?: () => void }) {
+  const label = sv.hiddenMark(t.travelers.filter((x) => who.includes(x.id)).map((x) => x.name).join(", "));
+  return open ? <span className="eye" onClick={(e) => e.stopPropagation()}><IconButton icon="eyeoff" look="bare" label={label} onClick={open} /></span>
+    : <span className="eye" role="img" aria-label={label} title={label}><Icon name="eyeoff" /></span>;
+}
+
 /** The short title, then the places and the note on lines of their own (ED-19). A hidden activity reaches a Resenär or
- * Följare without its title and shows as "Dold aktivitet"; a Planerare sees the title marked as hidden (AU-18). */
-export function ActivityText({ t, a, onPlace }: { t: Trip; a: Activity; onPlace: (id: string) => void }) {
+ * Följare without its title and shows as "Dold aktivitet"; a Planerare sees the title marked as hidden (AU-18), also when it
+ * is hidden for resembling a hidden activity (AU-24): `who` comes from hiddenFromIn, and the mark is an eye that opens whom (AU-25). */
+export function ActivityText({ t, a, who, eye, onPlace }: { t: Trip; a: Activity; who?: string[]; eye?: () => void; onPlace: (id: string) => void }) {
   if (a.hidden && !a.text) return <span className="what"><span className="name hiddenact"><Icon name="eyeoff" />{sv.hiddenActivity}</span></span>;
   const one = a.placeIds.length === 1;
   return (
     <span className="what">
       <span className="name">{one ? <PlaceLink t={t} id={a.placeIds[0]} text={a.text} onPlace={onPlace} /> : a.text}
-        {!!a.hiddenFrom?.length && <span className="badge hidebadge"><Icon name="eyeoff" />{sv.hiddenMark(a.hiddenFrom.map((id) => t.travelers.find((x) => x.id === id)?.name ?? id).join(", "))}</span>}</span>
+        {!!who?.length && <Eye t={t} who={who} open={eye} />}</span>
       {!one && a.placeIds.length > 0 && <small className="places">{a.placeIds.map((id, n) => <span key={id}>{n ? ", " : ""}<PlaceLink t={t} id={id} onPlace={onPlace} /></span>)}</small>}
       {a.note && <small className="ro anote">{a.note}</small>}
     </span>
@@ -55,10 +64,11 @@ export function ActivityText({ t, a, onPlace }: { t: Trip; a: Activity; onPlace:
 }
 
 export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
+  const who = hiddenFromIn(x);
   return <>{x.activities.map((a) => (
-    <div className={`act ${a.hiddenFrom?.length ? "hiddenrow" : ""}`} key={a.id}>
+    <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`} key={a.id}>
       <ActivityWhen a={a} />
-      <ActivityText t={t} a={a} onPlace={onPlace} />
+      <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
     </div>
   ))}</>;
@@ -85,6 +95,7 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, e
   editing: boolean; toggleLock?: () => void; run: Run; // no toggleLock: the role may not change the plan (AU-21)
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
+  const hid = [...new Set([...hiddenFromIn(x).values()].flat())]; // a closed day shows an eye for its hidden activities (AU-25)
   return (
     <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"}`} id={`day-${x.id}`}>
       {/* The whole header toggles on click; the title is the keyboard control (DC-09). The clock opens transport and does not toggle (TM-04). */}
@@ -95,7 +106,7 @@ function DayCard({ t, x, open, forecast, onToggle, onPlace, onTransport, edit, e
           <div className="sum">{x.summary}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
         </div>
-        <span className="ico"><CatIcons ids={dayIcons(x)} /></span>
+        <span className="ico">{!open && hid.length > 0 && <Eye t={t} who={hid} open={() => edit({ kind: "hidden", dayId: x.id })} />}<CatIcons ids={dayIcons(x)} /></span>
       </div>
       {open && (
         <div className="tools">
@@ -133,17 +144,7 @@ export function TripView(p: TripViewProps) {
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
   let main;
-  if (tab === "dr") main = <>
-    <div className="dreams">{t.dreams.map((d, i) => (
-      <article className="card dream" key={d.id}>
-        <div className="img" style={{ background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : DREAM_BG[i % 3] }}>
-          <CatIcon id={categoryIcon(d.category) ?? d.icon} big /></div>
-        <button className="heart" onClick={() => p.vote(i)} aria-label={sv.vote} disabled={perms.view.dr.dreams !== "write"}>♥ {d.votes}</button>
-        <div className="in"><h3>{d.title}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div></div>
-      </article>
-    ))}</div>
-    {perms.view.dr.dreams === "write" && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={p.addDream} />}
-  </>;
+  if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} /></Suspense>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
       <button className="stop" key={`${s.dayId}-${i}`} onClick={() => p.jump(s.dayId)}><b>{s.label}</b><small>{s.sub}</small></button>

@@ -8,10 +8,12 @@ import {
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
 import { IconButton } from "./Icons.tsx";
-import { CATEGORIES } from "./categories.ts";
+import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { suggestPurpose } from "./purpose.ts";
 import { shortDate } from "./format.ts";
 import { activityMissing } from "./schedule.ts";
+import { pickedLabel } from "./hiddenView.ts";
+import { svAdmin } from "./sv-admin.ts";
 import { fmtDuration } from "./transport.ts";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
@@ -168,13 +170,13 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
         <label>{sv.time}<input type="time" {...text("start")} /></label>
         <label className="check"><input type="checkbox" {...check("estimated")} />{sv.estimate}</label>
       </div>
-      <label>{sv.duration}<select {...text("duration")}>
+      {f.category !== TIME_POINT && <label>{sv.duration}<select {...text("duration")}> {/* a Klockslag has no duration (ED-20) */}
         <option value="">{sv.chooseDuration}</option>
         {[...new Set([...DURATIONS, ...(a?.durationMin ? [a.durationMin] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
-      </select></label>
+      </select></label>}
       <label>{sv.category}<select {...text("category")}>
         <option value="">{sv.noCategory}</option>
-        {CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
+        {ACTIVITY_CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
       </select></label>
       <label>{sv.placeLabel}<select {...text("place")}>
         <option value="">{sv.noPlace}</option>
@@ -186,10 +188,12 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
         <label>{sv.address}<input {...text("address")} /></label>
       </>}
       {p.t.travelers.some((x) => x.id !== p.self) && <fieldset className="hidefrom"> {/* no one hides an activity from themselves (AU-18) */}
-        <legend>{sv.hideActivity}</legend>
-        {p.t.travelers.filter((x) => x.id !== p.self).map((x) => <label className="check" key={x.id}><input type="checkbox" checked={hiddenFrom.includes(x.id)}
-          onChange={(e) => setHiddenFrom((h) => (e.target.checked ? [...h, x.id] : h.filter((id) => id !== x.id)))} />{x.name}</label>)}
-        <p className="ro note">{sv.hideActivityHint}</p>
+        <legend>{svAdmin.hidden.pickLabel}</legend>
+        <details className="multi"><summary>{pickedLabel(p.t, hiddenFrom)}</summary> {/* a dropdown with several choices (AU-25) */}
+          <div className="menu">{p.t.travelers.filter((x) => x.id !== p.self).map((x) => <label className="check" key={x.id}><input type="checkbox" checked={hiddenFrom.includes(x.id)}
+            onChange={(e) => setHiddenFrom((h) => (e.target.checked ? [...h, x.id] : h.filter((id) => id !== x.id)))} />{x.name}</label>)}</div>
+        </details>
+        <p className="ro note">{svAdmin.hidden.hint}</p>
       </fieldset>}
     </Form>
   );

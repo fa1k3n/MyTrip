@@ -5,8 +5,11 @@ export const CATEGORIES = [
   { name: "Mat" }, { name: "Utsikt" }, { name: "Aktivitet" }, { name: "Avkoppling" }, { name: "Museum" },
   { name: "Bad" }, { name: "Shopping" }, { name: "Natur" }, { name: "Resa" },
 ] as const;
+/** An activity type for a moment, e.g. the departure time: no duration, not a wish category, not a day icon (ED-20). */
+export const TIME_POINT = "Klockslag";
+export const ACTIVITY_CATEGORIES = [...CATEGORIES, { name: TIME_POINT }];
 
-const NAMES: readonly string[] = CATEGORIES.map((c) => c.name);
+const NAMES: readonly string[] = ACTIVITY_CATEGORIES.map((c) => c.name);
 /** The icon id of a category, or undefined for a category outside the list. */
 export const categoryIcon = (name: string): string | undefined => (NAMES.includes(name) ? name : undefined);
 
@@ -22,7 +25,7 @@ export function dayIcons(day: DayLike): string[] {
   const travel = [...minutes].reduce((a, b) => (b[1] > a[1] ? b : a), ["", 0] as [string, number]);
   const total = [...minutes.values()].reduce((a, b) => a + b, 0);
   const counts = new Map<string, number>();
-  for (const a of day.activities) if (a.category && categoryIcon(a.category)) counts.set(a.category, (counts.get(a.category) ?? 0) + 1);
+  for (const a of day.activities) if (a.category && a.category !== TIME_POINT && categoryIcon(a.category)) counts.set(a.category, (counts.get(a.category) ?? 0) + 1);
   const top = [...counts].sort((a, b) => b[1] - a[1]).map(([c]) => c); // stable: ties keep first-seen order
   const icons = [...new Set([...(total >= TRAVEL_MIN ? [travel[0]] : []), ...top])].slice(0, 2);
   return icons.length ? icons : day.icons;

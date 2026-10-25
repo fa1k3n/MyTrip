@@ -193,3 +193,27 @@ test("AU-22 permissions belong to the superuser", async () => {
   assert.deepEqual(Object.keys(f.access), ["follower"], "a link gets only its own role's rules");
   assert.equal(f.access.follower.up.parts.bookings, "read");
 });
+
+// REQ: AU-24 an activity similar to a hidden one on the same day is masked for the same travelers; the Planerare sees it marked
+test("AU-24 similar activities on the same day are hidden too", async () => {
+  const t = trip("berlin");
+  const store = memoryStore([{
+    ...t, places: [{ id: "lb", name: "Liseberg", address: "Gatan 3" }],
+    days: [{ ...t.days[0], activities: [
+      { id: "a1", text: "Bil till Liseberg", placeIds: [], start: "09:00", durationMin: 60 },
+      { id: "a2", text: "Liseberg", placeIds: ["lb"], start: "10:00", hiddenFrom: ["anna"] },
+      { id: "a3", text: "Bil hem", placeIds: [], start: "18:00" },
+    ] }],
+  }]);
+  const app = createApp(store, tokens);
+  const secret = (await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret;
+  for (const auth of [await person(app, "anna", "traveler"), `link.berlin.${secret}`]) {
+    const got = await json(call(app, "/api/trips/berlin", auth));
+    assert.deepEqual(got.days[0].activities.map((a: { text: string; hidden?: boolean }) => [a.text, !!a.hidden]),
+      [["", true], ["", true], ["Bil hem", false]], auth);
+  }
+  const bo = await json(call(app, "/api/trips/berlin", await person(app, "bo", "traveler")));
+  assert.equal(bo.days[0].activities[0].text, "Bil till Liseberg");
+  const planner = await json(call(app, "/api/trips/berlin", await person(app, "bo", "planner")));
+  assert.deepEqual(planner.days[0].activities[0].hiddenFrom, undefined, "the stored data is not changed");
+});

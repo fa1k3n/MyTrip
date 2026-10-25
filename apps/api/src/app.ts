@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, opNeeds, type AccessRole, type Op, type Part } from "@trip/schema";
+import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, type AccessRole, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 
 export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
@@ -191,7 +191,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (hide("dreams")) out.dreams = [];
     if (hide("packing")) { out.packing = []; out.packed = []; out.travelers = t.travelers.map((x) => ({ ...x, packing: [], packed: [] })); }
     if (ar === "planner") return out;
-    return masked(out, ar === "follower" ? (a) => !!a.hiddenFrom?.length : (a) => !!travelerId && !!a.hiddenFrom?.includes(travelerId));
+    const who = new Map(t.days.flatMap((d) => [...hiddenFromIn(d)])); // including activities that resemble a hidden one (AU-24)
+    return masked(out, ar === "follower" ? (a) => who.has(a.id) : (a) => !!travelerId && !!who.get(a.id)?.includes(travelerId));
   };
 
   app.get("/api/me", (c) => c.json(!scoped(c) ? { role: c.get("role") }

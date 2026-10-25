@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
+import { stampText } from "./offline.ts";
 import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
@@ -158,6 +159,7 @@ export type TripViewProps = {
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
+  forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
 };
 
 export function TripView(p: TripViewProps) {
@@ -210,7 +212,7 @@ export function TripView(p: TripViewProps) {
     ))}</div>}
     <div className={`${lock ? "lock" : ""} ${writes ? "" : "guest"}`}>{main}</div>
     {(tab === "nala" || tab === "up") && Object.keys(p.forecast).length > 0 && (
-      <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a></p>
+      <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>{p.forecastAt && <> · {sv.offline.weatherFrom(stampText(p.forecastAt, new Date(), t.timezone))}</>}</p>
     )}
   </>;
 }

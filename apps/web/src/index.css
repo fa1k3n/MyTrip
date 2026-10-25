@@ -296,3 +296,6 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 .lock .add:has(> [data-mut]){display:none} /* an add button for editing leaves no gap while its part is locked (UI-09) */
 /* PW-16: the start page with the trips of the links on the phone; each card can be removed (PW-17) */
 .tripwrap{position:relative}.tripwrap .rm{position:absolute;bottom:10px;right:10px}.tripwrap .rm .btn.icon{background:var(--card)}
+/* PW-04: the banner without a network; PW-10: what needs a network gives way to a short explanation */
+.offline{position:sticky;top:8px;z-index:5;margin:0 0 12px;padding:8px 14px;border-radius:10px;background:var(--line);color:var(--ink);font-size:.9rem;text-align:center}
+.mapoff{padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center}

@@ -1,7 +1,11 @@
 // The place window (PL-01..PL-16) and the transport panel behind the clock (TM-04, TR-01..TR-19).
 import { useEffect, useState } from "react";
 import type { Trip } from "@trip/schema";
-import { api } from "./api.ts";
+import { api, offlineState } from "./api.ts";
+
+/** Maps and the traffic check need a network; offline they give way to a short explanation (PW-10). */
+const offline = () => !navigator.onLine || offlineState() !== null;
+const NeedsNet = () => <p className="ro mapoff">{sv.offline.needsNet}</p>;
 import { dayTime } from "./format.ts";
 import { directionsUrl, fmtDuration, mapEmbedUrl, routeOf, vehicleTimes, type Traffic } from "./transport.ts";
 import { IconButton } from "./Icons.tsx";
@@ -30,7 +34,7 @@ export function PlaceView({ t, id, edit }: { t: Trip; id: string; edit?: () => v
       </div>
     )}
     {/* Rendered only while the window is open, so the map loads on demand (PL-07, CP-06). */}
-    <iframe className="mapframe" title={sv.mapTitle} src={v.embedUrl} loading="lazy" />
+    {offline() ? <NeedsNet /> : <iframe className="mapframe" title={sv.mapTitle} src={v.embedUrl} loading="lazy" />}
   </>;
 }
 
@@ -60,8 +64,10 @@ export function TransportView({ t, dayId }: { t: Trip; dayId: string }) {
       <div className="veh" key={v.icon}><span className="vi"><CatIcons ids={VEHICLE_IDS[v.icon] ?? []} /></span><span className="sr">{sv.vehicleNames[v.icon]}: </span><span>{v.text}</span></div>
     ))}
     {route && <>
-      <div className={`tst ${warn ? "warn" : ""}`} role="status">{lines.map((l) => <div key={l}>{l}</div>)}</div>
-      <iframe className="mapframe" title={sv.trafficMapTitle} src={mapEmbedUrl(route)} loading="lazy" />
+      {offline() ? <NeedsNet /> : <>
+        <div className={`tst ${warn ? "warn" : ""}`} role="status">{lines.map((l) => <div key={l}>{l}</div>)}</div>
+        <iframe className="mapframe" title={sv.trafficMapTitle} src={mapEmbedUrl(route)} loading="lazy" />
+      </>}
       <p className="ro">{sv.noBreaks}</p>
     </>}
     {route && <div className="dlgbar"><a className="btn" href={directionsUrl(route)} target="_blank" rel="noopener">{sv.openRoute}</a></div>}

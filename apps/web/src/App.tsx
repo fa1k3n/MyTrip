@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, deviceLinks, forgetLink, installed, linkKey, needsChoice, type Me } from "./api.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, type Me } from "./api.ts";
+import { keptForecast, offlineText } from "./offline.ts";
 import { forInstalled, permsFor, safariUrl } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
@@ -45,11 +46,13 @@ function useCovers(trips: Trip[]) {
   return urls;
 }
 
-/** One forecast request per opened trip (WX-11, PF-03). Failures hide the weather (WX-14). */
-function useForecast(trip: Trip | undefined) {
+/** One forecast request per opened trip (WX-11, PF-03). Failures hide the weather (WX-14), unless the phone kept the last
+ * one for the trip, which is shown with the time it was fetched (PW-10). */
+function useForecast(trip: Trip | undefined): [Record<string, Forecast>, string | undefined] {
   const [fc, setFc] = useState<Record<string, Forecast>>({});
+  const [at, setAt] = useState<string>();
   useEffect(() => {
-    setFc({});
+    setFc({}); setAt(undefined);
     const days = trip?.days.filter((d) => d.weather) ?? [];
     if (!days.length) return;
     let live = true;
@@ -57,11 +60,16 @@ function useForecast(trip: Trip | undefined) {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const per = j ? parseForecast(j) : [];
-        if (live) setFc(Object.fromEntries(days.flatMap((d, i) => (per[i]?.[d.date] ? [[d.id, per[i][d.date]]] : []))));
-      }, () => {});
+        const next = Object.fromEntries(days.flatMap((d, i) => (per[i]?.[d.date] ? [[d.id, per[i][d.date]]] : [])));
+        if (live) setFc(next);
+        if (j) copy.save({ forecast: { tripId: trip!.id, days: next } });
+      }, () => {
+        const kept = keptForecast<Forecast>(copy.load(), trip!.id);
+        if (live && kept) { setFc(kept.days); setAt(kept.at); }
+      });
     return () => { live = false; };
   }, [trip?.id, JSON.stringify(trip?.days.map((d) => [d.id, d.date, d.weather]))]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when days or places change (ED-04)
-  return fc;
+  return [fc, at];
 }
 
 export function App() {
@@ -113,6 +121,11 @@ export function App() {
   /** The pages shown: only Uppleva in the app on the home screen (PW-15). */
   const pagePerms = (x: Parameters<typeof permsFor>[1]) => (installed ? forInstalled(permsFor(role, x)) : permsFor(role, x));
   const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
+  useEffect(() => { // with a network again, the trip is fetched at once (PW-04)
+    if (!me) return;
+    addEventListener("online", load);
+    return () => removeEventListener("online", load);
+  }, [load, me]);
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
     const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
     return () => clearInterval(id);
@@ -125,7 +138,9 @@ export function App() {
   const aiCard = settings && <Suspense fallback={null}><AiSettings s={settings} service={settings.aiService} onChange={saveSettings} /></Suspense>;
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
-  const forecast = useForecast(view === "trip" ? t : undefined);
+  const [forecast, forecastAt] = useForecast(view === "trip" ? t : undefined);
+  const [off, setOff] = useState(offlineState()); // PW-04
+  useEffect(() => onOffline(() => setOff(offlineState())), []);
   const today = t ? todayIn(t.timezone) : "";
 
   useEffect(() => {
@@ -270,7 +285,7 @@ export function App() {
   );
   else page = (
     <TripView
-      t={t} cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast}
+      t={t} cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
@@ -286,7 +301,7 @@ export function App() {
   );
 
   return <>
-    <div className="wrap">{page}</div>
+    <div className="wrap">{off && <div className="offline" role="status">{offlineText(off.at, new Date(), t?.timezone ?? "Europe/Stockholm")}</div>}{page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
     <dialog
       ref={dialog} aria-label={!dlg ? undefined

@@ -1,6 +1,7 @@
 import type { Op, Settings, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
+import { dropAllCopies, dropCopy, loadCopy, saveCopy, type Copy } from "./offline.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
@@ -31,7 +32,7 @@ if (fromUrl?.kind === "link") {
   keep();
   history.replaceState(null, "", location.pathname + location.search);
 }
-if (fromUrl?.kind === "admin") { links = []; keep(); }
+if (fromUrl?.kind === "admin") { links = []; keep(); try { dropAllCopies(localStorage); } catch { /* nothing stored */ } } // PW-17
 // A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
 addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
 /** The link in use: the one just opened, or the only one on the phone; with several, the start page asks (PW-16). */
@@ -46,7 +47,10 @@ export const linkKey = () => (askedForAdmin ? null : link);
 export const deviceLinks = () => (askedForAdmin ? [] : links);
 export const needsChoice = () => !askedForAdmin && !link && links.length > 1;
 export const chooseLink = (key: string | null) => { link = key; };
-export const removeDeviceLink = (key: string) => { links = removeLink(links, key); if (link === key) link = null; keep(); }; // PW-17
+export const removeDeviceLink = (key: string) => { // PW-17: the link and what the phone kept for it
+  links = removeLink(links, key); if (link === key) link = null; keep();
+  try { dropCopy(localStorage, key); } catch { /* nothing stored */ }
+};
 
 const headers = (key = link) => {
   const a = askedForAdmin ? authHeader(TOKEN, null) : authHeader(TOKEN, key);
@@ -64,6 +68,37 @@ export class ApiError extends Error {
   }
 }
 
+/** Offline: the time the trip shown was fetched; null with a network (PW-04). Listeners hear every change. */
+let offline: { at?: string } | null = null;
+const listeners = new Set<() => void>();
+export const offlineState = () => offline;
+export const onOffline = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
+const setOffline = (next: { at?: string } | null) => {
+  if (JSON.stringify(next) === JSON.stringify(offline)) return;
+  offline = next;
+  listeners.forEach((f) => f());
+};
+addEventListener("online", () => setOffline(null));
+/** The link's copy on the phone, to read or write (PW-03). */
+export const copy = {
+  load: (): Copy | null => { try { return link ? loadCopy(localStorage, link) : null; } catch { return null; } },
+  save: (part: Parameters<typeof saveCopy>[2]) => { try { if (link) saveCopy(localStorage, link, part, new Date().toISOString()); } catch { /* blocked */ } },
+};
+/** A read that falls back on the phone's copy when the server cannot be reached; only links keep one (PW-03, PW-05). */
+async function kept<T>(part: "me" | "trips", path: string): Promise<T> {
+  try {
+    const v = await call<T>(path);
+    copy.save({ [part]: v });
+    setOffline(null);
+    return v;
+  } catch (e) {
+    const c = copy.load();
+    if (e instanceof ApiError || c?.[part] === undefined) throw e;
+    setOffline({ at: c.at });
+    return c[part] as T;
+  }
+}
+
 async function call<T>(path: string, init: RequestInit = {}, key = link): Promise<T> {
   const r = await fetch(path, { ...init, headers: headers(key) });
   if (!r.ok) throw new ApiError(r.status, ((await r.json().catch(() => ({}))) as { problems?: string[] }).problems ?? []);
@@ -76,7 +111,7 @@ export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId
 export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string };
 
 export const api = {
-  me: () => call<Me>("/api/me"),
+  me: () => kept<Me>("me", "/api/me"),
   login: (password: string) => call<void>("/api/login", { method: "POST", body: JSON.stringify({ password }) }),
   logout: () => call<void>("/api/logout", { method: "POST" }),
   link: (id: string) => call<{ secret: string }>(`${trip(id)}/link`),
@@ -86,7 +121,7 @@ export const api = {
     call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify({ role }) }),
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
-  trips: () => call<Trip[]>("/api/trips"),
+  trips: () => kept<Trip[]>("trips", "/api/trips"),
   tripsAs: (key: string) => call<Trip[]>("/api/trips", {}, key), // the trip of one link on the phone (PW-16)
   create: (title: string) => call<Trip>("/api/trips", { method: "POST", body: JSON.stringify({ title }) }),
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),

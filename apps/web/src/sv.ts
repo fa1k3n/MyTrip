@@ -23,6 +23,10 @@ export const sv = {
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
+  offline: { // PW-04, PW-10
+    title: "Offline", since: (time: string) => `Offline – senast uppdaterad ${time}`,
+    needsNet: "Kräver nätverk. Visas när du är uppkopplad igen.", weatherFrom: (time: string) => `Väder hämtat ${time}`,
+  },
   choose: { // PW-16, PW-17
     remove: (trip: string) => `Ta bort ${trip} från telefonen`,
     removeAsk: (trip: string) => `Ta bort ${trip} från telefonen? Du behöver länken igen för att öppna resan.`,

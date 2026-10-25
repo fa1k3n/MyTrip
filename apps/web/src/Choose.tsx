@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Trip } from "@trip/schema";
 import { api, ApiError, deviceLinks, removeDeviceLink } from "./api.ts";
+import { loadCopy } from "./offline.ts";
 import { tripOfLink } from "./access.ts";
 import { excerpt, tripDates } from "./format.ts";
 import { IconButton } from "./Icons.tsx";
@@ -19,7 +20,12 @@ export default function Choose({ onPick }: { onPick: (key: string) => void }) {
         const cover = trip?.image ? await api.image(trip.id, key).catch(() => undefined) : undefined;
         if (cover) setCards((c) => c.map((x) => (x.key === key ? { ...x, cover } : x)));
       }, (e) => {
-        if (!(e instanceof ApiError && e.status === 401)) return; // offline or a server error: keep the link
+        if (!(e instanceof ApiError && e.status === 401)) { // offline or a server error: keep the link, with the trip the phone kept (PW-03)
+          let kept: Trip | undefined;
+          try { kept = (loadCopy(localStorage, key)?.trips as Trip[] | undefined)?.[0]; } catch { /* storage blocked */ }
+          if (kept) setCards((c) => c.map((x) => (x.key === key ? { ...x, trip: kept } : x)));
+          return;
+        }
         removeDeviceLink(key); // the server no longer accepts it (AU-07, PW-17)
         setCards((c) => c.filter((x) => x.key !== key));
         setGone(true);

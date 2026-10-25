@@ -65,6 +65,14 @@ export function Uppleva(p: TripViewProps) {
           <div className="row"><span>{sv.paidAhead}</span><span>{kr(s.paid)}</span></div>
           <div className="row"><span>{sv.leftToPay}</span><span>{kr(s.left)}</span></div>
           {spent && <div className="row"><span>{sv.spentOnTrip}</span><span>{kr(s.spent)}</span></div>}
+          {p.waiting.map((x) => ( // counted above, marked until the server has them (PW-06, PW-09)
+            <div className="row mid waiting" key={x.expense.id}>
+              <span>{String(x.expense.text ?? "")}<br /><small className={x.state === "failed" ? "over" : "ro"}>{x.state === "failed" ? sv.queue.failed(x.reason ?? "") : sv.queue.waiting}</small></span>
+              <span className="end">{kr(x.expense.amount)}{x.state === "failed" && <>
+                <IconButton icon="refresh" look="bare" tip="left" label={`${sv.queue.retry}: ${String(x.expense.text ?? "")}`} onClick={() => p.retryWaiting(x.expense.id)} />
+                <IconButton icon="trash" look="bare" tip="left" label={`${sv.queue.remove}: ${String(x.expense.text ?? "")}`} onClick={() => { if (confirm(sv.queue.removeAsk)) p.removeWaiting(x.expense.id); }} /></>}</span>
+            </div>
+          ))}
           {/* Not an editing control: the superuser and personal links may add expenses here (UP-07, UP-12). */}
           {canAdd && t.travelers.length > 0 && <div className="add"><IconButton icon="plus" label={sv.addExpense} onClick={p.addExpense} tip="right" /></div>}
         </section>}

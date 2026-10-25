@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, type Me } from "./api.ts";
-import { keptForecast, offlineText } from "./offline.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
+import { dequeue, enqueue, keptForecast, offlineText, retry, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { forInstalled, permsFor, safariUrl } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
@@ -121,13 +121,23 @@ export function App() {
   /** The pages shown: only Uppleva in the app on the home screen (PW-15). */
   const pagePerms = (x: Parameters<typeof permsFor>[1]) => (installed ? forInstalled(permsFor(role, x)) : permsFor(role, x));
   const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
-  useEffect(() => { // with a network again, the trip is fetched at once (PW-04)
+  const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
+  const flushWaiting = useCallback(async () => {
+    if (!me || !("tripId" in me)) return;
+    if (await sendWaiting(me.tripId)) load(); // PW-07
+    setWaiting(queue.load());
+  }, [me, load]);
+  const changeWaiting = (next: Waiting[]) => { queue.save(next); setWaiting(next); flushWaiting(); }; // PW-09: try again, remove
+  useEffect(() => { // with a network again, the trip is fetched at once and waiting expenses are sent (PW-04, PW-07)
     if (!me) return;
-    addEventListener("online", load);
-    return () => removeEventListener("online", load);
-  }, [load, me]);
+    setWaiting(queue.load());
+    flushWaiting();
+    const back = () => { load(); flushWaiting(); };
+    addEventListener("online", back);
+    return () => removeEventListener("online", back);
+  }, [load, me, flushWaiting]);
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
-    const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) load(); }, 30_000);
+    const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) { load(); flushWaiting(); } }, 30_000);
     return () => clearInterval(id);
   }, [load, me]);
   useEffect(() => { if (!notice) return; const id = setTimeout(() => setNotice(""), 6000); return () => clearTimeout(id); }, [notice]);
@@ -235,7 +245,11 @@ export function App() {
       const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
       if (!self) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
-      change(r.ops, "add expense");
+      if (linkKey()) { // kept on the phone at once and sent from there, with or without a network (PW-06, PW-07)
+        queue.save(enqueue(queue.load(), r.ops[0].value as Expense));
+        setWaiting(queue.load());
+        flushWaiting();
+      } else change(r.ops, "add expense");
     } else {
       const amount = parseAmount(str("amount"));
       if (Number.isNaN(amount)) return setErr(sv.badAmount); // MI-03
@@ -285,7 +299,8 @@ export function App() {
   );
   else page = (
     <TripView
-      t={t} cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast} forecastAt={forecastAt}
+      t={withWaiting(t, waiting) as Trip} waiting={waiting} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
+      cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}

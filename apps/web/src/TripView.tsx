@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
-import { stampText } from "./offline.ts";
+import { stampText, type Waiting } from "./offline.ts";
 import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
@@ -160,6 +160,7 @@ export type TripViewProps = {
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
+  waiting: Waiting[]; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
 };
 
 export function TripView(p: TripViewProps) {

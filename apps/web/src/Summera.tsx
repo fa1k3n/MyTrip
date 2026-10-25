@@ -47,7 +47,7 @@ export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget
           <h3>{sv.expenses}</h3>
           {t.expenses.length ? t.expenses.map((e) => (
             <div className="row" key={e.id}>
-              <span>{e.hidden ? <HiddenText /> : <>{e.text}<TextEye t={t} texts={[e.text]} /></>}<br /><small className="ro">
+              <span>{e.hidden ? <HiddenText /> : <>{e.text}<TextEye t={t} texts={[e.text]} /></>}{"waiting" in e && <> <span className="badge">{sv.queue.waiting}</span></>}<br /><small className="ro">
                 {e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {e.sharedBy.length ? e.sharedBy.map(name).join(", ") : sv.everyone}
                 {e.addedBy && <> · {sv.addedBy.toLowerCase()} {name(e.addedBy)}</>}
               </small></span>

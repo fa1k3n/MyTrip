@@ -360,7 +360,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       if (!own) return c.json({ error: "forbidden" }, 403);
       b.ops = own;
     }
-    if (b.baseRevision !== t.revision) return c.json({ error: "conflict", revision: t.revision }, 409); // MC-05
+    // Expenses only add to the list, so they go onto the latest revision (PW-08), and one already recorded is not added again (PW-07).
+    const onlyExpenses = b.ops.length > 0 && b.ops.every((o) => o.op === "add" && o.path === "expenses/-");
+    if (onlyExpenses) {
+      b.ops = b.ops.filter((o) => !t.expenses.some((e) => e.id === (o.value as { id?: unknown })?.id));
+      if (!b.ops.length) return c.json({ ok: true, revision: t.revision });
+    } else if (b.baseRevision !== t.revision) return c.json({ error: "conflict", revision: t.revision }, 409); // MC-05
     let problems: string[], next: Trip;
     try {
       next = Trip.parse(applyOps(t, b.ops));

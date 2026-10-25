@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Trip } from "@trip/schema";
 import { api, ApiError, deviceLinks, removeDeviceLink } from "./api.ts";
-import { loadCopy } from "./offline.ts";
+import { loadCopy, loadQueue } from "./offline.ts";
 import { tripOfLink } from "./access.ts";
 import { excerpt, tripDates } from "./format.ts";
 import { IconButton } from "./Icons.tsx";
@@ -34,7 +34,9 @@ export default function Choose({ onPick }: { onPick: (key: string) => void }) {
   }, []);
   useEffect(() => { if (cards.length === 1) onPick(cards[0].key); }, [cards.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const remove = (x: Card) => {
-    if (!confirm(sv.choose.removeAsk(x.trip?.title ?? tripOfLink(x.key)))) return;
+    let n = 0;
+    try { n = loadQueue(localStorage, x.key).length; } catch { /* storage blocked */ }
+    if (!confirm(sv.choose.removeAsk(x.trip?.title ?? tripOfLink(x.key)) + (n ? ` ${sv.choose.unsent(n)}` : ""))) return; // PW-17
     removeDeviceLink(x.key);
     setCards((c) => c.filter((y) => y.key !== x.key));
   };

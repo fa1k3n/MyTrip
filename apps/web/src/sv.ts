@@ -23,6 +23,10 @@ export const sv = {
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
+  queue: { // PW-06, PW-09
+    waiting: "Ej skickad", failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
+    removeAsk: "Ta bort utgiften? Den har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot den (${status}).`,
+  },
   offline: { // PW-04, PW-10
     title: "Offline", since: (time: string) => `Offline – senast uppdaterad ${time}`,
     needsNet: "Kräver nätverk. Visas när du är uppkopplad igen.", weatherFrom: (time: string) => `Väder hämtat ${time}`,
@@ -31,6 +35,7 @@ export const sv = {
     remove: (trip: string) => `Ta bort ${trip} från telefonen`,
     removeAsk: (trip: string) => `Ta bort ${trip} från telefonen? Du behöver länken igen för att öppna resan.`,
     gone: "En länk gäller inte längre och togs bort från telefonen.",
+    unsent: (n: number) => (n === 1 ? "En utgift är inte skickad än och försvinner." : `${n} utgifter är inte skickade än och försvinner.`),
   },
   hiddenActivity: "Dold aktivitet", hiddenText: "Dold text", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18, AU-30
   limit: { // BG-13

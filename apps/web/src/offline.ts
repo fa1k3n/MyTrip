@@ -16,10 +16,11 @@ export function saveCopy(s: Store, link: string, part: Pick<Copy, "me" | "trips"
   const stamp = "forecast" in part ? { forecastAt: at } : { at };
   try { s.setItem(PREFIX + link, JSON.stringify({ ...old, ...part, ...stamp })); } catch { /* storage full or blocked: online only */ }
 }
-export const dropCopy = (s: Store, link: string) => s.removeItem(PREFIX + link);
-/** #admin removes every link and so every copy (PW-17). */
+/** A link leaves the phone with its copy and its waiting expenses (PW-17). */
+export const dropCopy = (s: Store, link: string) => { s.removeItem(PREFIX + link); s.removeItem(QUEUE + link); };
+/** #admin removes every link and so every copy and queue (PW-17). */
 export function dropAllCopies(s: Store) {
-  const keys = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k?.startsWith(PREFIX));
+  const keys = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k && (k.startsWith(PREFIX) || k.startsWith(QUEUE)));
   for (const k of keys) s.removeItem(k);
 }
 
@@ -37,4 +38,41 @@ export const offlineText = (at: string | undefined, now: Date, timeZone: string)
 export function keptForecast<F>(c: Copy | null, tripId: string): { days: Record<string, F>; at: string } | null {
   const f = c?.forecast as { tripId?: string; days?: Record<string, F> } | undefined;
   return f?.tripId === tripId && f.days && c?.forecastAt ? { days: f.days, at: c.forecastAt } : null;
+}
+
+/** An expense on the phone that the server does not have yet (PW-06), or that it rejected, with the reason (PW-09). */
+export type Expense = { id: string; amount: number; [k: string]: unknown };
+export type Waiting = { expense: Expense; state: "waiting" | "failed"; reason?: string };
+/** What sending one expense gave: recorded, no network (try later), or rejected with a reason. */
+export type Sent = { ok: true } | { offline: true } | { failed: string };
+
+const QUEUE = "mytrip.queue.";
+export function loadQueue(s: Store, link: string): Waiting[] {
+  try { return (JSON.parse(s.getItem(QUEUE + link) ?? "[]") as Waiting[]) ?? []; } catch { return []; }
+}
+export function saveQueue(s: Store, link: string, q: Waiting[]) {
+  try { if (q.length) s.setItem(QUEUE + link, JSON.stringify(q)); else s.removeItem(QUEUE + link); } catch { /* storage blocked */ }
+}
+export const enqueue = (q: Waiting[], expense: Expense): Waiting[] => [...q, { expense, state: "waiting" }];
+export const retry = (q: Waiting[], id: string): Waiting[] => q.map((x) => (x.expense.id === id ? { expense: x.expense, state: "waiting" } : x));
+export const dequeue = (q: Waiting[], id: string) => q.filter((x) => x.expense.id !== id);
+export const unsent = (q: Waiting[]) => q.length;
+
+/** The trip with the expenses still on the phone, marked, so the budget status counts them (PW-06). */
+export function withWaiting<T extends { expenses: Expense[] }>(t: T, q: Waiting[]): Omit<T, "expenses"> & { expenses: (T["expenses"][number] & { waiting?: Waiting["state"] })[] } {
+  const extra = q.filter((x) => !t.expenses.some((e) => e.id === x.expense.id)).map((x) => ({ ...x.expense, waiting: x.state }));
+  return { ...t, expenses: [...t.expenses, ...extra] };
+}
+
+/** Sends the waiting expenses in the order they were added; without a network the rest waits, and a rejected one stays with
+ * its reason while the next ones are still sent (PW-07, PW-09). A failed one waits for the user to try again. */
+export async function flush(q: Waiting[], send: (e: Expense) => Promise<Sent>): Promise<Waiting[]> {
+  const out: Waiting[] = [];
+  let stop = false;
+  for (const x of q) {
+    if (stop || x.state === "failed") { out.push(x); continue; }
+    const r = await send(x.expense);
+    if ("offline" in r) { stop = true; out.push(x); } else if ("failed" in r) out.push({ ...x, state: "failed", reason: r.failed });
+  }
+  return out;
 }

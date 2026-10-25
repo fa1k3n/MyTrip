@@ -1,7 +1,8 @@
 import type { Op, Settings, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { dropAllCopies, dropCopy, loadCopy, saveCopy, type Copy } from "./offline.ts";
+import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
@@ -84,6 +85,36 @@ export const copy = {
   load: (): Copy | null => { try { return link ? loadCopy(localStorage, link) : null; } catch { return null; } },
   save: (part: Parameters<typeof saveCopy>[2]) => { try { if (link) saveCopy(localStorage, link, part, new Date().toISOString()); } catch { /* blocked */ } },
 };
+/** The link's expenses that the server does not have yet (PW-06). */
+export const queue = {
+  load: (): Waiting[] => { try { return link ? loadQueue(localStorage, link) : []; } catch { return []; } },
+  save: (q: Waiting[]) => { try { if (link) saveQueue(localStorage, link, q); } catch { /* blocked */ } },
+};
+/** One expense to the server. No network, a conflict or a server error: try later; otherwise the reason (PW-07, PW-09). */
+async function sendExpense(tripId: string, e: Expense): Promise<Sent> {
+  try {
+    await call(`${trip(tripId)}/changes`, { method: "POST", signal: AbortSignal.timeout(20_000), // a hanging request must not hold up the queue
+      body: JSON.stringify({ baseRevision: 0, ops: [{ op: "add", path: "expenses/-", value: e }], reason: "add expense" }) });
+    return { ok: true };
+  } catch (x) {
+    if (!(x instanceof ApiError) || x.status === 409 || x.status >= 500) return { offline: true };
+    return { failed: x.status === 403 ? sv.queue.forbidden : x.problems.join(" ") || sv.queue.rejected(x.status) };
+  }
+}
+let flushing = false;
+/** Sends the waiting expenses; ones added meanwhile stay. True when the server got at least one (PW-07). */
+export async function sendWaiting(tripId: string): Promise<boolean> {
+  const before = queue.load();
+  if (flushing || !before.some((x) => x.state === "waiting")) return false;
+  flushing = true;
+  try {
+    const after = await flush(before, (e) => sendExpense(tripId, e));
+    const sent = before.filter((x) => !after.some((a) => a.expense.id === x.expense.id)).map((x) => x.expense.id);
+    queue.save(queue.load().filter((x) => !sent.includes(x.expense.id)).map((x) => after.find((a) => a.expense.id === x.expense.id) ?? x));
+    return sent.length > 0;
+  } finally { flushing = false; }
+}
+
 /** A read that falls back on the phone's copy when the server cannot be reached; only links keep one (PW-03, PW-05). */
 async function kept<T>(part: "me" | "trips", path: string): Promise<T> {
   try {

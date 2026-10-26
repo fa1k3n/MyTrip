@@ -44,6 +44,12 @@ export function bookingDates(b: { from: string; to: string }) {
   return f.m === t.m ? `${f.d}–${t.d} ${sv.months[t.m - 1]}` : `${dayMonth(b.from)} – ${dayMonth(b.to)}`;
 }
 
+/** The times of a booking after its dates: check-in and check-out of a Boende, the start of a Biljett (BK-07). */
+export function bookingTimes(b: { kind?: string; checkIn?: string; checkOut?: string; start?: string }) {
+  if (b.kind === "stay") return [b.checkIn && `${sv.bookingKinds.in} ${hhmm(b.checkIn)}`, b.checkOut && `${sv.bookingKinds.out} ${hhmm(b.checkOut)}`].filter(Boolean).join(" · ");
+  return b.kind === "ticket" && b.start ? `kl. ${hhmm(b.start)}` : "";
+}
+
 const vehicleIcon: Record<Vehicle, string> = { car: "🚗", ferry: "🚢", train: "🚆", transit: "🚇", walk: "🚶" };
 export const vehicleIcons = (d: { legs: { vehicle: Vehicle }[] }) =>
   [...new Set(d.legs.map((l) => vehicleIcon[l.vehicle]))].join("");

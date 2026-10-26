@@ -37,8 +37,17 @@ export const Day = z.object({
   hiddenSummary: z.boolean().optional(), // only in what a Resenär or Följare receives: the summary gives away a hidden activity (AU-30)
   hiddenRoute: z.boolean().optional(), // only in what a Resenär or Följare receives: the legs lost their places, no route map (AU-28)
 });
+/** A ticket file of a booking; the file itself is stored apart from the trip data (BK-09, BK-13). */
+export const TicketFile = z.object({
+  id: z.string().regex(/^[a-z0-9]{16,40}$/), name: z.string().min(1).max(200),
+  type: z.enum(["application/pdf", "image/png", "image/jpeg"]), size: z.number().int().positive().max(2 * 1024 * 1024),
+});
 export const Booking = z.object({
   id: Id, name: z.string().min(1), from: Date_, to: Date_,
+  kind: z.enum(["stay", "ticket", "transport", "other"]).optional(), // DM-12, BK-07; missing: other
+  checkIn: Time.optional(), checkOut: Time.optional(), start: Time.optional(), // Boende; Biljett (BK-07)
+  activityId: Id.optional(), // the activity a Biljett is for, on its first date (BK-08)
+  files: z.array(TicketFile).optional(), // BK-09
   status: z.enum(["ready", "paid", "cancelled"]),
   reference: z.string().optional(), // sensitive: removed for read-only tokens
   amount: z.object({ value: z.number(), currency: z.string().length(3) }).optional(),
@@ -97,6 +106,7 @@ export const Trip = z.object({
   bookings: z.array(Booking), tasks: z.array(Task), travelers: z.array(Traveler),
 });
 export type Trip = z.infer<typeof Trip>;
+export type TicketFile = z.infer<typeof TicketFile>;
 
 export function describeError(e: unknown): string[] {
   return e instanceof ZodError ? e.issues.map((i) => `${i.path.join("/")}: ${i.message}`) : [String(e)];

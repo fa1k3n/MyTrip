@@ -1,9 +1,9 @@
-// The store for the local Node server: one file per trip, <dir>/<id>.trip.json, and cover images in <dir>/img/.
+// The store for the local Node server: one file per trip, <dir>/<id>.trip.json, cover images in <dir>/img/ and ticket files in <dir>/files/ (BK-13).
 // settings.json, links.json (share link secrets, AU-01), person-links.json (AU-11), push-subs.json (NT-03), proposals.json and log.jsonl sit beside them (DP-04).
-import { appendFile, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Settings, Trip } from "@trip/schema";
-import { bySubscriber, pushMatch, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
+import { bySubscriber, isFileId, pushMatch, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -59,6 +59,21 @@ export function fileStore(dir: string): Store {
         if (missing(e)) return undefined;
         throw e;
       }
+    },
+    async file(id) { // the bytes in <id>, the owner and type in <id>.json
+      if (!isFileId(id)) return undefined;
+      const meta = await readJson<FileMeta | null>(join("files", `${id}.json`), null);
+      if (!meta) return undefined;
+      return { ...meta, bytes: new Uint8Array(await readFile(join(dir, "files", id))) };
+    },
+    async saveFile(m, bytes) {
+      if (!isFileId(m.id)) throw new Error("bad file id");
+      await mkdir(join(dir, "files"), { recursive: true });
+      await writeFile(join(dir, "files", m.id), bytes);
+      await writeJson(join("files", `${m.id}.json`), { id: m.id, tripId: m.tripId, type: m.type });
+    },
+    async removeFiles(ids) {
+      for (const id of ids.filter(isFileId)) await Promise.all([rm(join(dir, "files", id), { force: true }), rm(join(dir, "files", `${id}.json`), { force: true })]);
     },
     loadSettings: async () => Settings.parse(await readJson("settings.json", {})),
     saveSettings: (s) => writeJson("settings.json", s),

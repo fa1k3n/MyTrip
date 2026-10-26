@@ -1,15 +1,16 @@
 // Nåla's side column: bookings, budget, tasks, practical information and packing lists.
 // Loaded on demand with the Nåla tab to keep the page under 200 KB (PF-01).
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
-import { bookingDates, kr, shortDate } from "./format.ts";
+import { bookingDates, bookingTimes, kr, shortDate } from "./format.ts";
+import { api, type MailProposal } from "./api.ts";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText, budgetRows, money } from "./budget.ts";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { Icon, IconButton } from "./Icons.tsx";
-import { HiddenText, InfoText, PartLock, PlaceLink, TextEye, type Run } from "./TripView.tsx";
+import { HiddenText, InfoText, KindIcon, PartLock, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 
@@ -54,15 +55,39 @@ function Budget({ t, chart, onToggle, edit, part }: { part: LockOf; t: Trip; cha
   );
 }
 
+/** Mail to the trip's inbox waiting for review, for those who may change bookings (BK-17); others get none. */
+function useMailProposals(t: Trip, may: boolean) {
+  const [list, setList] = useState<MailProposal[]>([]);
+  useEffect(() => {
+    if (!may) { setList([]); return; }
+    let live = true;
+    api.proposals(t.id).then((ps) => { if (live) setList(ps.filter((p) => p.status === "pending" && p.source?.kind === "mail")); }, () => {});
+    return () => { live = false; };
+  }, [t, may]);
+  return list;
+}
+
 function Bookings({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+  const mails = useMailProposals(t, part("bookings") !== null);
+  const flag = mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>;
   return (
-    <Section title={sv.bookings} lock={part("bookings")}>
+    <Section title={sv.bookings} lock={part("bookings")} flag={flag}>
+      {mails.length > 0 && <div className="mails">{/* not an editing control: reviewing is the point (BK-17) */}
+        <p className="ro note">{sv.mail.waiting(mails.length)}</p>
+        {mails.map((m) => (
+          <button type="button" className="row mid mail" key={m.id} onClick={() => edit({ kind: "booking", proposal: m })} aria-label={sv.mail.open(m.source?.subject || sv.mail.noSubject)}>
+            <span><Icon name="mail" /> {m.booking?.name ?? (m.source?.subject || sv.mail.noSubject)}<br />
+              <small className="ro">{m.source?.from}{m.source?.at ? ` · ${shortDate(m.source.at.slice(0, 10))}` : ""}</small></span>
+          </button>
+        ))}
+      </div>}
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>
-          <span>{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
-            <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}</small>
+          <span><KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
+            <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}</small>
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
           <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span>
+            <TicketButton b={b} edit={edit} />
             {!b.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut />}</span>
         </div>
       ))}

@@ -1,14 +1,18 @@
 // Edit dialog kinds and titles, kept apart from the forms so the forms can load on demand (PF-01).
 import { sv } from "./sv.ts";
+import type { MailProposal } from "./api.ts";
 
 export type EditDlg =
   | { kind: "trip" } | { kind: "dates" } | { kind: "budgetMax" } | { kind: "day"; id?: string } | { kind: "activity"; dayId: string; id?: string }
-  | { kind: "booking"; id?: string } | { kind: "budget"; id?: string }
+  | { kind: "booking"; id?: string; proposal?: MailProposal } | { kind: "budget"; id?: string } // proposal: a mail to review (BK-17)
   | { kind: "task"; id?: string } | { kind: "placeEdit"; id?: string } | { kind: "info"; id?: string }
-  | { kind: "hidden"; dayId: string; id?: string }; // not a form: whom hidden activities are hidden from (AU-25)
+  | { kind: "hidden"; dayId: string; id?: string } // not a form: whom hidden activities are hidden from (AU-25)
+  | { kind: "tickets"; bookingId: string }; // not a form: a booking's ticket files (BK-10)
 export const EDIT_KINDS = ["trip", "dates", "budgetMax", "day", "activity", "booking", "budget", "task", "placeEdit", "info"];
 export const editTitle = (d: EditDlg) =>
   d.kind === "hidden" ? sv.hiddenActivity
+  : d.kind === "tickets" ? sv.tickets.title
+  : d.kind === "booking" && d.proposal ? sv.mail.review
   : d.kind === "trip" ? sv.editTrip
   : d.kind === "dates" ? sv.editDates
   : d.kind === "budgetMax" ? sv.editBudgetMax

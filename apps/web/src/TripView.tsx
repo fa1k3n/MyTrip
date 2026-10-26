@@ -21,6 +21,7 @@ import type { EditDlg } from "./editKinds.ts";
 import { anyWrite, type Perms } from "./access.ts";
 import { atLeast } from "@trip/schema/src/rules.ts";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
+import { hasTickets, ticketFor } from "./tickets.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
@@ -80,12 +81,23 @@ export function ActivityText({ t, a, who, eye, onPlace }: { t: Trip; a: Activity
   );
 }
 
+/** A booking's kind as an icon, with the kind as accessible name and tooltip (BK-07). */
+export function KindIcon({ kind }: { kind?: string }) {
+  const k = (kind ?? "other") as keyof typeof kindIcon, label = sv.bookingKinds[k];
+  return <span className="kind" role="img" aria-label={label} title={label}><Icon name={kindIcon[k] ?? "file"} /></span>;
+}
+const kindIcon = { stay: "bed", ticket: "ticket", other: "file", transport: "file" } as const;
+/** Opens a booking's ticket files, when it has any (BK-10). Not an editing control. */
+export const TicketButton = ({ b, edit }: { b: Trip["bookings"][number]; edit?: (d: EditDlg) => void }) =>
+  edit && hasTickets(b) ? <IconButton icon="ticket" look="bare" tip="left" label={`${sv.tickets.show}: ${b.name}`} onClick={() => edit({ kind: "tickets", bookingId: b.id })} /> : null;
+
 export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
   const who = hiddenFromIn(x);
   return <>{x.activities.map((a) => (
     <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`} key={a.id}>
       <ActivityWhen a={a} />
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />
+      {(() => { const b = ticketFor(t, a.id); return b && <TicketButton b={b} edit={edit} />; })() /* BK-08 */}
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
     </div>
   ))}</>;

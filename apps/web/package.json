@@ -9,7 +9,8 @@
   "dependencies": {
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "@trip/schema": "*"
+    "@trip/schema": "*",
+    "pdfjs-dist": "5.4.624"
   },
   "devDependencies": {
     "vite": "^5.4.0",

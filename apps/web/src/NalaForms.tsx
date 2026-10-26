@@ -1,13 +1,13 @@
 // Dialog forms for editing the plan (ED-01..ED-11). The changes themselves are built in edit.ts.
-import { useState, type ChangeEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { Op, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
-  type BookingInput, type Result,
+  readingToForm, ticketActivities, type BookingInput, type Result,
 } from "./edit.ts";
 import { geocode } from "./weather.ts";
-import { IconButton } from "./Icons.tsx";
+import { Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { suggestPurpose } from "./purpose.ts";
 import { shortDate } from "./format.ts";
@@ -15,6 +15,9 @@ import { activityMissing } from "./schedule.ts";
 import { pickedLabel } from "./hiddenView.ts";
 import { svAdmin } from "./sv-admin.ts";
 import { fmtDuration } from "./transport.ts";
+import { readBooking } from "@trip/schema/src/mailbooking.ts";
+import { api, type MailProposal } from "./api.ts";
+import { checkPick } from "./tickets.ts";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
@@ -23,7 +26,10 @@ import type { EditDlg } from "./editKinds.ts";
 export type { EditDlg };
 /** Sends the ops; resolves to an error text, or null when saved. */
 export type Save = (ops: Op[], reason: string) => Promise<string | null>;
-type Props = { t: Trip; save: Save; close: () => void; self?: string }; // self: the traveler of a personal link (AU-18)
+type Props = {
+  t: Trip; save: Save; close: () => void; self?: string; // self: the traveler of a personal link (AU-18)
+  approveMail?: (pid: string, ops: Op[]) => Promise<string | null>; rejectMail?: (pid: string) => Promise<void>; // BK-17
+};
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
 function useFields<T extends Record<string, string | boolean>>(init: T) {
@@ -37,15 +43,15 @@ function useFields<T extends Record<string, string | boolean>>(init: T) {
 function useSave({ save, close }: Props) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const submit = async (r: Result, reason: string) => {
+  const submit = async (r: Result, reason: string, send: (ops: Op[], reason: string) => Promise<string | null> = save) => {
     if (!r.ok) return setErr(r.error);
     setBusy(true);
-    const e = await save(r.ops, reason);
+    const e = await send(r.ops, reason);
     setBusy(false);
     if (e) setErr(e); else close(); // ED-10: a rejected change keeps the form open
   };
   const remove = (ops: Op[], reason: string) => { if (confirm(sv.confirmRemove)) submit({ ok: true, ops }, reason); }; // ED-09
-  return { err, busy, submit, remove };
+  return { err, busy, submit, remove, setErr };
 }
 
 function Form({ title, err, busy, close, onSubmit, onRemove, children }: {
@@ -199,29 +205,98 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   );
 }
 
-function BookingForm(p: Props & { id?: string }) {
+function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   const s = useSave(p);
-  const b = p.t.bookings.find((x) => x.id === p.id);
+  const b = p.t.bookings.find((x) => x.id === p.id), mail = p.proposal;
   const first = [...p.t.days].sort((x, y) => x.date.localeCompare(y.date))[0]?.date ?? "";
-  const { f, text } = useFields({
-    name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
-    note: b?.note ?? "",
+  const [f, setF] = useState<BookingInput>(() => {
+    const init: BookingInput = {
+      name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
+      note: b?.note ?? "", kind: b?.kind ?? "other", checkIn: b?.checkIn ?? "", checkOut: b?.checkOut ?? "", start: b?.start ?? "", activityId: b?.activityId ?? "",
+      files: b?.files ?? [],
+    };
+    return mail?.booking ? { ...readingToForm(init, mail.booking), files: mail.booking.files ?? [] } : init; // BK-17
   });
+  const text = (k: keyof BookingInput) => ({ value: (f[k] as string | undefined) ?? "", onChange: (e: Change) => setF((o) => ({ ...o, [k]: e.target.value })) });
+  const [paste, setPaste] = useState<string | null>(null), [filled, setFilled] = useState(""); // BK-18
+  const fill = () => {
+    const r = readBooking({ text: paste ?? "" }, p.t.days.map((d) => d.date));
+    setFilled(Object.keys(r).length ? sv.mail.filled : sv.mail.nothing);
+    if (Object.keys(r).length) { setF((o) => readingToForm(o, r)); setPaste(null); }
+  };
+  const [uploading, setUploading] = useState(false), pick = useRef<HTMLInputElement>(null);
+  const addFiles = async (list: FileList | null) => { // BK-09
+    setUploading(true);
+    for (const file of Array.from(list ?? [])) {
+      const c = checkPick(file);
+      if (c === "type" || c === "tooBig") { s.setErr(c === "type" ? sv.tickets.badType : sv.tickets.tooBig); continue; }
+      const blob = c === "scale" ? await import("./ticketFiles.ts").then((m) => m.scaleImage(file)) : file;
+      if (!blob) { s.setErr(sv.tickets.badImage); continue; }
+      const name = c === "scale" ? file.name.replace(/\.[^.]*$/, "") + ".jpg" : file.name;
+      try {
+        const up = await api.uploadFile(p.t.id, blob, name);
+        setF((o) => ({ ...o, files: [...(o.files ?? []), up] }));
+      } catch { s.setErr(sv.tickets.failed); }
+    }
+    setUploading(false);
+    if (pick.current) pick.current.value = "";
+  };
+  const kinds: NonNullable<BookingInput["kind"]>[] = ["stay", "ticket", "other", ...(b?.kind === "transport" ? ["transport" as const] : [])];
+  const acts = ticketActivities(p.t, f.from);
+  const submit = () => {
+    const r = saveBooking(p.t, f, p.id);
+    if (mail && p.approveMail) s.submit(r, "", (ops) => p.approveMail!(mail.id, ops)); // BK-17: saving approves the mail
+    else s.submit(r, p.id ? "edit booking" : "add booking");
+  };
+  const remove = mail && p.rejectMail ? () => { if (confirm(sv.mail.confirmReject)) p.rejectMail!(mail.id).then(p.close); }
+    : p.id ? () => s.remove(removeBooking(p.t, p.id!), "remove booking") : undefined;
   return (
-    <Form title={p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close}
-      onSubmit={() => s.submit(saveBooking(p.t, f as BookingInput, p.id), p.id ? "edit booking" : "add booking")}
-      onRemove={p.id ? () => s.remove(removeBooking(p.t, p.id!), "remove booking") : undefined}>
-      <label>{sv.name}<input {...text("name")} autoFocus /></label>
+    <Form title={mail ? sv.mail.review : p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close} onSubmit={submit} onRemove={remove}>
+      {mail && <p className="ro note mailfrom"><span className="ico"><Icon name="mail" /></span>{sv.mail.from(mail.source?.subject || sv.mail.noSubject, mail.source?.from ?? "")}<br />{sv.mail.checkFilled}</p>}
+      <div className="lblrow">
+        <label htmlFor="bname">{sv.name}</label>
+        <IconButton icon="paste" look="bare" tip="left" label={sv.mail.paste} pressed={paste !== null} onClick={() => { setPaste((x) => (x === null ? "" : null)); setFilled(""); }} />
+      </div>
+      {paste !== null && <div className="pastebox">
+        <label>{sv.mail.pasteLabel}<textarea rows={5} value={paste} onChange={(e) => setPaste(e.target.value)} autoFocus /></label>
+        <button type="button" className="btn ghost" onClick={fill} disabled={!paste.trim()}>{sv.mail.read}</button>
+      </div>}
+      {filled && <p className="ro note" role="status">{filled}</p>}
+      <input id="bname" {...text("name")} autoFocus={paste === null} />
+      <label>{sv.bookingKinds.label}<select {...text("kind")}>{kinds.map((k) => <option key={k} value={k}>{sv.bookingKinds[k]}</option>)}</select></label>
       <div className="two">
         <label>{sv.firstDate}<input type="date" {...text("from")} /></label>
         <label>{sv.lastDate}<input type="date" {...text("to")} /></label>
       </div>
+      {f.kind === "stay" && <div className="two">
+        <label>{sv.bookingKinds.checkIn}<input type="time" {...text("checkIn")} /></label>
+        <label>{sv.bookingKinds.checkOut}<input type="time" {...text("checkOut")} /></label>
+      </div>}
+      {f.kind === "ticket" && <div className="two">
+        <label>{sv.bookingKinds.start}<input type="time" {...text("start")} /></label>
+        <label>{sv.bookingKinds.activity}<select {...text("activityId")}>
+          <option value="">{sv.bookingKinds.noActivity}</option>
+          {acts.map((a) => <option key={a.id} value={a.id}>{a.text || sv.hiddenActivity}</option>)}
+        </select></label>
+      </div>}
       <label>{sv.status}<select {...text("status")}>
         {(Object.keys(sv.statuses) as (keyof typeof sv.statuses)[]).map((k) => <option key={k} value={k}>{sv.statuses[k]}</option>)}
       </select></label>
       <label>{sv.reference}<input {...text("reference")} /></label>
       <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
       <label>{sv.description}<textarea {...text("note")} /></label>
+      <fieldset className="files"><legend>{sv.tickets.title}</legend>
+        {(f.files ?? []).map((x) => (
+          <div className="row mid" key={x.id}>
+            <span><Icon name={x.type === "application/pdf" ? "file" : "ticket"} /> {x.name} <small className="ro">{Math.max(1, Math.round(x.size / 1024))} kB</small></span>
+            <IconButton icon="trash" look="bare" tip="left" label={sv.tickets.remove(x.name)}
+              onClick={() => { if (confirm(sv.tickets.confirmRemove)) setF((o) => ({ ...o, files: (o.files ?? []).filter((y) => y.id !== x.id) })); }} />
+          </div>
+        ))}
+        <input ref={pick} type="file" hidden multiple accept="application/pdf,image/*" onChange={(e) => addFiles(e.target.files)} />
+        <div className="add">{uploading ? <span className="ro">{sv.tickets.uploading}</span>
+          : <IconButton icon="attach" label={sv.tickets.add} tip="right" onClick={() => pick.current?.click()} />}</div>
+      </fieldset>
     </Form>
   );
 }
@@ -321,10 +396,11 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "budgetMax": return <BudgetMaxForm {...p} />;
     case "day": return <DayForm {...p} id={dlg.id} />;
     case "activity": return <ActivityForm {...p} dayId={dlg.dayId} id={dlg.id} />;
-    case "booking": return <BookingForm {...p} id={dlg.id} />;
+    case "booking": return <BookingForm {...p} id={dlg.id} proposal={dlg.proposal} />;
     case "budget": return <BudgetForm {...p} id={dlg.id} />;
     case "task": return <TaskForm {...p} id={dlg.id} />;
     case "placeEdit": return <PlaceForm {...p} id={dlg.id} />;
     case "info": return <InfoForm {...p} id={dlg.id} />;
+    default: return null;
   }
 }

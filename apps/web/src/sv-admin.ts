@@ -15,6 +15,16 @@ export const svAdmin = {
     copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Byt länk för ${n}`,
     copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Inga resenärer än. Lägg till dem med plusknappen.",
   },
+  inbox: { // BK-14
+    title: "Mejlimport", none: "Ingen adress än.", create: "Skapa adress", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
+    hint: "Vidarebefordra bokningsbekräftelser hit. De blir förslag under Bokningar i Nåla, som du granskar innan de sparas.",
+    off: "Mejlimport är inte inställd på servern: den behöver en egen domän (INBOX_DOMAIN).",
+    confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram.",
+  },
+  qr: { // AU-31
+    show: (n: string) => `Visa QR-kod för ${n}`, title: (n: string) => `Länk för ${n}`, label: (n: string) => `QR-kod med länken för ${n}`,
+    hint: "Låt den andra skanna koden med kameran i sin telefon.",
+  },
   perms: { // AU-20
     title: "Behörigheter", hint: "Vad varje roll får se och ändra i den här resan. Du som administratör kan alltid allt.",
     roles: { follower: "Följare", traveler: "Resenär", planner: "Planerare" }, shown: "Synlig", page: "Sidan", off: "Sidan är dold",

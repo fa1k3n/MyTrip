@@ -15,5 +15,5 @@ const store = fileStore(dir);
 const trafficThresholdMin = Number(process.env.TRAFFIC_DELAY_MIN ?? 10);
 // ADMIN_PASSWORD and SESSION_KEY turn on the admin login (AU-04); without them the dev token is the only admin access.
 const auth = { adminPassword: process.env.ADMIN_PASSWORD, sessionKey: process.env.SESSION_KEY };
-serve({ fetch: createApp(store, tokens, { aiService: !!process.env.AI_API_KEY, routesKey: process.env.ROUTES_API_KEY, trafficThresholdMin, auth, vapidKey: process.env.VAPID_KEY }).fetch, port: Number(process.env.PORT ?? 8787) });
+serve({ fetch: createApp(store, tokens, { aiService: !!process.env.AI_API_KEY, routesKey: process.env.ROUTES_API_KEY, trafficThresholdMin, auth, vapidKey: process.env.VAPID_KEY, inboxDomain: process.env.INBOX_DOMAIN }).fetch, port: Number(process.env.PORT ?? 8787) });
 console.log(`API on http://localhost:${process.env.PORT ?? 8787}, trips in ${dir}`);

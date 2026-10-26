@@ -3,6 +3,7 @@
 // The Worker configuration (wrangler.jsonc) lives in the private repository; it serves the web files and sends /api/* here first.
 import { createApp } from "./app.ts";
 import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
+import { receiveMail } from "./mail.ts";
 
 export type WorkerEnv = {
   DB: D1Like; IMAGES?: R2Like; ASSETS?: { fetch(r: Request): Promise<Response> };
@@ -11,7 +12,10 @@ export type WorkerEnv = {
   ADMIN_PASSWORD?: string; SESSION_KEY?: string; ROUTES_API_KEY?: string; AI_API_KEY?: string;
   VAPID_KEY?: string; // the private VAPID key as a JWK, for notices (NT-05)
   TRAFFIC_DELAY_MIN?: string;
+  INBOX_DOMAIN?: string; // the domain whose mail Cloudflare Email Routing sends to this Worker (BK-14)
 };
+/** The parts of an incoming mail the Worker uses (Cloudflare Email Routing). */
+export type IncomingMail = { to: string; raw: ReadableStream; setReject(reason: string): void };
 
 // One app per set of bindings, kept while the Worker instance lives; state that must last is in D1.
 const apps = new WeakMap<WorkerEnv, ReturnType<typeof createApp>>();
@@ -21,7 +25,7 @@ const appFor = (env: WorkerEnv) => {
     const tokens = { read: env.TRIP_READ_TOKEN ?? "", propose: env.TRIP_PROPOSE_TOKEN ?? "", admin: env.TRIP_ADMIN_TOKEN ?? "" };
     app = createApp(d1Store(env.DB, env.IMAGES), tokens, {
       aiService: !!env.AI_API_KEY, routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
-      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY }, vapidKey: env.VAPID_KEY,
+      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN,
     });
     apps.set(env, app);
   }
@@ -32,5 +36,10 @@ export default {
   fetch(req: Request, env: WorkerEnv, ctx?: Parameters<ReturnType<typeof createApp>["fetch"]>[2]): Promise<Response> | Response {
     if (new URL(req.url).pathname.startsWith("/api/")) return appFor(env).fetch(req, env, ctx); // ctx keeps notices going after the answer (NT-05)
     return env.ASSETS ? env.ASSETS.fetch(req) : new Response("Not found", { status: 404 });
+  },
+  /** BK-15: a mail to a trip's inbox address becomes a proposed booking; an unknown address or a full inbox is rejected. */
+  async email(message: IncomingMail, env: WorkerEnv): Promise<void> {
+    const r = await receiveMail(d1Store(env.DB, env.IMAGES), await new Response(message.raw).arrayBuffer(), message.to);
+    if ("error" in r) message.setReject(r.error === "too many" ? "Too many bookings waiting for review" : "Unknown address");
   },
 };

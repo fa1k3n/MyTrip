@@ -1,7 +1,7 @@
-// The store on Cloudflare: trips, settings, links, personal links, push subscriptions, proposals, the log and cover images in D1 (DP-03..DP-06, NT-03).
+// The store on Cloudflare: trips, settings, links, personal links, push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import type { LogEntry, PersonLink, Proposal, PushSub, Store } from "./app.ts";
+import { isFileId, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -14,6 +14,15 @@ export interface D1Like { prepare(sql: string): D1Stmt; batch(statements: D1Stmt
 export interface R2Like { get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null> }
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
+const PART = 40_000; // bytes per file part: as a hex literal 80 KB, under D1's 100 KB per statement, as for cover images (DP-05)
+const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+/** D1 returns a BLOB as an array of numbers, SQLite in tests as a Uint8Array; both become one run of bytes here. */
+function joined(parts: ArrayLike<number>[]) {
+  const all = parts.map((p) => Uint8Array.from(p)), out = new Uint8Array(all.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of all) { out.set(p, at); at += p.length; }
+  return out;
+}
 
 export function d1Store(db: D1Like, images?: R2Like): Store {
   const parse = (row: { id: string; json: string }) => Trip.parse({ ...JSON.parse(row.json), id: row.id });
@@ -47,13 +56,24 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
         const obj = await images.get(name);
         return obj ? new Uint8Array(await obj.arrayBuffer()) : undefined;
       }
-      // D1 returns a BLOB as an array of numbers, SQLite in tests as a Uint8Array; both become bytes here.
       const { results } = await db.prepare("SELECT data FROM images WHERE name = ? ORDER BY part").bind(name).all<{ data: ArrayLike<number> }>();
-      if (!results.length) return undefined;
-      const parts = results.map((r) => Uint8Array.from(r.data)), out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-      let at = 0;
-      for (const p of parts) { out.set(p, at); at += p.length; }
-      return out;
+      return results.length ? joined(results.map((r) => r.data)) : undefined;
+    },
+    async file(id) {
+      if (!isFileId(id)) return undefined;
+      const { results } = await db.prepare("SELECT trip_id, type, data FROM files WHERE id = ? ORDER BY part").bind(id)
+        .all<{ trip_id: string; type: FileMeta["type"]; data: ArrayLike<number> }>();
+      return results.length ? { id, tripId: results[0]!.trip_id, type: results[0]!.type, bytes: joined(results.map((r) => r.data)) } : undefined;
+    },
+    async saveFile(m, bytes) {
+      if (!isFileId(m.id)) throw new Error("bad file id");
+      const n = Math.max(1, Math.ceil(bytes.length / PART));
+      await db.batch([db.prepare("DELETE FROM files WHERE id = ?").bind(m.id), ...Array.from({ length: n }, (_, i) =>
+        db.prepare(`INSERT INTO files (id, part, trip_id, type, data) VALUES (?, ?, ?, ?, X'${hex(bytes.subarray(i * PART, (i + 1) * PART))}')`).bind(m.id, i, m.tripId, m.type))]);
+    },
+    async removeFiles(ids) {
+      const ok = ids.filter(isFileId);
+      if (ok.length) await db.batch(ok.map((id) => db.prepare("DELETE FROM files WHERE id = ?").bind(id)));
     },
     async loadSettings() {
       const row = await db.prepare("SELECT json FROM settings WHERE key = 'settings'").first<{ json: string }>();

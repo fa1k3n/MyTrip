@@ -1,12 +1,19 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type Op, type Part } from "@trip/schema";
+import { Settings, Trip, TicketFile, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
+import { importMail } from "./mail.ts";
 
-export type Proposal = { id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string };
+export type Proposal = {
+  id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
+  source?: { kind: "mail"; from: string; subject: string; at: string }; // a mail to the trip's inbox (BK-15)
+  booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
+};
+/** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
+export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] };
 export type LogEntry = { at: string; tripId: string; actor: string; reason: string; ops: Op[] };
 /** A traveler's personal link to one trip, with the permission Resenär (traveler) or Planerare (planner) (AU-11). */
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner" };
@@ -36,7 +43,13 @@ export interface Store {
   pushSubs(tripId: string): Promise<PushSub[]>;
   savePushSub(s: PushSub): Promise<void>;
   removePushSubs(tripId: string, match: { endpoint?: string; who?: string }): Promise<void>;
+  /** Ticket files (BK-13): an unknown or malformed id gives undefined. */
+  file(id: string): Promise<(FileMeta & { bytes: Uint8Array<ArrayBuffer> }) | undefined>;
+  saveFile(meta: FileMeta, bytes: Uint8Array): Promise<void>;
+  removeFiles(ids: string[]): Promise<void>;
 }
+/** The form of a ticket file id; checked before any store uses it. */
+export const isFileId = (id: string) => /^[a-z0-9]{16,40}$/.test(id);
 export type Tokens = { read: string; propose: string; admin: string };
 /** Admin login (AU-04): off when no password is set. The session key signs the cookie. */
 export type Auth = { adminPassword?: string; sessionKey?: string };
@@ -52,7 +65,11 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   let people: PersonLink[] = [];
   const proposals = new Map<string, Proposal>(), log: LogEntry[] = [];
   let subs: PushSub[] = [];
+  const files = new Map<string, FileMeta & { bytes: Uint8Array<ArrayBuffer> }>();
   return {
+    file: async (id) => { const f = files.get(id); return f && { ...f, bytes: f.bytes.slice() }; },
+    saveFile: async (m, bytes) => void files.set(m.id, { ...m, bytes: Uint8Array.from(bytes) }),
+    removeFiles: async (ids) => ids.forEach((id) => files.delete(id)),
     pushSubs: async (tripId) => structuredClone(subs.filter((x) => x.tripId === tripId).sort(bySubscriber)),
     savePushSub: async (x) => { subs = [...subs.filter((y) => !(y.tripId === x.tripId && y.endpoint === x.endpoint)), structuredClone(x)]; },
     removePushSubs: async (tripId, m) => { subs = subs.filter((x) => !(x.tripId === tripId && pushMatch(x, m))); },
@@ -90,6 +107,8 @@ function same(a: string, b: string) {
 }
 const SESSION_DAYS = 30, MAX_FAILS = 5, FAIL_WINDOW_MS = 15 * 60_000;
 /** 144 random bits as base64url (AU-01). */
+/** 80 random bits in lowercase letters and digits, for an inbox address (BK-14). */
+const inboxSecret = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => "abcdefghijklmnopqrstuvwxyz234567"[b & 31]).join("");
 const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18)))).replace(/\+/g, "-").replace(/\//g, "_");
 /** The role a link has in the trip's permissions (AU-20). */
 const accessRole = (role: Role): AccessRole | undefined => (role === "link" ? "follower" : role === "traveler" || role === "planner" ? role : undefined);
@@ -124,7 +143,9 @@ function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity
   }));
   const stops = t.stops.map((s) => { const d = t.days.find((x) => x.id === s.dayId); return d && dayGives(d, s.label) ? { ...s, label: "" } : s; });
   const budget = t.budget.map(({ note, ...b }) => (gives([b.category, note]) ? { ...b, category: "", hidden: true } : { ...b, ...(note !== undefined ? { note } : {}) }));
-  const bookings = t.bookings.map(({ note, placeId, ...b }) => (gives([b.name, note], placeId) ? { ...b, name: "", hidden: true } : { ...b, ...(note !== undefined ? { note } : {}), ...(placeId ? { placeId } : {}) }));
+  const hiddenIds = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).map((a) => a.id)));
+  const bookings = t.bookings.map(({ note, placeId, files, ...b }) => (gives([b.name, note], placeId) || (b.activityId && hiddenIds.has(b.activityId)) // BK-11
+    ? { ...b, name: "", hidden: true } : { ...b, ...(note !== undefined ? { note } : {}), ...(placeId ? { placeId } : {}), ...(files ? { files } : {}) }));
   const tasks = t.tasks.map(({ placeId, ...k }) => (gives([k.text], placeId) ? { ...k, text: "", hidden: true } : { ...k, ...(placeId ? { placeId } : {}) }));
   const info = t.info.map(({ unsuitable, placeId, ...i }) => (gives([i.title, i.text, unsuitable], placeId) ? { ...i, title: "", text: "", hidden: true }
     : { ...i, ...(unsuitable !== undefined ? { unsuitable } : {}), ...(placeId ? { placeId } : {}) }));
@@ -170,13 +191,35 @@ function ownExpenses(ops: Op[], travelerId: string): Op[] | null {
   return out;
 }
 
+const withoutInbox = ({ inbox: _inbox, ...t }: Trip): Trip => t;
+/** The ticket files that bookings use. */
+const fileIdsOf = (bookings: Trip["bookings"]) => bookings.flatMap((b) => (b.files ?? []).map((f) => f.id));
+/** The ticket files of a trip's pending proposals, which the reviewer opens before approving (BK-17). */
+const proposalFiles = (ps: Proposal[]) => ps.filter((p) => p.status === "pending").flatMap((p) => (p.booking?.files ?? []).map((f) => f.id));
+/** The types a ticket may have, each with the first bytes its content starts with (BK-09). */
+const MAGIC: Record<TicketFile["type"], number[]> = { "application/pdf": [0x25, 0x50, 0x44, 0x46], "image/png": [0x89, 0x50, 0x4e, 0x47], "image/jpeg": [0xff, 0xd8, 0xff] };
+export const MAX_FILE = 2 * 1024 * 1024;
+/** A ticket file's type when its content matches it; undefined otherwise (BK-09, BK-15). */
+export const ticketType = (type: string, bytes: Uint8Array): TicketFile["type"] | undefined => {
+  const t = type.split(";")[0]!.trim().toLowerCase() as TicketFile["type"];
+  return MAGIC[t]?.every((b, i) => bytes[i] === b) ? t : undefined;
+};
+/** A random id of 80 bits for a stored file. */
+export const newFileId = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => b.toString(16).padStart(2, "0")).join("");
+/** Stores a ticket file of a trip and returns what the booking keeps of it. */
+export async function storeTicket(store: Store, tripId: string, name: string, type: TicketFile["type"], bytes: Uint8Array): Promise<TicketFile> {
+  const id = newFileId();
+  await store.saveFile({ id, tripId, type }, bytes);
+  return { id, name: name.trim().slice(0, 200) || "biljett", type, size: bytes.length };
+}
+
 type Env = { Variables: { role: Role; tripId?: string; travelerId?: string } };
 /** True when a subscription matches every given field. */
 /** The order every store lists subscriptions in. */
 export const bySubscriber = (a: PushSub, b: PushSub) => a.who.localeCompare(b.who) || a.endpoint.localeCompare(b.endpoint);
 export const pushMatch = (x: PushSub, m: { endpoint?: string; who?: string }) => (!m.endpoint || x.endpoint === m.endpoint) && (!m.who || x.who === m.who);
 
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth; vapidKey?: string } & TrafficOpts = {}) {
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth; vapidKey?: string; inboxDomain?: string } & TrafficOpts = {}) {
   const app = new Hono<Env>();
   const { adminPassword, sessionKey } = opts.auth ?? {};
   const fails = new Map<string, { n: number; since: number }>(); // per address, in memory (AU-05)
@@ -231,15 +274,15 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
    * references never reach a Följare (AU-22), activities hidden from the viewer are masked (AU-18), and the link gets only its
    * own role's rules (AU-20). Read-only tokens get no booking references (MC-11). */
   const view = (t: Trip, role: Role, travelerId?: string, mask = true): Trip => {
-    if (role === "read") return { ...t, bookings: t.bookings.map(({ reference, ...b }) => b) };
+    if (role === "read") return { ...withoutInbox(t), bookings: t.bookings.map(({ reference, files, ...b }) => b) }; // MC-11, BK-11
     const ar = accessRole(role);
     if (!ar) return t;
     const rules = accessFor(t, ar), hide = (p: Part) => rules.parts[p] === "hidden";
-    const { budgetMax, access: _all, ...rest } = t;
+    const { budgetMax, access: _all, ...rest } = ar === "planner" ? t : withoutInbox(t); // the inbox address is for managers (BK-14)
     const own = t.access?.[ar]; // the role's own choices, so the app shows the same as the server sends
     const out: Trip = { ...rest, ...(!hide("budget") && budgetMax !== undefined ? { budgetMax } : {}), ...(own ? { access: { [ar]: own } } : {}) };
     if (hide("bookings")) out.bookings = [];
-    else if (ar === "follower") out.bookings = t.bookings.map(({ reference, ...b }) => b);
+    else if (ar === "follower") out.bookings = t.bookings.map(({ reference, files, ...b }) => b); // AU-22, BK-11
     if (hide("budget")) out.budget = [];
     if (hide("expenses")) { out.expenses = []; out.payments = []; }
     if (hide("tasks")) out.tasks = [];
@@ -263,6 +306,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   const later = (c: Context<Env>, p: Promise<unknown>) => { const q = p.catch(() => {}); try { c.executionCtx.waitUntil(q); } catch { /* Node */ } };
   /** Who made a change, as notices compare it with each subscription (NT-01). */
   const whoOf = (c: Context<Env>) => c.get("travelerId") ?? (c.get("role") === "link" ? "follower" : "admin");
+  /** The name a change is logged with: the traveler of a personal link, or "user" for the superuser (AU-15). */
+  const actorName = (c: Context<Env>, t: Trip) => { const id = c.get("travelerId"); return id ? t.travelers.find((x) => x.id === id)?.name ?? id : "user"; };
   /** A notice to every other phone with notices on, each described from its own view of the trip (NT-01, NT-02, NT-05). */
   async function notify(before: Trip, after: Trip, who: string, name: string, origin: string) {
     if (!opts.vapidKey) return;
@@ -286,6 +331,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (problems.length) return { problems };
     if (!(await store.save({ ...next, id: base.id, revision: base.revision + 1 }, base.revision))) return { conflict: true as const }; // DP-03
     await store.appendLog({ at: new Date().toISOString(), tripId: base.id, actor, reason, ops });
+    const kept = new Set([...fileIdsOf(next.bookings), ...proposalFiles(await store.proposals(base.id))]);
+    const gone = fileIdsOf(base.bookings).filter((id) => !kept.has(id));
+    if (gone.length) await store.removeFiles(gone); // BK-13
     if (notice) later(notice.c, notify(base, next, notice.who, notice.who === "admin" ? sv.notice.admin : actor, new URL(notice.c.req.url).origin));
     return { revision: base.revision + 1 };
   }
@@ -414,6 +462,45 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return c.body(null, 204);
   });
 
+  // BK-09: a Planerare or the superuser uploads a ticket file; the booking that uses it is saved as a normal change.
+  app.post("/api/trips/:id/files", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const bytes = new Uint8Array(await c.req.arrayBuffer());
+    if (bytes.length > MAX_FILE) return c.json({ error: "too large" }, 413);
+    const type = ticketType(c.req.header("content-type") ?? "", bytes);
+    if (!type || !bytes.length) return c.json({ error: "PDF, PNG or JPEG only" }, 415);
+    return c.json(await storeTicket(store, c.req.param("id"), c.req.query("name") ?? "", type, bytes), 201);
+  });
+  // BK-11: a file only for those who get its booking with the reference, and for managers while a proposal holds it.
+  app.get("/api/trips/:id/files/:fid", async (c) => {
+    const id = c.req.param("fid"), t = await load(c.req.param("id"));
+    const seen = fileIdsOf(view(t, c.get("role"), c.get("travelerId")).bookings).includes(id)
+      || (manager(c) && proposalFiles(await store.proposals(t.id)).includes(id));
+    const f = seen ? await store.file(id) : undefined;
+    if (!f || f.tripId !== t.id) return c.json({ error: "not found" }, 404);
+    return c.body(f.bytes, 200, { "content-type": f.type, "cache-control": "private, max-age=31536000, immutable" }); // a file never changes under its id
+  });
+  // BK-14: the trip's inbox address, under the instance's mail domain; a new one replaces the old at once.
+  app.get("/api/trips/:id/inbox", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id"));
+    return c.json(opts.inboxDomain ? { enabled: true, ...(t.inbox ? { address: t.inbox } : {}) } : { enabled: false });
+  });
+  app.post("/api/trips/:id/inbox", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    if (!opts.inboxDomain) return c.json({ error: "mail import is off" }, 404);
+    const t = await load(c.req.param("id"));
+    const address = `${t.id.slice(0, 40)}-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
+    const r = await apply(t, [{ op: "set", path: "inbox", value: address }], actorName(c, t), "new inbox address");
+    return "revision" in r ? c.json({ address }) : c.json({ error: "conflict" }, 409);
+  });
+  // BK-15: on the Node server a manager posts a raw message; on Cloudflare mail arrives through the Worker's email handler.
+  app.post("/api/trips/:id/mail", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const r = await importMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
+    return "proposalId" in r ? c.json(r, 202) : c.json(r, 429);
+  });
+
   app.post("/api/trips/:id/changes", async (c) => {
     const b = await c.req.json<{ baseRevision: number; ops: Op[]; reason?: string; dryRun?: boolean }>();
     const role = c.get("role"), travelerId = c.get("travelerId"), ar = accessRole(role);
@@ -460,7 +547,29 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const p = (await store.proposals(c.req.param("id"))).find((x) => x.id === c.req.param("pid") && x.status === "pending");
     if (!p) return c.json({ error: "not found" }, 404);
-    if (c.req.param("action") === "reject") { p.status = "rejected"; await store.saveProposal(p); return c.json(p); }
+    if (c.req.param("action") === "reject") {
+      p.status = "rejected";
+      await store.saveProposal(p);
+      const used = new Set(fileIdsOf((await load(p.tripId)).bookings));
+      await store.removeFiles((p.booking?.files ?? []).map((f) => f.id).filter((id) => !used.has(id))); // BK-17
+      return c.json(p);
+    }
+    if (p.source?.kind === "mail") { // BK-17: approved with the booking as the reviewer edited it
+      const b = await c.req.json<{ baseRevision?: number; ops?: Op[] }>().catch(() => ({} as { baseRevision?: number; ops?: Op[] }));
+      if (!Array.isArray(b.ops) || typeof b.baseRevision !== "number") return c.json({ error: "the edited booking is needed" }, 400);
+      const t = await load(p.tripId);
+      if (t.revision !== b.baseRevision) return c.json({ error: "conflict", revision: t.revision }, 409);
+      p.status = "approved"; // first, so apply keeps the files the booking now uses and no longer counts the proposal
+      await store.saveProposal(p);
+      let r: Awaited<ReturnType<typeof apply>>;
+      try { r = await apply(t, b.ops, actorName(c, t), `mail: ${p.source.subject}`, { c, who: whoOf(c) }); } catch (e) { r = { problems: describeError(e) }; }
+      if (!("revision" in r)) { p.status = "pending"; await store.saveProposal(p); }
+      else { // files the reviewer left out of the booking go too
+        const used = new Set(fileIdsOf((await load(p.tripId)).bookings));
+        await store.removeFiles((p.booking?.files ?? []).map((f) => f.id).filter((id) => !used.has(id)));
+      }
+      return "conflict" in r ? c.json({ error: "conflict" }, 409) : "problems" in r ? c.json({ ok: false, problems: r.problems }, 422) : c.json({ proposal: p, result: r });
+    }
     const t = await load(p.tripId);
     if (t.revision !== p.baseRevision) return c.json({ error: "conflict", revision: t.revision }, 409);
     const r = await apply(t, p.ops, "llm", p.reason, { c, who: "admin" });

@@ -1,5 +1,5 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, installed, maskedToken, type PersonLinkInfo } from "./api.ts";
 import { linkFromText, missingLinks, personUrl, shareUrl } from "./access.ts";
@@ -8,6 +8,7 @@ import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { IconButton } from "./Icons.tsx";
+import { qr, qrSvgPath } from "./qr.ts";
 import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
@@ -58,10 +59,36 @@ function PasteLink() {
   </form>;
 }
 
+/** AU-31: a link as a QR code, to show on this screen to the one who is invited. Drawn here, so the link stays on the device. */
+function QrDialog({ url, name, close }: { url: string; name: string; close: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = ref.current!, opener = document.activeElement as HTMLElement | null;
+    d.showModal();
+    document.body.style.overflow = "hidden"; // PL-14
+    return () => { document.body.style.overflow = ""; opener?.focus(); };
+  }, []);
+  const { path, box } = qrSvgPath(qr(url));
+  return (
+    <dialog ref={ref} aria-label={svAdmin.qr.title(name)} onClose={close}
+      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
+        const r = e.currentTarget.getBoundingClientRect();
+        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
+      }}>
+      <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
+      <h3>{svAdmin.qr.title(name)}</h3>
+      <svg className="qr" viewBox={`0 0 ${box} ${box}`} role="img" aria-label={svAdmin.qr.label(name)} shapeRendering="crispEdges">
+        <rect width={box} height={box} className="qrbg" /><path d={path} />
+      </svg>
+      <p className="ro note">{svAdmin.qr.hint}</p>
+    </dialog>
+  );
+}
+
 /** AU-06: the trip's share link, to copy or replace. Replacing it stops the old link at once. */
 function ShareLink({ t }: { t: Trip }) {
   const [secret, setSecret] = useState<string | null | undefined>(undefined); // undefined: loading, null: none yet
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false), [showQr, setShowQr] = useState(false);
   useEffect(() => { api.link(t.id).then((r) => setSecret(r.secret), () => setSecret(null)); }, [t.id]);
   const url = secret ? shareUrl(location.origin, t.id, secret) : "";
   const make = async () => {
@@ -81,11 +108,41 @@ function ShareLink({ t }: { t: Trip }) {
         <div className="row mid">
           <span className="ro">{copied ? svAdmin.share.copied : secret ? "" : svAdmin.share.none}</span>
           <span className="end">
+            {secret && <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(svAdmin.people.follower)} onClick={() => setShowQr(true)} />}
             {secret && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.share.copy} onClick={copy} />}
             <IconButton icon={secret ? "refresh" : "plus"} look="bare" tip="left" label={secret ? svAdmin.share.replace : svAdmin.share.create} onClick={make} />
           </span>
         </div>
       )}
+      {showQr && url && <QrDialog url={url} name={svAdmin.people.follower} close={() => setShowQr(false)} />}
+    </div>
+  );
+}
+
+/** BK-14: the trip's inbox address for booking confirmations, to copy or replace; off without a mail domain on the server. */
+function Inbox({ t }: { t: Trip }) {
+  const [box, setBox] = useState<{ enabled: boolean; address?: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { api.inbox(t.id).then(setBox, () => setBox({ enabled: false })); }, [t.id]);
+  if (!box) return null;
+  const make = async () => {
+    if (box.address && !confirm(svAdmin.inbox.confirmReplace)) return;
+    setBox({ enabled: true, address: (await api.newInbox(t.id)).address });
+    setCopied(false);
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(box.address ?? ""); setCopied(true); } catch { /* the field can still be copied by hand */ } };
+  return (
+    <div className="card">
+      <h3>{svAdmin.inbox.title}</h3>
+      <p className="ro note">{box.enabled ? svAdmin.inbox.hint : svAdmin.inbox.off}</p>
+      {box.address && <input readOnly value={box.address} aria-label={svAdmin.inbox.title} onFocus={(e) => e.currentTarget.select()} />}
+      {box.enabled && <div className="row mid">
+        <span className="ro">{copied ? svAdmin.inbox.copied : box.address ? "" : svAdmin.inbox.none}</span>
+        <span className="end">
+          {box.address && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.inbox.copy} onClick={copy} />}
+          <IconButton icon={box.address ? "refresh" : "plus"} look="bare" tip="left" label={box.address ? svAdmin.inbox.replace : svAdmin.inbox.create} onClick={make} />
+        </span>
+      </div>}
     </div>
   );
 }
@@ -93,7 +150,7 @@ function ShareLink({ t }: { t: Trip }) {
 /** AU-11: a personal link per traveler, created with the permission Resenär when missing; the permission is picked in a dropdown. */
 function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
-  const [copied, setCopied] = useState("");
+  const [copied, setCopied] = useState(""), [showQr, setShowQr] = useState<{ url: string; name: string } | null>(null);
   useEffect(() => {
     api.people(t.id).then(async (ls) => {
       const made = await Promise.all(missingLinks(t.travelers, ls).map((id) => api.setPerson(t.id, id, "traveler")));
@@ -122,6 +179,8 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
                     {(["traveler", "planner"] as const).map((r) => <option key={r} value={r}>{svAdmin.people.roles[r]}</option>)}
                   </select>
                 </span>
+                <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(x.name)}
+                  onClick={() => setShowQr({ url: personUrl(location.origin, t.id, l.travelerId, l.secret), name: x.name })} />
                 <IconButton icon="copy" look="bare" tip="left" label={svAdmin.people.copy(x.name)} onClick={() => copy(l, x.name)} />
                 <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.people.replace(x.name)}
                   onClick={async () => { if (confirm(svAdmin.share.confirmReplace)) put(await api.renewPerson(t.id, x.id)); }} />
@@ -132,6 +191,7 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
       })}
       <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={add} tip="right" /></div> {/* AU-26, UI-09 */}
       {copied && <p className="ro" role="status">{svAdmin.people.copied(copied)}</p>}
+      {showQr && <QrDialog url={showQr.url} name={showQr.name} close={() => setShowQr(null)} />}
     </div>
   );
 }
@@ -195,12 +255,8 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
     <PeopleLinks t={t} add={addPerson} />
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
-    {superuser && (t.inbox || maskedToken()) && (
-      <div className="card">
-        {t.inbox && <><h3>{sv.inbox}</h3><p>{sv.inboxText} <b>{t.inbox}</b></p></>}
-        {maskedToken() && <><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></>}
-      </div>
-    )}
+    <Inbox t={t} />
+    {superuser && maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
     {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
     {superuser && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;

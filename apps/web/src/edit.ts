@@ -1,5 +1,5 @@
 // Builds the changes (ops) for editing in Nåla. Pure, so it runs under node --test (ED-01..ED-08).
-import type { Op, Trip } from "@trip/schema";
+import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import { dateBadge } from "./format.ts";
 import { parseAmount } from "./money.ts";
 import { sv } from "./sv.ts";
@@ -204,7 +204,12 @@ export function removeActivity(t: Trip, dayId: string, id: string): Op[] {
 export type BookingInput = {
   name: string; from: string; to: string; status: "paid" | "ready" | "cancelled"; reference: string; placeId: string;
   note?: string; // undefined: keep, "": remove (BK-06)
+  kind?: "stay" | "ticket" | "other" | "transport"; checkIn?: string; checkOut?: string; start?: string; activityId?: string; // undefined: keep (BK-07, BK-08)
+  files?: TicketFile[]; // undefined: keep (BK-09)
 };
+
+/** The activities a Biljett can be linked to: those on its first date (BK-08). */
+export const ticketActivities = (t: Trip, date: string) => t.days.filter((d) => d.date === date).flatMap((d) => d.activities);
 
 export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const name = input.name.trim();
@@ -213,12 +218,32 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   if (input.to < input.from) return fail(sv.errors.toBeforeFrom);
   const i = id ? t.bookings.findIndex((b) => b.id === id) : -1;
   const old = t.bookings[i];
+  const kind = input.kind ?? old?.kind;
+  const time = (v: string | undefined, keep?: string) => (v === undefined ? keep : v.trim() || undefined);
+  const times = input.kind === undefined ? {} : { // only the times and the link that belong to the kind (BK-07, BK-08)
+    checkIn: kind === "stay" ? time(input.checkIn, old?.checkIn) : undefined, checkOut: kind === "stay" ? time(input.checkOut, old?.checkOut) : undefined,
+    start: kind === "ticket" ? time(input.start, old?.start) : undefined, activityId: kind === "ticket" ? time(input.activityId, old?.activityId) : undefined,
+  };
+  if ([times.checkIn, times.checkOut, times.start].some((x) => x !== undefined && !isTime(x))) return fail(sv.errors.activityTime);
+  if (times.activityId && !ticketActivities(t, input.from).some((a) => a.id === times.activityId)) return fail(sv.errors.activityDate);
+  const files = input.files === undefined ? old?.files : input.files.length ? input.files : undefined;
+  const { files: _f, checkIn: _ci, checkOut: _co, start: _s, activityId: _a, ...rest } = old ?? {};
   const booking = clean({
-    ...old, id: old?.id ?? uniqueId(name, allIds(t)), name, from: input.from, to: input.to, status: input.status,
+    ...(input.kind === undefined ? old : rest), id: old?.id ?? uniqueId(name, allIds(t)), name, from: input.from, to: input.to, status: input.status,
     reference: input.reference.trim() || undefined, placeId: input.placeId || undefined,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
+    kind, ...times, files,
   });
   return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking }]);
+}
+
+/** The fields read from a mail or a pasted confirmation fill in the form; what was not read stays (BK-17, BK-18). */
+export function readingToForm(f: BookingInput, r: BookingReading): BookingInput {
+  const kind = r.kind === "stay" || r.kind === "ticket" ? r.kind : r.kind ? "other" : f.kind;
+  return {
+    ...f, kind, name: r.name ?? f.name, from: r.from ?? f.from, to: r.to ?? r.from ?? f.to, reference: r.reference ?? f.reference,
+    status: r.status ?? f.status, checkIn: r.checkIn ?? f.checkIn, checkOut: r.checkOut ?? f.checkOut, start: r.start ?? f.start,
+  };
 }
 
 export const removeBooking = (t: Trip, id: string): Op[] => removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]);

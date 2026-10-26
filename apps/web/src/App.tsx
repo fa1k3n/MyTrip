@@ -11,6 +11,7 @@ const EditDialog = lazy(() => import("./NalaForms.tsx").then((m) => ({ default: 
 const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.PlaceView })));
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
+const TicketView = lazy(() => import("./TicketView.tsx"));
 import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggleOne, tripDates, type Open, type Unlock } from "./format.ts";
 import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
@@ -151,6 +152,7 @@ export function App() {
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
   const [forecast, forecastAt] = useForecast(view === "trip" ? t : undefined);
+  useEffect(() => { if (trips) import("./ticketFiles.ts").then((m) => m.keepTickets(trips), () => {}); }, [trips]); // BK-12
   const [off, setOff] = useState(offlineState()); // PW-04
   const [hint, setHint] = useState(() => { // PW-12: once per phone, until closed
     let closed = false;
@@ -217,6 +219,18 @@ export function App() {
       return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
     }
   };
+  /** BK-17: saving a booking from a mail approves the mail; the trash rejects it. */
+  const approveMail = async (pid: string, ops: Op[]): Promise<string | null> => {
+    try {
+      await api.approveMail(t!, pid, ops);
+      await load();
+      return null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) { await load(); return sv.conflict; }
+      return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
+    }
+  };
+  const rejectMail = async (pid: string) => { await api.rejectMail(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); };
   /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
   const run: Run = async (build, reason) => {
     let cur = t!;
@@ -329,7 +343,7 @@ export function App() {
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
     <dialog
-      ref={dialog} aria-label={!dlg ? undefined
+      ref={dialog} className={dlg?.kind === "tickets" ? "full" : undefined} aria-label={!dlg ? undefined
         : dlg.kind === "place" ? t?.places.find((x) => x.id === dlg.id)?.name
         : dlg.kind === "transport" ? sv.transport
         : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
@@ -345,6 +359,7 @@ export function App() {
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}
+      {dlg?.kind === "tickets" && t && <TicketView t={t} bookingId={dlg.bookingId} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
           <h3>{sv.newDream}</h3>
@@ -354,7 +369,7 @@ export function App() {
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
-        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} />
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} />
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (

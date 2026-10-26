@@ -301,3 +301,21 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 .mapoff{padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center}
 /* PW-12: the hint on adding the app to the home screen, closed with its X */
 .hint{display:flex;gap:8px;align-items:flex-start;padding:12px 8px 12px 16px;margin-bottom:12px;border-left:5px solid var(--sage)}.hint p{margin:0;flex:1;font-size:.95rem}
+/* AU-31, BK-10: QR codes and tickets are dark on light also in dark mode, so cameras and scanners read them */
+:root{--scanBg:#fff;--scanInk:#2C2A29}.qr{display:block;width:100%;max-width:320px;margin:12px auto;border-radius:8px}.qr .qrbg{fill:var(--scanBg)}.qr path{fill:var(--scanInk)}
+/* BK-07: the kind of a booking as a small icon before its name */
+.kind{display:inline-flex;vertical-align:-3px;margin-right:6px;color:var(--mute)}.kind svg{width:16px;height:16px;stroke-width:2}
+/* BK-10: the ticket viewer fills the screen on white */
+dialog.full{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border-radius:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));background:var(--scanBg);color:var(--scanInk)}
+dialog.full .dlg-x{top:calc(8px + env(safe-area-inset-top,0px))}.tickets .ro{color:var(--scanInk)}
+.ticketpage{display:block;width:100%;max-width:900px;height:auto;margin:12px auto;background:var(--scanBg)}
+/* BK-09: the ticket files in the booking form */
+fieldset.files{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}fieldset.files legend{font-weight:600}
+fieldset.files svg{width:16px;height:16px;vertical-align:-3px}
+/* BK-17, BK-18: mail waiting for review, and the pasted confirmation */
+.mailflag{display:inline-flex;align-items:center;gap:3px;margin:0 auto 0 8px;color:var(--acct);font-size:.85rem;font-weight:600}.mailflag svg{width:16px;height:16px}
+.mails{margin-bottom:10px;padding:4px 10px;border-left:4px solid var(--acc);background:var(--bg);border-radius:8px}
+button.row.mail{width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer}button.row.mail:last-child{border-bottom:0}
+button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)}
+.mailfrom{display:block}.mailfrom .ico svg{width:16px;height:16px;vertical-align:-3px;margin-right:4px}
+.pastebox{margin:6px 0 10px}.pastebox .btn{margin-top:6px}

@@ -1,4 +1,4 @@
-import type { Op, Settings, Trip } from "@trip/schema";
+import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
 import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
@@ -142,6 +142,8 @@ async function call<T>(path: string, init: RequestInit = {}, key = link): Promis
 const trip = (id: string) => `/api/trips/${encodeURIComponent(id)}`;
 
 export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string } | { role: "traveler" | "planner"; tripId: string; travelerId: string };
+/** A mail to the trip's inbox, read into a proposed booking that waits for review (BK-15, BK-17). */
+export type MailProposal = { id: string; status: "pending" | "approved" | "rejected"; source?: { kind: "mail"; from: string; subject: string; at: string }; booking?: BookingReading & { files?: TicketFile[] } };
 /** A traveler's personal link as the settings show it (AU-11). */
 export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string };
 
@@ -168,6 +170,23 @@ export const api = {
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
+  // BK-09, BK-10: ticket files go up and come down as they are, with the link's credentials.
+  uploadFile: async (tripId: string, blob: Blob, name: string) => {
+    const r = await fetch(`${trip(tripId)}/files?name=${encodeURIComponent(name)}`, { method: "POST", headers: { ...headers(), "content-type": blob.type }, body: blob });
+    if (!r.ok) throw new ApiError(r.status, []);
+    return (await r.json()) as TicketFile;
+  },
+  file: async (tripId: string, id: string) => {
+    const r = await fetch(`${trip(tripId)}/files/${encodeURIComponent(id)}`, { headers: headers() });
+    if (!r.ok) throw new ApiError(r.status, []);
+    return r.blob();
+  },
+  proposals: (id: string) => call<MailProposal[]>(`${trip(id)}/proposals`), // BK-17
+  approveMail: (t: Trip, pid: string, ops: Op[]) =>
+    call<unknown>(`${trip(t.id)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops }) }),
+  rejectMail: (tripId: string, pid: string) => call<unknown>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/reject`, { method: "POST" }),
+  inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-14
+  newInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }),
   image: async (id: string, key = link) => {
     const r = await fetch(`${trip(id)}/image`, { headers: headers(key) });
     if (!r.ok) throw new Error(`${r.status} image`);

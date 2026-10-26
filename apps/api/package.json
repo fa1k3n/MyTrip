@@ -1,4 +1,4 @@
 { "name": "@trip/api", "version": "0.1.0", "type": "module",
   "scripts": { "dev": "tsx watch src/node.ts" },
-  "dependencies": { "@trip/schema": "*", "hono": "^4.6.0", "@hono/node-server": "^1.13.0" },
+  "dependencies": { "@trip/schema": "*", "hono": "^4.6.0", "@hono/node-server": "^1.13.0", "postal-mime": "2.7.6" },
   "devDependencies": { "tsx": "^4.19.0" } }

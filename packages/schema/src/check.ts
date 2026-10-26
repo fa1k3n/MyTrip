@@ -13,6 +13,12 @@ export function checkTrip(t: Trip): string[] {
     for (const a of d.activities)
       for (const pid of a.placeIds) if (!places.has(pid)) p.push(`Activity ${a.id} refers to unknown place ${pid}`); // DM-09
   for (const b of t.bookings) if (b.placeId && !places.has(b.placeId)) p.push(`Booking ${b.id} refers to unknown place ${b.placeId}`);
+  for (const b of t.bookings) { // BK-08
+    if (!b.activityId) continue;
+    const day = t.days.find((d) => d.activities.some((a) => a.id === b.activityId));
+    if (!day) p.push(`Booking ${b.id} refers to unknown activity ${b.activityId}`);
+    else if (day.date !== b.from) p.push(`Booking ${b.id} is linked to an activity on another date`);
+  }
   for (const k of t.tasks) if (k.placeId && !places.has(k.placeId)) p.push(`Task ${k.id} refers to unknown place ${k.placeId}`);
   for (const x of t.info ?? []) if (x.placeId && !places.has(x.placeId)) p.push(`Info ${x.id} refers to unknown place ${x.placeId}`);
   for (const s of t.stops) if (!t.days.some((d) => d.id === s.dayId)) p.push(`Stop ${s.label} refers to unknown day ${s.dayId}`);

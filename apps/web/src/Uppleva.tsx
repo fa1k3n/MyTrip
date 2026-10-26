@@ -1,11 +1,11 @@
 // Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
 import { useEffect, useRef } from "react";
-import { bookingDates, dateBadge, dayTime, dayTitle, kr, stopLabel, timelineStops, titleHiddenFrom, todayId } from "./format.ts";
+import { bookingDates, bookingTimes, dateBadge, dayTime, dayTitle, kr, stopLabel, timelineStops, titleHiddenFrom, todayId } from "./format.ts";
 import { adjacentDay, bookingsOn, budgetStatus, coveringStops, dayHeading, pickDay } from "./today.ts";
 import { IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
-import { Activities, Eye, HiddenText, InfoText, PlaceLink, TextEye, Weather, type TripViewProps } from "./TripView.tsx";
+import { Activities, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
@@ -82,10 +82,10 @@ export function Uppleva(p: TripViewProps) {
             return (
               <div className="row mid" key={b.id}>
                 <span>
-                  {b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
-                  <small className="ro">{bookingDates(b)}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
+                  <KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
+                  <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
                 </span>
-                <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span></span>
+                <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span><TicketButton b={b} edit={p.edit} /></span>
               </div>
             );
           }) : <p className="ro">{sv.noBookingsToday}</p>}

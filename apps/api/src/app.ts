@@ -118,7 +118,8 @@ function linkMayChange(t: Trip, ar: AccessRole, ops: Op[]) {
   const rules = accessFor(t, ar);
   const ok = ops.length > 0 && ops.every((o) => {
     const n = opNeeds(o);
-    return n.part === "access" ? false : n.part === "trip" ? ar === "planner" : atLeast(rules.parts[n.part], n.level);
+    return n.part === "access" ? false : n.part === "trip" ? ar === "planner"
+      : n.part === "memories" ? atLeast(rules.view.mi.memories ?? "hidden", n.level) : atLeast(rules.parts[n.part], n.level); // MI-21
   });
   const adds = ops.some((o) => o.op === "add" && o.path === "expenses/-");
   return ok && (!adds || rules.parts.expenses === "write" || ops.length === 1);
@@ -152,10 +153,13 @@ function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity
   const expenses = t.expenses.map((e) => (gives([e.text]) ? { ...e, text: "", hidden: true } : e));
   const payments = t.payments.map(({ note, ...x }) => (gives([note]) ? { ...x, hidden: true } : { ...x, ...(note !== undefined ? { note } : {}) }));
   const dreams = t.dreams.map((w) => (gives([w.title, w.source]) ? { ...w, title: "", source: "", hidden: true } : w));
+  // MI-21: kept in place, so that the viewer's own memories keep their positions, but without verdict or comment
+  const secretWishes = new Set(dreams.filter((w) => w.hidden).map((w) => w.id));
+  const memories = t.memories.map((m) => (secretWishes.has(m.dreamId) ? { id: m.id, dreamId: m.dreamId, by: m.by } : m));
   const trip = { ...(gives([t.purpose]) ? { purpose: "", hiddenPurpose: true } : {}), ...(t.note && gives([t.note]) ? { note: "", hiddenNote: true } : {}) };
   const secret = new Set(t.days.flatMap((d) => d.activities.filter(hiddenFor).flatMap((a) => a.placeIds)));
   const used = new Set([...days.flatMap((d) => d.activities.flatMap((a) => a.placeIds)), ...bookings.map((b) => b.placeId), ...tasks.map((k) => k.placeId), ...info.map((i) => i.placeId)]);
-  return { ...t, ...trip, days, stops, budget, bookings, tasks, info, expenses, payments, dreams,
+  return { ...t, ...trip, days, stops, budget, bookings, tasks, info, expenses, payments, dreams, memories,
     places: t.places.filter((x) => !named.has(x.id) && (!secret.has(x.id) || used.has(x.id))) } as T;
 }
 /** The paths where two versions of a trip differ: what the masking changed for the viewer (AU-30). */
@@ -178,6 +182,13 @@ function approvesExpense(before: Trip, after: Trip) {
 function hidesFromSelf(before: Trip, after: Trip, travelerId: string) {
   const was = new Map(before.days.flatMap((d) => d.activities).map((a) => [a.id, a.hiddenFrom ?? []]));
   return after.days.flatMap((d) => d.activities).some((a) => a.hiddenFrom?.includes(travelerId) && !was.get(a.id)?.includes(travelerId));
+}
+/** True when the change adds, changes or removes a memory of another traveler than the one making it (MI-22). */
+function othersMemories(before: Trip, after: Trip, travelerId: string) {
+  const key = (m: Trip["memories"][number]) => JSON.stringify(m);
+  const was = new Set(before.memories.filter((m) => m.by !== travelerId).map(key));
+  const now = new Set(after.memories.filter((m) => m.by !== travelerId).map(key));
+  return was.size !== now.size || [...was].some((k) => !now.has(k));
 }
 /** New expenses from a personal link are paid and added by its traveler; null when one names someone else (AU-13). */
 function ownExpenses(ops: Op[], travelerId: string): Op[] | null {
@@ -288,6 +299,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (hide("tasks")) out.tasks = [];
     if (hide("info")) out.info = [];
     if (hide("dreams")) out.dreams = [];
+    if ((rules.view.mi.memories ?? "hidden") === "hidden") { out.memories = []; delete out.album; } // MI-21
+    else if (ar !== "planner") out.memories = t.memories.map(({ note, ...m }) => (note !== undefined && m.by === travelerId ? { ...m, note } : m)); // MI-18: only one's own comment
     if (hide("packing")) { out.packing = []; out.packed = []; out.travelers = t.travelers.map((x) => ({ ...x, packing: [], packed: [] })); }
     if (ar === "planner" || !mask) return out;
     const who = new Map(t.days.flatMap((d) => [...hiddenFromIn(d)])); // including activities that resemble a hidden one (AU-24)
@@ -526,6 +539,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ ok: false, problems: describeError(e) }, 422); // MC-03
     }
     if (travelerId && hidesFromSelf(t, next, travelerId)) return c.json({ error: "forbidden" }, 403); // AU-18
+    if (travelerId && othersMemories(t, next, travelerId)) return c.json({ error: "forbidden" }, 403); // MI-22
     if (ar === "traveler" && approvesExpense(t, next)) return c.json({ error: "forbidden" }, 403); // MI-12
     const hidden = ar && ar !== "planner" ? changedPaths(view(t, c.get("role"), travelerId, false), view(t, c.get("role"), travelerId)) : [];
     if (b.ops.some((o) => touchesMasked(o, hidden))) return c.json({ error: "forbidden" }, 403); // AU-30: no overwriting what one cannot see

@@ -27,6 +27,13 @@ export function checkTrip(t: Trip): string[] {
   for (const e of t.expenses ?? []) who(`Expense ${e.id}`, [e.paidBy, ...e.sharedBy, ...(e.addedBy ? [e.addedBy] : [])]); // UP-13
   for (const x of t.payments ?? []) who(`Payment ${x.id}`, [x.from, x.to]);
   for (const a of t.days.flatMap((d) => d.activities)) who(`Activity ${a.id}`, a.hiddenFrom ?? []); // AU-18
+  const memories = new Set<string>();
+  for (const m of t.memories ?? []) { // MI-17: one per traveler and wish
+    if (ids.has(m.id) || memories.has(`${m.dreamId} ${m.by}`)) p.push(`Duplicate memory: ${m.id}`);
+    ids.add(m.id); memories.add(`${m.dreamId} ${m.by}`);
+  }
+  const wishes = new Set((t.dreams ?? []).map((w) => w.id));
+  for (const a of t.days.flatMap((d) => d.activities)) if (a.dreamId && !wishes.has(a.dreamId)) p.push(`Activity ${a.id} refers to unknown wish ${a.dreamId}`); // MI-19
   const dates = t.days.map((d) => d.date).sort();
   for (const b of t.bookings)
     if (b.status !== "cancelled" && dates.length && (b.from < dates[0] || b.to > dates[dates.length - 1]))

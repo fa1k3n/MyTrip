@@ -297,6 +297,9 @@ export function App() {
     <select name={field} defaultValue={value}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
   );
 
+  const [, setAdderTick] = useState(0);
+  /** The superuser's pick of traveler, kept on the device for expenses and memories (UP-13, MI-17). */
+  const setAdder = (id: string) => { try { localStorage.setItem(`${ADDER_KEY}.${t?.id}`, id); } catch { /* private mode */ } setAdderTick((n) => n + 1); };
   /** The traveler the superuser last chose as payer on this device, if still on the trip (UP-13). */
   const adder = () => {
     let stored: string | null = null;
@@ -343,7 +346,8 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity } }); }} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
-      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
+      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self}
+      memoryBy={self ?? (permsFor(role, t).superuser ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal

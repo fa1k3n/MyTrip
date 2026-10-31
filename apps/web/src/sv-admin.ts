@@ -32,7 +32,7 @@ export const svAdmin = {
       dr: { dreams: "Önskningar" },
       nala: { plan: "Dagar och aktiviteter", bookings: "Bokningar", budget: "Budget", tasks: "Att göra", info: "Praktiskt", packing: "Packlista" },
       up: { budget: "Budgetläge", bookings: "Biljetter och bokningar", expenses: "Lägga till utlägg" },
-      mi: { expenses: "Utlägg", budget: "Budget mot utfall" },
+      mi: { expenses: "Utlägg", budget: "Budget mot utfall", memories: "Upplevt" },
     } as Record<string, Record<string, string>>,
     level: { hidden: "Dold", read: "Läsa", check: "Bocka av", add: "Lägga till", write: "Ändra" },
     reset: (role: string) => `Återställ standard för ${role}`, fixed: "Resans inställningar och länkar kan bara Planerare och du ändra.",

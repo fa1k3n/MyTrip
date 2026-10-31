@@ -35,7 +35,8 @@ export function permsFor(role: Role, t: { access?: AccessConfig }): Perms {
   return { ...accessFor(t, role === "link" ? "follower" : role), scoped: true, superuser: false, settings: role === "planner" };
 }
 /** True when the role may change some component, so Nåla offers edit mode. */
-export const anyWrite = (p: Perms) => Object.values(p.view).some((page) => Object.values(page).some((l) => l === "write"));
+/** Whether the role edits the trip; writing one's own memories is not editing it (MI-21). */
+export const anyWrite = (p: Perms) => Object.values(p.view).some((page) => Object.entries(page).some(([k, l]) => l === "write" && k !== "memories"));
 
 /** The installed app on the home screen is for the trip itself and shows only Uppleva (PW-15). */
 export const forInstalled = (p: Perms): Perms => (p.pages.includes("up") ? { ...p, pages: ["up"], settings: false } : p);

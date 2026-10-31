@@ -156,6 +156,7 @@ export type ActivityInput = {
   durationMin?: number; // undefined: keep (ED-15)
   note?: string; // undefined: keep, "": remove (ED-19)
   hiddenFrom?: string[]; // undefined: keep, []: shown to everyone (AU-18)
+  dreamId?: string; // undefined: keep, "": no wish (MI-19)
 };
 
 /** Timed activities in time order, untimed last (ED-05). */
@@ -191,6 +192,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     durationMin: point ? undefined : input.durationMin ?? old?.durationMin,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     hiddenFrom: input.hiddenFrom === undefined ? old?.hiddenFrom : input.hiddenFrom.length ? input.hiddenFrom : undefined,
+    dreamId: input.dreamId === undefined ? old?.dreamId : input.dreamId || undefined,
     end: point ? input.start : input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];

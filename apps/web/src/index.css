@@ -373,3 +373,31 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
 :root[data-theme="dark"]{--upbtn:#3A3632}
 .upbtns .btn.icon,.upbtns .btn.icon.bare,.upbtns .btn.icon:hover,.upbtns .btn.icon.bare:hover{background:var(--upbtn)}
 @media (max-width:399px){.wxs.big{display:flex;flex-wrap:wrap;gap:4px 14px}} /* narrow phones: the day's weather may take two rows (RS-10) */
+/* Minnas (MI-15..MI-29): Upplevt and Pengar, verdicts on wishes, comments and a calm outcome bar, never red. */
+.viewpick{display:inline-flex;gap:6px;flex:0 0 auto} /* Upplevt or Pengar in the title row (MI-15) */
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;margin:4px 0 10px}.vhead h2{font-size:1.3rem}
+.verdicts{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-top:12px}.verdict{position:relative;display:inline-flex}
+.verdict>[role=img]{color:var(--acct);cursor:default}
+.vcount{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--acc);color:#fff;font-size:.7rem;font-weight:700;
+  line-height:19px;text-align:center;pointer-events:none;box-shadow:0 0 0 2px var(--card)}.vcount[data-n="0"]{opacity:0;transform:scale(0)}
+.verdict .btn.icon{transition:transform .18s cubic-bezier(.34,1.56,.64,1),background-color .25s,border-color .25s,color .25s} /* choosing and taking back fade (MI-28) */
+.verdicts>.btn.icon{margin-left:auto}
+.btn.icon .front{fill:var(--card)}.btn.icon[aria-pressed="true"] .front{fill:var(--acc)} /* the front thumb of "Igen" covers the back one */
+/* Animations (MI-28): the thumb bounces when chosen, the count pops when it changes, a new comment slides in. */
+.verdict .btn.icon[aria-pressed="true"] svg{animation:thumbpop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes thumbpop{0%{transform:scale(.6) rotate(-14deg)}60%{transform:scale(1.25) rotate(8deg)}100%{transform:none}}
+.said{animation:rowin .4s cubic-bezier(.22,1,.36,1)}
+/* Dialogs fade and rise in when opened (MI-28); closing is at once, since the app empties a dialog as it closes. */
+dialog[open]{transition:opacity .2s,transform .22s cubic-bezier(.22,1,.36,1)}
+@starting-style{dialog[open]{opacity:0;transform:translateY(10px) scale(.98)}}
+dialog[open]::backdrop{transition:background-color .2s}
+@starting-style{dialog[open]::backdrop{background-color:rgba(0,0,0,0)}}
+/* The wishes as a carousel that is swiped or stepped with the arrows (MI-27); wide enough for all buttons on one row. */
+.cstrip{display:grid;grid-auto-flow:column;grid-auto-columns:min(300px,86%);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
+  padding:6px 4px 14px;margin:0 -4px;scrollbar-width:thin}
+.cstrip>.dream{scroll-snap-align:start}.cstrip:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.verdict .btn.icon[aria-pressed="true"] svg,.said{animation:none}.verdict .btn.icon,dialog[open],dialog[open]::backdrop{transition:none}}
+.as{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.said{margin:6px 0 0;font-size:.9rem;font-family:Fraunces,Georgia,serif;font-style:italic}.said small{font-style:normal}
+.calmbar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px}.calmbar span{display:block;height:100%;background:var(--sage);border-radius:99px}
+.calm{color:inherit}

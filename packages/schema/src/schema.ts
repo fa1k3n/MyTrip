@@ -17,6 +17,7 @@ export const Activity = z.object({
   durationMin: z.number().int().positive().optional(), // estimated length; a fixed `end` wins (DM-13)
   category: z.string().min(1).optional(), // same list as the wishes; gives the day its icons (DC-14)
   hiddenFrom: z.array(Id).optional(), // the travelers it is hidden from, e.g. a surprise for the children (AU-18)
+  dreamId: Id.optional(), // the wish it makes come true; experienced when its day has passed (MI-19)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: hidden from them, title and places removed (AU-18)
 });
 export const Leg = z.object({
@@ -72,6 +73,8 @@ export const Expense = z.object({
   pending: z.boolean().optional(), // added by a Resenär and not yet approved by a Planerare: not settled (MI-09, MI-10)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
+/** A traveler's verdict and comment on an experienced wish, one per traveler and wish, kept for later trips (MI-17, MI-26). */
+export const Memory = z.object({ id: Id, dreamId: Id, by: Id, verdict: z.enum(["again", "ok", "never"]).optional(), note: z.string().min(1).max(140).optional() });
 export const Payment = z.object({ id: Id, from: Id, to: Id, amount: z.number().positive(), date: Date_.optional(), note: z.string().optional(), hidden: z.boolean().optional() }) // hidden: AU-30
   .refine((p) => p.from !== p.to, { message: "A payment needs two different travelers", path: ["to"] }); // MI-06
 export const BudgetItem = z.object({
@@ -103,6 +106,8 @@ export const Trip = z.object({
   access: AccessConfig.optional(), // what each role may see and change; missing: the defaults (AU-20)
   dreams: z.array(Dream).default([]), budget: z.array(BudgetItem).default([]),
   expenses: z.array(Expense).default([]), payments: z.array(Payment).default([]),
+  memories: z.array(Memory).default([]), // MI-17
+  album: z.string().url().regex(/^https:\/\//).optional(), // a link to the travelers' shared album, no upload (MI-20)
   info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)
   packed: z.array(z.string()).default([]), // checked items of the shared list (PK-05)
   stops: z.array(Stop), days: z.array(Day), places: z.array(Place),

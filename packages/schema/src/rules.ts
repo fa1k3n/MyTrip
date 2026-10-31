@@ -13,7 +13,7 @@ export const PAGE_PARTS = {
   dr: { dreams: [H, R, W] },
   nala: { plan: [R, W], bookings: [H, R, W], budget: [H, R, W], tasks: [H, R, C, W], info: [H, R, W], packing: [H, R, C, W] },
   up: { budget: [H, R], bookings: [H, R], expenses: [H, A] }, // the day itself is always shown
-  mi: { expenses: [H, R, A, W], budget: [H, R] }, // budget: the follow-up against actual expenses
+  mi: { expenses: [H, R, A, W], budget: [H, R], memories: [H, R, W] }, // budget: the follow-up against actual expenses; memories: MI-21
 } as const satisfies Record<Page, Record<string, readonly Level[]>>;
 /** The data behind the components: days and activities (plan), bookings, budget, expenses, tasks, packing lists, information, wishes. */
 export const PARTS = ["plan", "bookings", "budget", "expenses", "tasks", "packing", "info", "dreams"] as const;
@@ -33,19 +33,19 @@ export const DEFAULT_ACCESS: Record<AccessRole, RoleRules> = {
     dr: { visible: false, parts: { dreams: H } },
     nala: { visible: false, parts: { plan: R, bookings: H, budget: H, tasks: H, info: H, packing: H } },
     up: { visible: true, parts: { budget: H, bookings: H, expenses: H } },
-    mi: { visible: false, parts: { expenses: H, budget: H } },
+    mi: { visible: false, parts: { expenses: H, budget: H, memories: H } },
   },
   traveler: {
     dr: { visible: true, parts: { dreams: R } },
     nala: { visible: true, parts: { plan: R, bookings: R, budget: R, tasks: C, info: R, packing: C } },
     up: { visible: true, parts: { budget: R, bookings: R, expenses: A } },
-    mi: { visible: true, parts: { expenses: A, budget: R } },
+    mi: { visible: true, parts: { expenses: A, budget: R, memories: W } },
   },
   planner: {
     dr: { visible: true, parts: { dreams: W } },
     nala: { visible: true, parts: { plan: W, bookings: W, budget: W, tasks: W, info: W, packing: W } },
     up: { visible: true, parts: { budget: R, bookings: R, expenses: A } },
-    mi: { visible: true, parts: { expenses: W, budget: R } },
+    mi: { visible: true, parts: { expenses: W, budget: R, memories: W } },
   },
 };
 /** The superuser may do everything (AU-20). */
@@ -53,9 +53,11 @@ export const ALL_ACCESS: RoleRules = Object.fromEntries(PAGES.map((p) => [p, {
   visible: true, parts: Object.fromEntries(Object.entries(PAGE_PARTS[p]).map(([k, ls]) => [k, ls[ls.length - 1]])),
 }])) as RoleRules;
 
-/** The levels a role may be given on a page's component: a Följare is no person, so it adds and changes no expenses (AU-22). */
+/** The levels a role may be given on a page's component: a Följare is no person, so it adds and changes no expenses (AU-22)
+ * and sees no memories (MI-21). */
 export const levelsFor = (role: AccessRole, page: Page, part: string): Level[] => {
   const all = (PAGE_PARTS[page] as Record<string, readonly Level[]>)[part] ?? [];
+  if (role === "follower" && part === "memories") return [H];
   return role === "follower" && part === "expenses" ? all.filter((l) => l === H || l === R) : [...all];
 };
 
@@ -85,10 +87,11 @@ export function accessFor(t: { access?: AccessConfig }, role: AccessRole): Rules
   }])) as RoleRules);
 }
 
-/** The component and level a change needs. "trip" is the trip's own settings, "access" the permissions (AU-21, AU-22). */
-export function opNeeds(o: Op): { part: Part | "trip" | "access"; level: Level } {
+/** The component and level a change needs. "trip" is the trip's own settings, "access" the permissions (AU-21, AU-22).
+ * Memories are shown only in Minnas, so their level is that page's component (MI-21); the album link is a setting (MI-20). */
+export function opNeeds(o: Op): { part: Part | "memories" | "trip" | "access"; level: Level } {
   const [head] = o.path.split("/");
-  const w = (part: Part | "trip" | "access") => ({ part, level: "write" as Level });
+  const w = (part: Part | "memories" | "trip" | "access") => ({ part, level: "write" as Level });
   if (/^tasks\/\d+\/done$/.test(o.path) && o.op === "set") return { part: "tasks", level: "check" };
   if (/^(packed|travelers\/\d+\/packed)$/.test(o.path) && o.op === "set") return { part: "packing", level: "check" };
   if (head === "packing" || /^travelers\/\d+\/packing(\/|$)/.test(o.path)) return w("packing");
@@ -98,5 +101,6 @@ export function opNeeds(o: Op): { part: Part | "trip" | "access"; level: Level }
   if (head === "budget" || head === "budgetMax") return w("budget");
   if (head === "bookings" || head === "tasks" || head === "info" || head === "dreams") return w(head);
   if (head === "access") return w("access");
+  if (head === "memories") return w("memories");
   return w("trip");
 }

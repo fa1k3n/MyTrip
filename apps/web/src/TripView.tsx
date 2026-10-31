@@ -1,5 +1,5 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
@@ -11,9 +11,9 @@ import type { Transfer } from "./money.ts";
 import { Gear, Icon, IconButton } from "./Icons.tsx";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
-// Uppleva and Summera load when their tab is first opened (PF-01).
+// Uppleva and Minnas load when their tab is first opened (PF-01).
 const Uppleva = lazy(() => import("./Uppleva.tsx").then((m) => ({ default: m.Uppleva })));
-const Summera = lazy(() => import("./Summera.tsx").then((m) => ({ default: m.Summera })));
+const Minnas = lazy(() => import("./Minnas.tsx").then((m) => ({ default: m.Minnas })));
 const Side = lazy(() => import("./Side.tsx"));
 const Dreams = lazy(() => import("./Dreams.tsx"));
 const PlanActivities = lazy(() => import("./Plan.tsx")); // edit mode only (ED-16)
@@ -22,6 +22,7 @@ import { anyWrite, type Perms } from "./access.ts";
 import { atLeast } from "@trip/schema/src/rules.ts";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { hasTickets, ticketFor } from "./tickets.ts";
+import { keepView, minnasView, storedView, type MinnasView } from "./memories.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
@@ -173,11 +174,16 @@ export type TripViewProps = {
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
   notices: () => void; // the bell: notices on this phone (NT-03)
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
+  memoryBy?: string; setMemoryBy?: (id: string) => void; // whose hearts and sentences in Minnen (MI-17)
   waiting: Waiting[]; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
 };
 
 export function TripView(p: TripViewProps) {
   const { t, tab, perms } = p, writes = anyWrite(perms);
+  const seesMemories = (perms.view.mi.memories ?? "hidden") !== "hidden";
+  const [miView, setMiView] = useState<MinnasView>(() => minnasView(storedView(), true)); // MI-15
+  const shownMi = seesMemories ? miView : "budget";
+  const pickMi = (v: MinnasView) => { setMiView(v); keepView(v); };
   const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
@@ -203,9 +209,9 @@ export function TripView(p: TripViewProps) {
     </div>
   </>;
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
-  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Summera t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
-    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
-    approver={perms.superuser || p.who?.role === "planner"} run={p.run} /></Suspense>;
+  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Minnas t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
+    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
+    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} /></Suspense>;
   return <>
     <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}
@@ -220,6 +226,10 @@ export function TripView(p: TripViewProps) {
     </div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
+      {tab === "mi" && seesMemories && <span className="viewpick" role="group" aria-label={sv.minnas.views}>{/* Upplevt or Pengar, no second row of tabs (MI-15) */}
+        <IconButton icon="ok" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
+        <IconButton icon="banknote" label={sv.minnas.budget} pressed={shownMi === "budget"} onClick={() => pickMi("budget")} tip="left" />
+      </span>}
       {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
     </div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
     <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <>{t.purpose || sv.noPurpose}<TextEye t={t} texts={[t.purpose]} /></>}</div> {/* AU-30 */}

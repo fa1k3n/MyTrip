@@ -216,6 +216,15 @@
           "category": "Utsikt"
         },
         {
+          "id": "a-12",
+          "text": "Fernsehturm i solnedgång",
+          "placeIds": [],
+          "start": "17:00",
+          "estimated": false,
+          "category": "Utsikt",
+          "dreamId": "fernsehturm"
+        },
+        {
           "id": "a-9",
           "text": "Middag Hackescher Markt",
           "placeIds": [
@@ -270,6 +279,15 @@
           ],
           "start": "11:00",
           "estimated": false
+        },
+        {
+          "id": "a-13",
+          "text": "Currywurst på Konnopke’s",
+          "placeIds": [],
+          "start": "12:00",
+          "estimated": false,
+          "category": "Mat",
+          "dreamId": "currywurst"
         },
         {
           "id": "a-11",
@@ -471,5 +489,34 @@
       "date": "2026-10-24"
     }
   ],
-  "payments": []
+  "payments": [],
+  "memories": [
+    {
+      "id": "m-fernsehturm-anna",
+      "dreamId": "fernsehturm",
+      "by": "anna",
+      "verdict": "again",
+      "note": "Boka biljett i förväg, kön var lång vid solnedgången."
+    },
+    {
+      "id": "m-fernsehturm-erik",
+      "dreamId": "fernsehturm",
+      "by": "erik",
+      "verdict": "ok"
+    },
+    {
+      "id": "m-currywurst-anna",
+      "dreamId": "currywurst",
+      "by": "anna",
+      "verdict": "again"
+    },
+    {
+      "id": "m-currywurst-erik",
+      "dreamId": "currywurst",
+      "by": "erik",
+      "verdict": "again",
+      "note": "Ta med kontanter."
+    }
+  ],
+  "album": "https://photos.example.org/album/berlin-hostlov"
 }

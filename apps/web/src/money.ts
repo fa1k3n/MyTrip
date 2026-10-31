@@ -1,6 +1,7 @@
 // Shared costs for Summera. All sums are done in whole öre so balances add up to exactly zero (MI-04).
 import type { Op } from "@trip/schema";
 import { kr } from "./format.ts";
+import { budgetLimit } from "./budget.ts";
 import { sv } from "./sv.ts";
 
 type Person = { id: string };
@@ -112,3 +113,22 @@ const at = (t: { expenses: { id: string }[] }, id: string) => t.expenses.findInd
 /** Approving removes the mark; rejecting removes the expense (MI-11). */
 export const approveExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}/pending` }]);
 export const rejectExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}` }]);
+
+/** The outcome against the maximum budget as in BG-13, the bar stopping at full; without a maximum the expenses' sum (MI-23). */
+export function outcome(t: Parameters<typeof budgetLimit>[0]): { used: number; max?: number; left?: number; percent?: number } {
+  const l = budgetLimit(t);
+  if (!l) return { used: t.expenses.reduce((a, e) => a + ore(e.amount), 0) / 100 };
+  return { used: l.used, max: l.max, left: l.left, percent: Math.min(100, l.percent) };
+}
+
+/** Expenses by date, then by when they were added, never by amount (MI-24). */
+export const byDate = <E extends { date?: string; addedAt?: string }>(expenses: E[]) =>
+  [...expenses].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.addedAt ?? "").localeCompare(b.addedAt ?? ""));
+
+/** Who shares an expense, in the travelers' order; everyone is stored as shared by all (MI-25, MI-02). */
+export function splitOps(t: { travelers: Person[]; expenses: { id: string }[] }, id: string, selected: string[]): { ok: true; ops: Op[] } | { ok: false; error: string } {
+  const i = at(t, id);
+  if (i < 0) return { ok: false, error: sv.errors.expenseText };
+  if (!selected.some((s) => t.travelers.some((x) => x.id === s))) return { ok: false, error: sv.minnas.splitNeeded };
+  return { ok: true, ops: [{ op: "set", path: `expenses/${i}/sharedBy`, value: sharedByValue(selected, t.travelers.map((x) => x.id)) }] };
+}

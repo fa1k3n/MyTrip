@@ -18,6 +18,8 @@ import { fmtDuration } from "./transport.ts";
 import { readBooking } from "@trip/schema/src/mailbooking.ts";
 import { api, type MailProposal } from "./api.ts";
 import { checkPick } from "./tickets.ts";
+import { MAX_NOTE, memoryOps, mineOf, saveAlbum } from "./memories.ts";
+import { splitOps } from "./money.ts";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
@@ -99,6 +101,46 @@ function BudgetMaxForm(p: Props) {
   );
 }
 
+/** The link to the travelers' shared album; empty removes it (MI-20). */
+function AlbumForm(p: Props) {
+  const s = useSave(p);
+  const { f, text } = useFields({ album: p.t.album ?? "" });
+  return (
+    <Form title={sv.minnas.albumLabel} {...s} close={p.close} onSubmit={() => s.submit(saveAlbum(p.t, f.album), "album")}>
+      <label>{sv.minnas.albumLabel}<input {...text("album")} type="url" inputMode="url" placeholder="https://" autoFocus /></label>
+      <p className="ro note">{sv.minnas.albumHint}</p>
+    </Form>
+  );
+}
+
+/** One traveler's comment on an experienced wish, for planning the next trip (MI-17, MI-18). */
+function MemoryForm(p: Props & { dreamId: string; by: string }) {
+  const s = useSave(p);
+  const w = p.t.dreams.find((x) => x.id === p.dreamId);
+  const { f, text } = useFields({ note: mineOf(p.t, p.dreamId, p.by)?.note ?? "" });
+  return (
+    <Form title={sv.minnas.write(w?.title ?? "")} {...s} close={p.close} onSubmit={() => s.submit(memoryOps(p.t, p.dreamId, p.by, { note: f.note }), "memory")}>
+      <label>{sv.minnas.note}<input {...text("note")} maxLength={MAX_NOTE} autoFocus /></label>
+      <p className="ro note">{sv.minnas.noteHint}</p>
+    </Form>
+  );
+}
+
+/** Who shares an expense, chosen per expense in Minnas > Budget (MI-25). */
+function SplitForm(p: Props & { id: string }) {
+  const s = useSave(p);
+  const e = p.t.expenses.find((x) => x.id === p.id);
+  const [picked, setPicked] = useState<string[]>(e && e.sharedBy.length ? e.sharedBy : p.t.travelers.map((x) => x.id));
+  const flip = (id: string) => setPicked((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
+  return (
+    <Form title={sv.minnas.split(e?.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(splitOps(p.t, p.id, picked), "split expense")}>
+      <fieldset><legend>{sv.minnas.splitTitle}</legend>
+        {p.t.travelers.map((x) => <label className="check" key={x.id}><input type="checkbox" checked={picked.includes(x.id)} onChange={() => flip(x.id)} />{x.name}</label>)}
+      </fieldset>
+    </Form>
+  );
+}
+
 /** First and last date of the trip; days follow the dates (ED-14). Removing days asks first (ED-09). */
 function DatesForm(p: Props) {
   const s = useSave(p);
@@ -158,7 +200,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   const a = p.t.days.find((x) => x.id === p.dayId)?.activities.find((x) => x.id === p.id);
   const { f, text, check } = useFields({
     start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
-    category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "",
+    category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "", dreamId: a?.dreamId ?? "",
   });
   const [hiddenFrom, setHiddenFrom] = useState<string[]>(a?.hiddenFrom ?? []); // AU-18
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
@@ -168,7 +210,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
       onSubmit={() => {
         const durationMin = Number(f.duration) || undefined;
         const miss = f.text.trim() ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
-        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)) }, p.id), p.id ? "edit activity" : "add activity");
+        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, dreamId: f.dreamId, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)) }, p.id), p.id ? "edit activity" : "add activity");
       }}
       onRemove={p.id ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
@@ -185,6 +227,10 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
         <option value="">{sv.noCategory}</option>
         {ACTIVITY_CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
       </select></label>
+      {p.t.dreams.length > 0 && <label>{sv.minnas.dream}<select {...text("dreamId")}> {/* the wish it makes come true (MI-19) */}
+        <option value="">{sv.minnas.noDream}</option>
+        {p.t.dreams.filter((w) => !w.hidden).map((w) => <option key={w.id} value={w.id}>{w.title}</option>)}
+      </select></label>}
       <label>{sv.placeLabel}<select {...text("place")}>
         <option value="">{sv.noPlace}</option>
         {p.t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -402,6 +448,9 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "task": return <TaskForm {...p} id={dlg.id} />;
     case "placeEdit": return <PlaceForm {...p} id={dlg.id} />;
     case "info": return <InfoForm {...p} id={dlg.id} />;
+    case "album": return <AlbumForm {...p} />;
+    case "memory": return <MemoryForm {...p} dreamId={dlg.dreamId} by={dlg.by} />;
+    case "split": return <SplitForm {...p} id={dlg.id} />;
     default: return null;
   }
 }

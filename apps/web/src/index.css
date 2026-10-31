@@ -346,7 +346,7 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
 .upbtns .btn.icon:active{transform:scale(.88);box-shadow:none}
 .tab[aria-selected=true]{animation:tabpop .28s cubic-bezier(.34,1.56,.64,1)}
 @keyframes tabpop{from{transform:scale(.94)}}
-/* A saved expense in Uppleva: the amount rises, coins burst from the button, the button shakes (UP-35). */
+/* A saved expense: the amount rises and coins burst from the button (UP-35). */
 .burst{position:fixed;z-index:30;width:0;height:0;pointer-events:none}
 .burst .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;background:var(--sage);color:#1b2a20;font-weight:700;font-size:.9rem;
   padding:4px 12px;border-radius:99px;box-shadow:var(--sh);animation:burstlbl 1.3s cubic-bezier(.22,1,.36,1) forwards}
@@ -356,12 +356,10 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
   75%{opacity:1}100%{opacity:0;transform:translate(-50%,-260%) scale(1)}}
 @keyframes burstcoin{0%{opacity:1;transform:translate(0,0) rotate(0) scale(.5)}55%{opacity:1;transform:translate(var(--dx),var(--dy)) rotate(var(--spin)) scale(1)}
   100%{opacity:0;transform:translate(calc(var(--dx) * 1.15),calc(var(--dy) + 36px)) rotate(var(--spin)) scale(.8)}}
-.chaching{animation:chaching .5s ease-in-out}
-@keyframes chaching{20%{transform:rotate(-10deg) scale(1.08)}40%{transform:rotate(8deg) scale(1.08)}60%{transform:rotate(-5deg)}80%{transform:rotate(3deg)}}
 .row.waiting{animation:rowin .4s cubic-bezier(.22,1,.36,1)}
 @keyframes rowin{from{opacity:0;transform:translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){.btn,.tab,.addrow{transition:none}.btn:active,.tab:active,.addrow:active,.upbtns .btn.icon:active{transform:none}
-  .tab[aria-selected=true],.chaching,.row.waiting{animation:none}.burst{display:none}} /* AC-06 */
+  .tab[aria-selected=true],.row.waiting{animation:none}.burst{display:none}} /* AC-06 */
 /* At 320 px the four tabs fit without sideways scrolling (RS-10). */
 @media (max-width:359px){.tabs{gap:4px}.tab{min-width:0;padding:9px 2px;font-size:.88rem}}
 /* Uppleva: the day heading card ends at its content (UP-38). */
@@ -374,8 +372,4 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--upbtn:#3A3632}}
 :root[data-theme="dark"]{--upbtn:#3A3632}
 .upbtns .btn.icon,.upbtns .btn.icon.bare,.upbtns .btn.icon:hover,.upbtns .btn.icon.bare:hover{background:var(--upbtn)}
-/* How many expenses an activity has, on its money button (UP-37). */
-.moneybtn{position:relative;display:inline-flex}
-.moneybtn .count{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--acc);color:#fff;
-  font-size:.7rem;font-weight:700;line-height:19px;text-align:center;pointer-events:none;box-shadow:0 0 0 2px var(--card)}
 @media (max-width:399px){.wxs.big{display:flex;flex-wrap:wrap;gap:4px 14px}} /* narrow phones: the day's weather may take two rows (RS-10) */

@@ -7,7 +7,7 @@ export const sv = {
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
     now: "Nu",
     place: "Visa platsen",
-    expenseTitle: (name: string) => `Nytt utlägg för ${name}`, shortText: "Kort beskrivning (valfri)", count: (n: number) => (n === 1 ? "1 utlägg" : `${n} utlägg`), shortTextNeeded: "Kort beskrivning",
+    expenseTitle: (name: string) => `Nytt utlägg för ${name}`, shortText: "Kort beskrivning (valfri)", shortTextNeeded: "Kort beskrivning",
     noRate: (c: string) => `Kunde inte hämta växelkursen för ${c}. Försök igen när du har nät.`,
     clash: (end: string, name: string, start: string) => `Slutar ${end.replace(":", ".")} och krockar med ${name} ${start.replace(":", ".")}`,
     hours: (h: number) => `${h} tim`, minutes: (m: number) => `${m} min`, about: "ca",

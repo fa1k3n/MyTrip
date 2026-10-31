@@ -1,4 +1,4 @@
-// A small celebration when an expense is saved in Uppleva: the amount rises and coins burst from the button (UP-35).
+// A small celebration when an expense is saved: the amount rises and coins burst from the button (UP-35).
 import { money } from "./budget.ts";
 import { kr } from "./format.ts";
 
@@ -51,6 +51,5 @@ export function burst(start: Element | null, label: string) {
     box.append(coin);
   });
   document.body.append(box);
-  el!.classList.add("chaching");
-  setTimeout(() => { box.remove(); el!.classList.remove("chaching"); }, 1400);
+  setTimeout(() => box.remove(), 1400);
 }

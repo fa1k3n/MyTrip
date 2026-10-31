@@ -38,5 +38,3 @@ export const upTime = (a: { start?: string; estimated: boolean }) => (a.start ? 
 /** The day's time in Uppleva's heading, without "ca" (UP-36). */
 export const upDayTime = <D extends { start: string; end: string }>(d: D) => `${hh(d.start)}–${hh(d.end)}`;
 
-/** How many expenses an activity has (UP-37). */
-export const expensesFor = (expenses: { activityId?: string }[], id: string) => expenses.filter((e) => e.activityId === id).length;

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
 import { adjacentDay, bookingsOn, budgetStatus, clockIn, dayHeading, pickDay } from "./today.ts";
-import { clashes, durationText, expensesFor, nowAt, upDayTime, upTime } from "./upday.ts";
+import { clashes, durationText, nowAt, upDayTime, upTime } from "./upday.ts";
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
 import { geocodeUrl } from "./weather.ts";
 import { Icon, IconButton } from "./Icons.tsx";
@@ -133,7 +133,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
   const line = now && <li className="nowline" key="now"><span>{sv.up.now} {now.replace(":", ".")}</span></li>;
   return <ol className="upday">
     {day.activities.map((a, i) => {
-      const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false), n = expensesFor(t.expenses, a.id); // UP-36, UP-37
+      const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false); // UP-36
       const hid = who.get(a.id), eye = p.edit && (() => p.edit({ kind: "hidden", dayId: day.id, id: a.id }));
       const card = <li key={a.id} className={`card upact ${c ? "warn" : ""} ${hid ? "hiddenrow" : ""}`}>
         {hid && <span className="upeye"><Eye t={t} who={hid} open={eye} /></span> /* top right, not in the title (UP-32) */}
@@ -148,8 +148,8 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
           <span className="upbtns">
             {place && <IconButton icon="map" look="bare" tip="left" label={`${sv.up.place}: ${t.places.find((x) => x.id === place)?.name ?? a.text}`} onClick={() => p.place(place)} />}
             {b && <TicketButton b={b} edit={p.edit} />}
-            {add && !a.hidden && <span className="moneybtn"><IconButton icon="money" look="bare" tip="left" label={n ? `${sv.up.expenseTitle(a.text)} (${sv.up.count(n)})` : sv.up.expenseTitle(a.text)}
-              onClick={() => p.addShortExpense(currency, { id: a.id, text: a.text, category: a.category })} />{n > 0 && <span className="count" aria-hidden="true">{n}</span>}</span>}
+            {add && !a.hidden && <IconButton icon="money" look="bare" tip="left" label={sv.up.expenseTitle(a.text)}
+              onClick={() => p.addShortExpense(currency, { id: a.id, text: a.text, category: a.category })} />}
           </span>
         </span>
       </li>;

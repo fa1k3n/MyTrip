@@ -31,6 +31,7 @@ export const Day = z.object({
   startEstimated: z.boolean().optional(), endEstimated: z.boolean().optional(),
   location: z.string().optional(), // where the day is mostly spent (WX-01)
   weather: z.object({ lat: z.number(), lon: z.number() }).optional(),
+  country: z.string().regex(/^[A-Z]{2}$/).optional(), // from the same lookup as `weather`, for the currency of expenses (UP-24)
   legs: z.array(Leg).default([]),
   activities: z.array(Activity),
   hiddenTitle: z.boolean().optional(), // only in what a Resenär or Följare receives: title and summary give away a hidden activity (AU-27)
@@ -64,7 +65,9 @@ export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.st
 export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
-  date: Date_.optional(),
+  date: Date_.optional(), activityId: Id.optional(), // the activity it was for, if any (UP-20)
+  // paid in another currency: the amount as entered and the rate of its date; `amount` is converted to the trip's currency (UP-25)
+  foreign: z.object({ amount: z.number().positive(), currency: z.string().regex(/^[A-Z]{3}$/), rate: z.number().positive(), rateDate: Date_ }).optional(),
   addedBy: Id.optional(), addedAt: z.string().datetime().optional(), // who added it, among the travelers, and when (UP-13)
   pending: z.boolean().optional(), // added by a Resenär and not yet approved by a Planerare: not settled (MI-09, MI-10)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)

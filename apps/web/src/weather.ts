@@ -17,7 +17,14 @@ export const weatherSymbol = (code: number) => group(code)[1];
 const n = (x: number) => Math.round(x).toLocaleString("sv-SE");
 export const forecastRows = (f: Forecast) => [`${group(f.code)[2]}, ${n(f.rain)} % regn`, `${n(f.tMax)} °C`, `${n(f.wind)} m/s`];
 
-export function forecastUrl(points: { lat: number; lon: number }[]) {
+/** Days back to the earliest trip day, at most 92 (the provider's limit), so past trip days keep their weather (WX-16). */
+export function pastDays(dates: string[], today: string) {
+  const first = [...dates].sort()[0];
+  if (!first || first >= today) return 0;
+  return Math.min(92, Math.round((Date.parse(today) - Date.parse(first)) / 86_400_000));
+}
+
+export function forecastUrl(points: { lat: number; lon: number }[], past = 0) {
   const u = new URL("https://api.open-meteo.com/v1/forecast");
   u.searchParams.set("latitude", points.map((p) => p.lat).join(","));
   u.searchParams.set("longitude", points.map((p) => p.lon).join(","));
@@ -25,6 +32,7 @@ export function forecastUrl(points: { lat: number; lon: number }[]) {
   u.searchParams.set("wind_speed_unit", "ms");
   u.searchParams.set("timezone", "auto");
   u.searchParams.set("forecast_days", "16");
+  if (past > 0) u.searchParams.set("past_days", String(past)); // WX-16
   return u.toString();
 }
 
@@ -60,6 +68,8 @@ export const wxLabel = (f: Forecast) =>
   `${f.precip !== undefined ? `${mm(f.precip)} nederbörd` : `${n(f.rain)} % risk för regn`}, vind ${n(f.wind)} m/s`;
 
 /** Place search of the same provider, used to give a new day its forecast location (ED-04). */
+import { parseCountry } from "./currency.ts";
+
 export function geocodeUrl(name: string) {
   const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
   u.searchParams.set("name", name);
@@ -73,6 +83,10 @@ export function parseGeocode(json: unknown): { lat: number; lon: number } | null
   const r = (json as { results?: { latitude: number; longitude: number }[] })?.results?.[0];
   return r ? { lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100 } : null;
 }
+
+/** Coordinates and country from one lookup (ED-04, UP-24); null when the provider cannot be reached. */
+export const lookupPlace = (name: string) =>
+  fetch(geocodeUrl(name)).then((r) => (r.ok ? r.json() : null)).then((j) => ({ weather: parseGeocode(j), country: parseCountry(j) ?? null }), () => null);
 
 /** null when the place is unknown or the provider cannot be reached. */
 export const geocode = (name: string) =>

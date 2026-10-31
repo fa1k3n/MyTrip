@@ -60,6 +60,7 @@ export type DayInput = {
   date: string; title: string; summary: string; icons: string; start: string; end: string;
   startEstimated: boolean; endEstimated: boolean; location: string;
   weather?: { lat: number; lon: number } | null; // undefined: keep, null: remove
+  country?: string | null; // the same (UP-24)
 };
 
 export function saveDay(t: Trip, input: DayInput, id?: string): Result {
@@ -81,6 +82,7 @@ export function saveDay(t: Trip, input: DayInput, id?: string): Result {
     start: input.start, end: input.end, estimated: false,
     startEstimated: input.startEstimated, endEstimated: input.endEstimated, location,
     weather: input.weather === undefined ? old?.weather : input.weather ?? undefined,
+    country: input.country === undefined ? old?.country : input.country ?? undefined,
   });
   const badge = dateBadge(day.date);
   const stop = { label: location ?? day.title, sub: `${badge.d} ${badge.w}`, dayId: day.id }; // ED-03

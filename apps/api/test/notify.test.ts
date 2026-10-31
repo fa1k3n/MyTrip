@@ -13,9 +13,9 @@ const withs = (patch: object) => ({ ...base, ...patch });
 // REQ: NT-01 a notice names who did what: expenses, activities and other things added
 test("NT-01 describeChange", () => {
   assert.deepEqual(describeChange(base, withs({ expenses: [...base.expenses, { id: "e1", text: "Glass", amount: 60, pending: true }] }), "Bo"),
-    ["Bo lade till en utgift: Glass, 60 kr (väntar på godkännande)"]);
-  assert.deepEqual(describeChange(base, withs({ expenses: [base.expenses[0], { ...base.expenses[1], pending: undefined }] }), "Anna"), ["Anna godkände utgiften Taxi"]);
-  assert.deepEqual(describeChange(base, withs({ expenses: [base.expenses[0]] }), "Anna"), ["Anna avvisade utgiften Taxi"]);
+    ["Bo lade till ett utlägg: Glass, 60 kr (väntar på godkännande)"]);
+  assert.deepEqual(describeChange(base, withs({ expenses: [base.expenses[0], { ...base.expenses[1], pending: undefined }] }), "Anna"), ["Anna godkände utlägget Taxi"]);
+  assert.deepEqual(describeChange(base, withs({ expenses: [base.expenses[0]] }), "Anna"), ["Anna avvisade utlägget Taxi"]);
   assert.deepEqual(describeChange(base, withs({ days: [day([...base.days[0].activities, { id: "a2", text: "Liseberg", placeIds: [], start: "14:00" }])] }), "Anna"),
     ["Anna lade till Liseberg, lör 24 okt"]);
   assert.deepEqual(describeChange(base, withs({ days: [day([{ id: "a1", text: "Zoo", placeIds: [], start: "11:00" }])] }), "Anna"), ["Anna ändrade Zoo, lör 24 okt"]);
@@ -30,7 +30,7 @@ test("NT-01 describeChange", () => {
 test("NT-02 hidden things are never named", () => {
   const hidden = { id: "a2", text: "", placeIds: [], start: "14:00", hidden: true };
   assert.deepEqual(describeChange(base, withs({ days: [day([...base.days[0].activities, hidden])] }), "Anna"), []);
-  assert.deepEqual(describeChange(base, withs({ expenses: [...base.expenses, { id: "e2", text: "", amount: 30, hidden: true }] }), "Anna"), ["Anna lade till en utgift: 30 kr"]);
+  assert.deepEqual(describeChange(base, withs({ expenses: [...base.expenses, { id: "e2", text: "", amount: 30, hidden: true }] }), "Anna"), ["Anna lade till ett utlägg: 30 kr"]);
   assert.deepEqual(describeChange(base, base, "Anna"), []);
 });
 

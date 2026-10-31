@@ -319,3 +319,63 @@ button.row.mail{width:100%;background:none;border:0;border-bottom:1px solid var(
 button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)}
 .mailfrom{display:block}.mailfrom .ico svg{width:16px;height:16px;vertical-align:-3px;margin-right:4px}
 .pastebox{margin:6px 0 10px}.pastebox .btn{margin-top:6px}
+/* Uppleva: the day as a timeline of cards that do not fold out (UP-16), all alike (UP-27); the "Nu" line (UP-29); clash (UP-28); the eye in the corner (UP-32); buttons (UP-20, UP-21). */
+.upday{list-style:none;margin:0 0 14px;padding:0}
+.upact{position:relative;display:flex;gap:12px;align-items:flex-start;padding:12px 12px 8px 14px;margin-bottom:10px;border:1.5px solid transparent}
+.upeye{position:absolute;top:4px;right:4px}.upeye .eye{margin:0}.upact.hiddenrow .upbody .what{padding-right:30px} /* UP-32 */
+.upact.hiddenrow{background:color-mix(in srgb,var(--acc) 7%,var(--card))}
+.upwhen{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:4.6em;flex:none}.upwhen time{font-weight:600}
+.upbody{display:flex;flex-direction:column;gap:2px;flex:1 1 auto;min-width:0}
+.upbody .what{display:flex;flex-direction:column;gap:2px;min-width:0}.upbody .what .name{font-weight:600}.upbody .place{text-align:left}
+.upbody .places,.upbody .anote{font-size:.85rem;line-height:1.35}
+.upact .clash{display:flex;gap:6px;align-items:flex-start;color:var(--warn);font-weight:600;font-size:.85rem;line-height:1.35}.upact .clash svg{width:16px;height:16px;flex:none;margin-top:1px}
+.upbtns{display:flex;justify-content:flex-end;gap:2px;margin:2px -6px -4px 0;min-height:44px} /* kept when empty, so cards are alike (UP-33) */
+.nowline{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:var(--sageT);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.nowline::after{content:"";flex:1;height:1.5px;background:var(--sage);border-radius:2px}
+.addrow{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 16px;border:2px dashed var(--line);border-radius:16px;background:transparent;color:var(--mute);font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.addrow span{flex:1}.addrow svg{width:20px;height:20px}.addrow:hover{color:var(--ink);border-color:var(--acc)}.addrow:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+/* The card buttons look like buttons: a filled, outlined square, as in the design (UP-20). */
+.upbtns{gap:8px;margin:6px 0 2px}
+.upbtns .btn.icon,.upbtns .btn.icon.bare{background:var(--bg);border:1px solid var(--line);border-radius:12px;color:var(--ink);box-shadow:0 1px 2px rgba(44,42,41,.08)}
+.upbtns .btn.icon:hover,.upbtns .btn.icon.bare:hover{border-color:var(--acc);color:var(--acct);background:var(--bg)}
+/* A dropdown in a form shaped like those in the settings: a pill with the app's chevron, in neutral colours (UP-34). */
+.rolepick.field{display:flex;width:100%;margin:4px 0 10px}.rolepick.field select{width:100%;color:var(--ink);border-color:var(--line);background:var(--bg);font-weight:600}.rolepick.field::after{color:var(--mute)}
+/* Press feedback: buttons shrink a little and spring back (UI-10). */
+.btn,.tab,.addrow{transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
+.btn:active,.tab:active{transform:scale(.92)}.addrow:active{transform:scale(.98)}
+.upbtns .btn.icon:active{transform:scale(.88);box-shadow:none}
+.tab[aria-selected=true]{animation:tabpop .28s cubic-bezier(.34,1.56,.64,1)}
+@keyframes tabpop{from{transform:scale(.94)}}
+/* A saved expense in Uppleva: the amount rises, coins burst from the button, the button shakes (UP-35). */
+.burst{position:fixed;z-index:30;width:0;height:0;pointer-events:none}
+.burst .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;background:var(--sage);color:#1b2a20;font-weight:700;font-size:.9rem;
+  padding:4px 12px;border-radius:99px;box-shadow:var(--sh);animation:burstlbl 1.3s cubic-bezier(.22,1,.36,1) forwards}
+.burst .coin{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#F0D59A,#D9B26F 60%,#B8904A);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);animation:burstcoin .95s cubic-bezier(.2,.8,.3,1) forwards;opacity:0}
+@keyframes burstlbl{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}18%{opacity:1;transform:translate(-50%,-120%) scale(1.08)}30%{transform:translate(-50%,-140%) scale(1)}
+  75%{opacity:1}100%{opacity:0;transform:translate(-50%,-260%) scale(1)}}
+@keyframes burstcoin{0%{opacity:1;transform:translate(0,0) rotate(0) scale(.5)}55%{opacity:1;transform:translate(var(--dx),var(--dy)) rotate(var(--spin)) scale(1)}
+  100%{opacity:0;transform:translate(calc(var(--dx) * 1.15),calc(var(--dy) + 36px)) rotate(var(--spin)) scale(.8)}}
+.chaching{animation:chaching .5s ease-in-out}
+@keyframes chaching{20%{transform:rotate(-10deg) scale(1.08)}40%{transform:rotate(8deg) scale(1.08)}60%{transform:rotate(-5deg)}80%{transform:rotate(3deg)}}
+.row.waiting{animation:rowin .4s cubic-bezier(.22,1,.36,1)}
+@keyframes rowin{from{opacity:0;transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){.btn,.tab,.addrow{transition:none}.btn:active,.tab:active,.addrow:active,.upbtns .btn.icon:active{transform:none}
+  .tab[aria-selected=true],.chaching,.row.waiting{animation:none}.burst{display:none}} /* AC-06 */
+/* At 320 px the four tabs fit without sideways scrolling (RS-10). */
+@media (max-width:359px){.tabs{gap:4px}.tab{min-width:0;padding:9px 2px;font-size:.88rem}}
+/* Uppleva: the day heading card ends at its content (UP-38). */
+.uphead>:last-child{margin-bottom:0}.uphead .dayhead:last-child{margin-bottom:0}
+/* From 600 px the card buttons sit to the right of the text (UP-39). */
+@media (min-width:600px){.upbody{display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:start}
+  .upbody>*{grid-column:1}.upbody>.upbtns{grid-column:2;grid-row:1 / span 4;align-self:center;margin:0}}
+/* Lighter card buttons in dark mode (UP-40). */
+:root{--upbtn:var(--bg)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--upbtn:#3A3632}}
+:root[data-theme="dark"]{--upbtn:#3A3632}
+.upbtns .btn.icon,.upbtns .btn.icon.bare,.upbtns .btn.icon:hover,.upbtns .btn.icon.bare:hover{background:var(--upbtn)}
+/* How many expenses an activity has, on its money button (UP-37). */
+.moneybtn{position:relative;display:inline-flex}
+.moneybtn .count{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--acc);color:#fff;
+  font-size:.7rem;font-weight:700;line-height:19px;text-align:center;pointer-events:none;box-shadow:0 0 0 2px var(--card)}
+@media (max-width:399px){.wxs.big{display:flex;flex-wrap:wrap;gap:4px 14px}} /* narrow phones: the day's weather may take two rows (RS-10) */

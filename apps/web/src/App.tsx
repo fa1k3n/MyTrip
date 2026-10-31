@@ -13,10 +13,11 @@ const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: 
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
 const TicketView = lazy(() => import("./TicketView.tsx"));
 import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggleOne, tripDates, type Open, type Unlock } from "./format.ts";
-import { forecastUrl, parseForecast, type Forecast } from "./weather.ts";
+import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
-import { newExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
+import { burst, burstLabel } from "./celebrate.ts";
+import { activityExpense, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
 import { Gear, IconButton } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
@@ -28,7 +29,7 @@ const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 
-type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense" } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | EditDlg;
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string }; payer?: boolean } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | EditDlg;
 const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
 const ADDER_KEY = "mytrip.adder";
 const HINT_KEY = "mytrip.installHint";
@@ -59,7 +60,7 @@ function useForecast(trip: Trip | undefined): [Record<string, Forecast>, string 
     const days = trip?.days.filter((d) => d.weather) ?? [];
     if (!days.length) return;
     let live = true;
-    fetch(forecastUrl(days.map((d) => d.weather!)))
+    fetch(forecastUrl(days.map((d) => d.weather!), pastDays(days.map((d) => d.date), todayIn(trip!.timezone))))
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const per = j ? parseForecast(j) : [];
@@ -95,6 +96,7 @@ export function App() {
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
   const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
   const dialog = useRef<HTMLDialogElement>(null);
+  const origin = useRef<Element | null>(null); // the button that opened Uppleva's expense form, for the burst (UP-35)
   const opener = useRef<HTMLElement | null>(null);
 
   const load = useCallback(() => api.trips().then(setTrips, () => setFailed(true)), []);
@@ -256,22 +258,33 @@ export function App() {
   };
   const savePayment = (x: Transfer & { note?: string }) =>
     change([{ op: "add", path: "payments/-", value: { id: newId("pay"), ...x, date: today } }], "payment");
-  const saveForm = (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
+  const saveForm = async (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
     const f = new FormData(form), str = (k: string) => String(f.get(k) ?? "").trim();
     if (kind === "person") {
       const name = str("name"); // the same traveler from Summera and the settings (MI-01, AU-26)
       import("./edit.ts").then((m) => run((x) => m.addTraveler(x, name), "add traveler"));
     } else if (kind === "expense") {
-      const payer = self ?? str("paidBy"); // a personal link pays and adds in its own name; the superuser picks who paid (UP-13, AU-13)
-      const input = { text: str("text"), amount: str("amount"), category: str("category"), paidBy: payer, sharedBy: t!.travelers.map((x) => x.id), addedBy: payer }; // shared by all; split in Summera (MI-02)
+      const short = dlg?.kind === "expense" ? dlg.short : undefined, activity = short?.activity; // the short form (UP-22, UP-30, MI-13)
+      const payer = self ?? (short?.payer ? str("paidBy") : adder()); // a personal link pays and adds in its own name; the superuser picks who paid in Summera (UP-13, AU-13)
+      const all = t!.travelers.map((x) => x.id);
+      const cur = str("currency") || t!.currency;
+      const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
+      if (rate === null) return setErr(sv.up.noRate(cur));
+      const foreign = rate && { currency: cur, rate: rate.rate, rateDate: rate.date };
+      const input = { ...(activity ? activityExpense(activity, { text: str("text"), amount: str("amount") }, payer, all) // UP-22, UP-23
+        : plainExpense({ text: str("text"), amount: str("amount"), category: str("category") }, payer, all)), ...(foreign ? { foreign } : {}) }; // shared by all; split in Summera (MI-02)
       const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
-      if (!self) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
+      if (!self && short?.payer) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
       if (linkKey()) { // kept on the phone at once and sent from there, with or without a network (PW-06, PW-07)
         queue.save(enqueue(queue.load(), r.ops[0].value as Expense));
         setWaiting(queue.load());
         flushWaiting();
       } else change(r.ops, "add expense");
+      { // after the dialog has closed, over the button that opened it (UP-35)
+        const at = origin.current, label = burstLabel(r.ops[0].value as Expense, t!.currency);
+        setTimeout(() => burst(at, label), 80);
+      }
     } else {
       const amount = parseAmount(str("amount"));
       if (Number.isNaN(amount)) return setErr(sv.badAmount); // MI-03
@@ -329,7 +342,7 @@ export function App() {
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
-      addExpense={() => setDlg({ kind: "expense" })} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
+      addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity } }); }} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
@@ -373,14 +386,19 @@ export function App() {
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
-        <form onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
-          <h3>{dlgTitle[dlg.kind]}</h3>
+        <form key={JSON.stringify(dlg)} onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
+          <h3>{dlg.kind === "expense" && dlg.short?.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlgTitle[dlg.kind]}</h3>
           {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus /></label>}
-          {dlg.kind === "expense" && <>
-            <label>{sv.text}<input name="text" autoFocus /></label>
-            <label>{sv.amount}<input name="amount" inputMode="decimal" /></label>
-            <label>{sv.category}<select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></label>
-            {!self && <label>{sv.paidBy}{people("paidBy", 0, adder())}</label>}
+          {dlg.kind === "expense" && dlg.short && <> {/* amount, currency and a short description; a category without an activity (UP-22, UP-30) */}
+            <div className="two">
+              <label>{sv.amount.replace(" (kr)", "")}<input name="amount" inputMode="decimal" autoFocus /></label>
+              <label>{sv.currency}<span className="rolepick field"><select name="currency" defaultValue={dlg.short.currency}>{[...new Set([dlg.short.currency, t!.currency, ...sv.currencies])].map((c) => <option key={c}>{c}</option>)}</select></span></label>
+            </div>
+            {dlg.short.activity ? <label>{sv.up.shortText}<input name="text" maxLength={60} placeholder={dlg.short.activity.text} /></label> : <>
+              <label>{sv.up.shortTextNeeded}<input name="text" maxLength={60} /></label>
+              <label>{sv.category}<span className="rolepick field"><select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></span></label> {/* like the settings (UP-34) */}
+            </>}
+            {dlg.short.payer && !self && <label>{sv.paidBy}<span className="rolepick field">{people("paidBy", 0, adder())}</span></label> /* Summera: the superuser picks who paid (MI-13, UP-13) */}
           </>}
           {dlg.kind === "payment" && <>
             <label>{sv.from}{people("from")}</label>

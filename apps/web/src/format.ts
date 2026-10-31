@@ -115,3 +115,6 @@ export const editModeLabel = (on: boolean) => (on ? sv.editModeOff : sv.editMode
 export const toggleAllLabel = (open: Open) => (anyOpen(open) ? sv.collapseAll : sv.expandAll);
 export const jumpTo = (id: string): Open => ({ [id]: true });
 export const scrollBehavior = (reducedMotion: boolean): ScrollBehavior => (reducedMotion ? "auto" : "smooth");
+
+/** The class of a booking's status badge: green when paid or ready (BK-19). */
+export const statusBadge = (status: string) => (status === "paid" || status === "ready" ? "badge ok" : "badge");

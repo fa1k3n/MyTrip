@@ -8,6 +8,10 @@ type DayLike = { id: string; date: string };
 export const todayIn = (timeZone: string, now = new Date()) =>
   new Intl.DateTimeFormat("sv-SE", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 
+/** The time of day (HH:MM) in the trip's time zone, for the "Nu" line in Uppleva (UP-18). */
+export const clockIn = (timeZone: string, now = new Date()) =>
+  new Intl.DateTimeFormat("sv-SE", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+
 const sorted = <D extends DayLike>(days: D[]) => [...days].sort((a, b) => a.date.localeCompare(b.date));
 
 /** Today, else the nearest coming day, else the last day (UP-01). */
@@ -21,16 +25,6 @@ export function defaultTab(days: DayLike[], today: string): "nala" | "up" | "mi"
   const s = sorted(days);
   if (!s.length || today < s[0].date) return "nala";
   return today > s[s.length - 1].date ? "mi" : "up";
-}
-
-/** Indexes of the stops that mark the day in the timeline: its own, else those of the closest earlier day with stops (UP-08). */
-export function coveringStops(t: { days: DayLike[]; stops: { dayId: string }[] }, dayId: string): number[] {
-  const s = sorted(t.days), i = s.findIndex((d) => d.id === dayId);
-  for (let j = i; j >= 0; j--) {
-    const hit = t.stops.flatMap((x, n) => (x.dayId === s[j].id ? [n] : []));
-    if (hit.length) return hit;
-  }
-  return [];
 }
 
 /** The day before (-1) or after (1) in date order (UP-09). */

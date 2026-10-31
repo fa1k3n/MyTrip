@@ -163,7 +163,7 @@ export type TripViewProps = {
   setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; toggleChart: () => void;
   place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; back: () => void; admin: () => void;
   today: string; upDay: string | null; setUpDay: (id: string) => void;
-  addExpense: () => void; addPayment: (prefill?: Transfer) => void; addPerson: () => void;
+  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }) => void; /* Uppleva (UP-22, UP-30) */ addPayment: (prefill?: Transfer) => void; addPerson: () => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)

@@ -62,15 +62,43 @@ export function budgetVsActual(budget: { category: string; amount?: number; paid
 export const balanceText = (v: number) =>
   Math.abs(v) < 0.005 ? sv.even : v > 0 ? `${sv.owedBack} ${kr(v)}` : `${sv.owes} ${kr(-v)}`;
 
-export type ExpenseInput = { text: string; amount: string; category: string; paidBy: string; sharedBy: string[]; addedBy: string };
+export type ExpenseInput = { text: string; amount: string; category: string; paidBy: string; sharedBy: string[]; addedBy: string; activityId?: string;
+  foreign?: { currency: string; rate: number; rateDate: string }; // `amount` is then in this currency (UP-25)
+};
 
 /** A new expense with who added it and when (MI-02, UP-13). `date` is the trip's today, `at` the moment as ISO time. */
+/** An amount in another currency as the trip's amount, rounded to öre, with what was entered (UP-25). */
+function converted(amount: number, f: ExpenseInput["foreign"]) {
+  if (!f) return {};
+  return { amount: Math.round(amount * f.rate * 100) / 100, foreign: { amount, currency: f.currency, rate: f.rate, rateDate: f.rateDate } };
+}
+
 export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date: string, at: string, id: string): { ok: true; ops: Op[] } | { ok: false; error: string } {
   const amount = parseAmount(input.amount);
   if (!input.text.trim()) return { ok: false, error: sv.errors.expenseText };
   if (Number.isNaN(amount)) return { ok: false, error: sv.badAmount }; // MI-03
   const sharedBy = sharedByValue(input.sharedBy, t.travelers.map((x) => x.id));
-  return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, addedBy: input.addedBy, addedAt: at } }] };
+  return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, ...(input.activityId ? { activityId: input.activityId } : {}), ...converted(amount, input.foreign), addedBy: input.addedBy, addedAt: at } }] };
+}
+
+/** An activity's budget category for its expenses: Resa is Transport, Klockslag and unknown ones Övrigt, the rest Mat/Fritid (UP-22). */
+const EXPENSE_CATEGORY: Record<string, string> = { Resa: "Transport", Klockslag: "Övrigt", Mat: "Mat/Fritid", Utsikt: "Mat/Fritid", Aktivitet: "Mat/Fritid",
+  Avkoppling: "Mat/Fritid", Museum: "Mat/Fritid", Bad: "Mat/Fritid", Shopping: "Mat/Fritid", Natur: "Mat/Fritid" };
+
+/** The short form for an activity: only the amount and an optional description, which falls back to the activity's title (UP-22). */
+export function activityExpense(a: { id: string; text: string; category?: string }, f: { text: string; amount: string }, payer: string, sharedBy: string[]): ExpenseInput {
+  return { text: f.text.trim() || a.text, amount: f.amount, category: EXPENSE_CATEGORY[a.category ?? ""] ?? "Övrigt", paidBy: payer, sharedBy, addedBy: payer, activityId: a.id };
+}
+
+/** Summera's and Uppleva's short form without an activity: the category from the form (MI-13, UP-30). */
+export const plainExpense = (f: { text: string; amount: string; category: string }, payer: string, sharedBy: string[]): ExpenseInput =>
+  ({ text: f.text.trim(), amount: f.amount, category: f.category, paidBy: payer, sharedBy, addedBy: payer });
+
+/** The title of the activity an expense was for, if it is still in the plan (MI-14). */
+export function activityTitle(t: { days: { activities: { id: string; text: string }[] }[] }, e: { activityId?: string }) {
+  if (!e.activityId) return undefined;
+  for (const d of t.days) for (const a of d.activities) if (a.id === e.activityId) return a.text;
+  return undefined;
 }
 
 /** Who adds the expense: the traveler remembered on this device if still on the trip, else the first (UP-13). */

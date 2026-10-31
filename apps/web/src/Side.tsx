@@ -2,7 +2,7 @@
 // Loaded on demand with the Nåla tab to keep the page under 200 KB (PF-01).
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
-import { bookingDates, bookingTimes, kr, shortDate } from "./format.ts";
+import { bookingDates, bookingTimes, kr, shortDate, statusBadge } from "./format.ts";
 import { api, type MailProposal } from "./api.ts";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText, budgetRows, money } from "./budget.ts";
@@ -86,7 +86,7 @@ function Bookings({ t, edit, onPlace, part }: { part: LockOf; t: Trip; edit: (d:
           <span><KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
             <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}</small>
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
-          <span className="end"><span className={`badge ${b.status === "paid" ? "ok" : ""}`}>{sv.badge[b.status]}</span>
+          <span className="end"><span className={statusBadge(b.status)}>{sv.badge[b.status]}</span>
             <TicketButton b={b} edit={edit} />
             {!b.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut />}</span>
         </div>

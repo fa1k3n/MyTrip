@@ -2,10 +2,11 @@
 import type { ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
-import { approveExpense, balanceText, balances, budgetVsActual, rejectExpense, settle, settled, unhandled, type Transfer } from "./money.ts";
+import { approveExpense, balanceText, balances, budgetVsActual, rejectExpense, settle, settled, unhandled, type Transfer, activityTitle } from "./money.ts";
 import { IconButton } from "./Icons.tsx";
 import type { Level } from "@trip/schema/src/rules.ts";
 import { sv } from "./sv.ts";
+import { expenseAmountText } from "./currency.ts"; // UP-26
 import { HiddenText, TextEye, type Run } from "./TripView.tsx";
 
 type Props = {
@@ -29,10 +30,10 @@ export function Summera({ t, addExpense, addPayment, addPerson, expenses, budget
   const row = (e: Trip["expenses"][number], actions?: ReactNode) => (
     <div className="row mid" key={e.id}>
       <span>{e.hidden ? <HiddenText /> : <>{e.text}<TextEye t={t} texts={[e.text]} /></>}{"waiting" in e && <> <span className="badge">{sv.queue.waiting}</span></>}<br /><small className="ro">
-        {e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {e.sharedBy.length ? e.sharedBy.map(name).join(", ") : sv.everyone}
+        {activityTitle(t, e) && activityTitle(t, e) !== e.text && <>{activityTitle(t, e)} · </> /* MI-14, not twice */}{e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {e.sharedBy.length ? e.sharedBy.map(name).join(", ") : sv.everyone}
         {e.addedBy && <> · {sv.addedBy.toLowerCase()} {name(e.addedBy)}</>}
       </small></span>
-      <span className="end">{kr(e.amount)}{actions}</span>
+      <span className="end">{expenseAmountText(e, t.currency)}{actions}</span>
     </div>
   );
   return (

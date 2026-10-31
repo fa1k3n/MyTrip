@@ -13,7 +13,7 @@ const t = (extra: object = {}) => ({
 test("BG-14 donutSlices with a maximum", () => {
   assert.deepEqual(donutSlices(t({ budgetMax: 10000 })), {
     slices: [{ label: "Boende", value: 5200, kind: "cat" }, { label: "Transport", value: 2000, kind: "cat" },
-      { label: "Utgifter under resan", value: 800.5, kind: "spent" }, { label: "Oanvänt", value: 1999.5, kind: "unused" }],
+      { label: "Utlägg under resan", value: 800.5, kind: "spent" }, { label: "Oanvänt", value: 1999.5, kind: "unused" }],
     total: 10000, used: 8000.5, max: 10000,
   });
   const over = donutSlices(t({ budgetMax: 7500 }));

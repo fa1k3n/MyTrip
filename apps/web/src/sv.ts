@@ -4,11 +4,19 @@ export const sv = {
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", admin: "Admin & Inställningar",
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Summera" },
+  up: { // the day's timeline in Uppleva (UP-16..UP-21)
+    now: "Nu",
+    place: "Visa platsen",
+    expenseTitle: (name: string) => `Nytt utlägg för ${name}`, shortText: "Kort beskrivning (valfri)", count: (n: number) => (n === 1 ? "1 utlägg" : `${n} utlägg`), shortTextNeeded: "Kort beskrivning",
+    noRate: (c: string) => `Kunde inte hämta växelkursen för ${c}. Försök igen när du har nät.`,
+    clash: (end: string, name: string, start: string) => `Slutar ${end.replace(":", ".")} och krockar med ${name} ${start.replace(":", ".")}`,
+    hours: (h: number) => `${h} tim`, minutes: (m: number) => `${m} min`, about: "ca",
+  },
   today: "Idag", startsToday: "börjar idag", noBookingsToday: "Inga bokningar den här dagen.",
   noActivities: "Inga aktiviteter inlagda.", noDays: "Resan har inga dagar ännu. Lägg in dem under Nåla.",
-  planned: "Planerat", paidAhead: "Betalt i förväg", leftToPay: "Kvar att betala", spentOnTrip: "Utgifter under resan",
+  planned: "Planerat", paidAhead: "Betalt i förväg", leftToPay: "Kvar att betala", spentOnTrip: "Utlägg under resan",
   balance: "Saldo", owedBack: "får tillbaka", owes: "ska betala", even: "kvitt", settleUp: "Förslag på betalningar", allEven: "Alla är kvitt.",
-  register: "Registrera betalning:", expenses: "Utgifter", addExpense: "Lägg till utgift", newExpense: "Ny utgift", noExpenses: "Inga utgifter ännu.",
+  register: "Registrera betalning:", expenses: "Utlägg", addExpense: "Lägg till utlägg", newExpense: "Nytt utlägg", noExpenses: "Inga utlägg ännu.",
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
   payments: "Inbetalningar", addPayment: "Registrera inbetalning", newPayment: "Ny inbetalning", noPayments: "Inga inbetalningar ännu.",
   from: "Från", to: "Till", note: "Notering",
@@ -19,14 +27,14 @@ export const sv = {
   bookings: "Bokningar", budget: "Budget", paidSoFar: "Betalt hittills:", showList: "Visa lista", showChart: "Visa diagram",
   budgetChart: "Budget per kategori", total: "totalt",
   budgetMax: "Maxbudget", editBudgetMax: "Ändra maxbudget", noBudgetMax: "Ingen maxbudget",
-  budgetMaxHint: "Planerad budget plus utgifter under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
+  budgetMaxHint: "Planerad budget plus utlägg under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-14
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
   notice: { // NT-01..NT-05: the texts of notices, also used by the server
-    expense: (who: string, what: string) => `${who} lade till en utgift: ${what}`, waits: " (väntar på godkännande)",
-    approved: (who: string, text: string) => `${who} godkände utgiften ${text}`, rejected: (who: string, text: string) => `${who} avvisade utgiften ${text}`,
+    expense: (who: string, what: string) => `${who} lade till ett utlägg: ${what}`, waits: " (väntar på godkännande)",
+    approved: (who: string, text: string) => `${who} godkände utlägget ${text}`, rejected: (who: string, text: string) => `${who} avvisade utlägget ${text}`,
     added: (who: string, text: string, day: string) => `${who} lade till ${text}, ${day}`, changed: (who: string, text: string, day: string) => `${who} ändrade ${text}, ${day}`,
     removed: (who: string, text: string, day: string) => `${who} tog bort ${text}, ${day}`,
     booking: (who: string, name: string) => `${who} lade till bokningen ${name}`, task: (who: string, text: string) => `${who} lade till uppgiften ${text}`,
@@ -42,8 +50,8 @@ export const sv = {
     approve: (text: string) => `Godkänn ${text}`, reject: (text: string) => `Avvisa ${text}`, rejectAsk: (text: string) => `Avvisa och ta bort ${text}?`,
   },
   queue: { // PW-06, PW-09
-    waiting: "Ej skickad", failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
-    removeAsk: "Ta bort utgiften? Den har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot den (${status}).`,
+    waiting: "Ej skickat", failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
+    removeAsk: "Ta bort utlägget? Det har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot det (${status}).`,
   },
   offline: { // PW-04, PW-10
     title: "Offline", since: (time: string) => `Offline – senast uppdaterad ${time}`,
@@ -53,7 +61,7 @@ export const sv = {
     remove: (trip: string) => `Ta bort ${trip} från telefonen`,
     removeAsk: (trip: string) => `Ta bort ${trip} från telefonen? Du behöver länken igen för att öppna resan.`,
     gone: "En länk gäller inte längre och togs bort från telefonen.",
-    unsent: (n: number) => (n === 1 ? "En utgift är inte skickad än och försvinner." : `${n} utgifter är inte skickade än och försvinner.`),
+    unsent: (n: number) => (n === 1 ? "Ett utlägg är inte skickat än och försvinner." : `${n} utlägg är inte skickade än och försvinner.`),
   },
   hiddenActivity: "Dold aktivitet", hiddenText: "Dold text", hiddenTitle: "Dold rubrik", hiddenMark: (names: string) => `Dold för ${names}`, // AU-18, AU-30
   limit: { // BG-13
@@ -76,7 +84,7 @@ export const sv = {
     suggestions: ["Ge förslag", "Resmål, fler önskningar, tempo för barnen och budgetuppskattningar"],
     changes: ["Ändra mina planer", "Fylla dagarna, planera om, packlistor och ändringar med egna ord. Du godkänner alltid först."],
     mail: ["Läsa mina mail", "Mejlade länkar blir önskningar och bokningsbekräftelser blir bokningar"],
-    receipts: ["Läsa kvitton", "Ett foto av ett kvitto blir en utgift i Summera"],
+    receipts: ["Läsa kvitton", "Ett foto av ett kvitto blir ett utlägg i Summera"],
     web: ["Söka på webben", "Öppettider, adresser och telefonnummer till platser"],
     location: ["Använda min plats", "Visa önskningar i närheten under resan"],
   },
@@ -147,7 +155,7 @@ export const sv = {
     time: "Ange start- och sluttid.", endBeforeStart: "Sluttiden kan inte vara före starttiden.", day: "Dagen finns inte längre.",
     text: "Beskriv aktiviteten.", activityTime: "Ange tiden som TT:MM.", place: "Ange namn och adress för den nya platsen.",
     name: "Ange ett namn.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
-    expenseText: "Beskriv utgiften.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
+    expenseText: "Beskriv utlägget.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
     taskText: "Beskriv uppgiften.", url: "Webbadressen ser inte ut att stämma, t.ex. www.exempel.se.", item: "Skriv vad som ska packas.",
     tooLong: "En resa kan vara högst 60 dagar.", activityDate: "Aktiviteten ligger inte på bokningens första datum.",
     activityStart: "Ange när aktiviteten börjar.", duration: "Ange ungefär hur lång tid aktiviteten tar.", move: "Aktiviteten eller dagen finns inte längre.",

@@ -6,7 +6,7 @@ import {
   saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
   readingToForm, ticketActivities, type BookingInput, type Result,
 } from "./edit.ts";
-import { geocode } from "./weather.ts";
+import { lookupPlace } from "./weather.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { suggestPurpose } from "./purpose.ts";
@@ -134,8 +134,9 @@ function DayForm(p: Props & { id?: string }) {
   const submit = async () => {
     const loc = f.location.trim();
     // ED-04: look up coordinates only when the place changed
-    const weather = loc === (d?.location ?? "") ? undefined : loc ? await geocode(loc) : null;
-    s.submit(saveDay(p.t, { ...f, weather }, p.id), p.id ? "edit day" : "add day");
+    const found = loc === (d?.location ?? "") ? undefined : loc ? await lookupPlace(loc) : null; // with the country (UP-24)
+    const weather = found === undefined ? undefined : found?.weather ?? null, country = found === undefined ? undefined : found?.country ?? null;
+    s.submit(saveDay(p.t, { ...f, weather, country }, p.id), p.id ? "edit day" : "add day");
   };
   return (
     <Form title={sv.editDay} {...s} close={p.close} onSubmit={submit}>

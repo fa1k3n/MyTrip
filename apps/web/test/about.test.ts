@@ -33,3 +33,10 @@ test("PW-21 the service worker keeps only the start page as the page for offline
   const src = swSource(["/"]);
   assert.match(src, /url\.pathname === "\/"/);
 });
+
+// REQ: UI-13 the film says the app is for a day trip as well as a long trip, in the soft-shape style
+test("UI-13 the film shows the day trip and the long trip, with soft figures", () => {
+  assert.ok(page.includes('chap: "Stort som smått"'));
+  assert.match(page, /Dagstur/);
+  assert.match(page, /class="skin"/);
+});

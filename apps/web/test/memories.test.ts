@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { applyOps, Trip } from "@trip/schema";
 import { albumOk, saveAlbum, experienced, memoryOps, minnasView, notesOf, verdictCounts } from "../src/memories.ts";
 import { saveActivity } from "../src/edit.ts";
-import { byDate, outcome, splitOps } from "../src/money.ts";
+import { byDate, splitOps } from "../src/money.ts";
 import { sv } from "../src/sv.ts";
 
 const act = (id: string, text: string, extra: object = {}) => ({ id, text, placeIds: [], ...extra });
@@ -102,15 +102,6 @@ test("MI-20 album link", () => {
   assert.equal(saveAlbum(trip(), "http://x.example.org").ok, false);
   assert.deepEqual(saveAlbum(trip({ album: "https://photos.example.org/a" }), ""), { ok: true, ops: [{ op: "remove", path: "album" }] }, "empty clears it");
   assert.deepEqual(saveAlbum(trip(), ""), { ok: true, ops: [] });
-});
-
-// REQ: MI-23 the outcome against the maximum budget, or the sum of expenses without one
-test("MI-23 outcome against the maximum budget", () => {
-  const ex = [{ id: "e1", text: "Mat", category: "Mat/Fritid", amount: 400, paidBy: "anna" }, { id: "e2", text: "Glass", category: "Mat/Fritid", amount: 100.5, paidBy: "bo" }];
-  const budget = [{ id: "b1", category: "Boende", amount: 1000, paid: true }];
-  assert.deepEqual(outcome(trip({ budgetMax: 2000, budget, expenses: ex })), { used: 1500.5, max: 2000, left: 499.5, percent: 75 });
-  assert.deepEqual(outcome(trip({ budgetMax: 1000, budget, expenses: ex })), { used: 1500.5, max: 1000, left: -500.5, percent: 100 }, "the bar stops at full");
-  assert.deepEqual(outcome(trip({ budget, expenses: ex })), { used: 500.5 });
 });
 
 // REQ: MI-24 expenses are listed by date and then by when they were added, never by amount

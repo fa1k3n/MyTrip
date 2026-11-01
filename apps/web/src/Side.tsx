@@ -4,8 +4,8 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { bookingDates, bookingTimes, kr, shortDate, statusBadge } from "./format.ts";
 import { api, type MailProposal } from "./api.ts";
-import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
-import { amountText, budgetRows, money } from "./budget.ts";
+import { BudgetPlanView, LimitIcon, limitClass } from "./Donut.tsx";
+import { amountText } from "./budget.ts";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
@@ -27,29 +27,22 @@ const Section = ({ title, lock, flag, tint = "", children }: { title: string; lo
   </details>
 );
 
-function Budget({ t, chart, onToggle, edit, part }: { part: LockOf; t: Trip; chart: boolean; onToggle: () => void; edit: (d: EditDlg) => void }) {
-  const { paid, totals, other } = budgetRows(t.budget, t.currency);
-  const label = (i: Trip["budget"][number]) => `${i.note ?? i.category}${i.owner ? ` · ${i.owner}` : ""}`;
-  const row = (i: Trip["budget"][number], est: boolean) => (
-    <div className={`row mid ${est ? "est" : ""}`} key={i.id}>
-      <span>{i.hidden ? <HiddenText /> : <>{label(i)}<TextEye t={t} texts={[i.category, i.note]} /></>}</span>
-      <span className="end">{amountText(i, t.currency)}
-        {!i.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut />}</span>
-    </div>
-  );
-  const sum = totals.map((x) => money(x.sum, x.currency)).join(" + ") || kr(0);
+/** Nåla's budget: the shared card, then the budget items in the category order, each with its edit button (BG-17, BG-20). */
+function Budget({ t, edit, part }: { part: LockOf; t: Trip; edit: (d: EditDlg) => void }) {
+  const label = (i: Trip["budget"][number]) => i.note ?? i.category;
+  const rank = (c: string) => { const i = sv.budgetCategories.indexOf(c); return i < 0 ? sv.budgetCategories.length : i; };
+  const items = [...t.budget].sort((a, b) => rank(a.category) - rank(b.category));
   return (
     <Section title={sv.budget} lock={part("budget")} flag={<LimitIcon t={t} />} tint={limitClass(t)}>
-      <div className="row mid"><span className="ro">{sv.paidSoFar} {sum}</span>
-        <IconButton icon={chart ? "list" : "chart"} label={chart ? sv.showList : sv.showChart} onClick={onToggle} tip="left" /></div>
-      {chart
-        ? <Donut t={t} />
-        : <>
-          {paid.map((i) => row(i, false))}
-          {paid.length > 0 && <div className="row"><b>{sv.paidSoFar.replace(":", "")}</b><b>{sum}</b></div>}
-          {other.map((i) => row(i, true))}
-          <p className="ro note">{sv.budgetNote}</p>
-        </>}
+      <BudgetPlanView t={t}>
+        {items.length > 0 && <div className="bitems"><h4>{sv.plan.items}</h4>{items.map((i) => (
+          <div className="row mid" key={i.id}>
+            <span>{i.hidden ? <HiddenText /> : <>{label(i)}<TextEye t={t} texts={[i.category, i.note]} /><br /><small className="ro">{[i.note && i.category, i.owner].filter(Boolean).join(" · ")}</small></>}</span>
+            <span className="end">{i.paid && !i.estimate && i.amount !== undefined && <span className="badge">{sv.badge.paid}</span>}{amountText(i, t.currency)}
+              {!i.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut />}</span>
+          </div>
+        ))}</div>}
+      </BudgetPlanView>
       <div className="add"><IconButton icon="plus" label={sv.addCost} onClick={() => edit({ kind: "budget" })} mut tip="right" /></div>
     </Section>
   );
@@ -171,14 +164,14 @@ function Packing({ t, run, part, tick }: { part: LockOf; t: Trip; run: Run; tick
 }
 
 /** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
-export default function Side({ t, today, chart, toggleChart, edit, run, onPlace, part: lockOf, parts }: {
+export default function Side({ t, today, edit, run, onPlace, part: lockOf, parts }: {
   part: Part; parts: Record<string, Level>; // the role's levels on Nåla's components (AU-20)
-  t: Trip; today: string; chart: boolean; toggleChart: () => void; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void;
+  t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void;
 }) {
   const part = (id: string) => (parts[id] === "write" ? lockOf(id) : null);
   return <>
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />}
-    {parts.budget !== "hidden" && <Budget part={part} t={t} chart={chart} onToggle={toggleChart} edit={edit} />}
+    {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} />}
     {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}
     {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}

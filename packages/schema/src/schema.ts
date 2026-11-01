@@ -59,6 +59,7 @@ export const Booking = z.object({
 export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional(), hidden: z.boolean().optional() }); // hidden: AU-30
 export const Traveler = z.object({
   id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()),
+  shares: z.boolean().optional(), // false: not among those who share an expense shared by all, e.g. a child (MI-38)
   packed: z.array(z.string()).default([]), // the items in `packing` that are checked (PK-05)
 });
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });

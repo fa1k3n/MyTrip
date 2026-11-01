@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { dayTextWho, textWho, titleHiddenFrom } from "../src/format.ts";
-import { donutSlices } from "../src/budget.ts";
+import { budgetPlan, planSlices } from "../src/budget.ts";
 
 const t = {
   places: [{ id: "park", name: "Lisebergs parkering", address: "Gatan 1" }, { id: "zoo", name: "Zoo", address: "Gatan 2" }],
@@ -27,6 +27,6 @@ test("AU-30 day texts across the trip", () => {
 
 // REQ: AU-30 the budget chart groups hidden budget items as "Dold text"
 test("AU-30 hidden budget items in the chart", () => {
-  const s = donutSlices({ currency: "SEK", budget: [{ category: "", amount: 500, paid: false }, { category: "", amount: 100, paid: false }, { category: "Mat", amount: 300, paid: true }], expenses: [] } as never);
-  assert.deepEqual(s.slices.map((x) => [x.label, x.value]), [["Dold text", 600], ["Mat", 300]]);
+  const s = planSlices(budgetPlan({ currency: "SEK", budget: [{ category: "", amount: 500, paid: false }, { category: "", amount: 100, paid: false }, { category: "Mat", amount: 300, paid: true }], expenses: [] }));
+  assert.deepEqual(s.slices.map((x) => [x.label, x.value]), [["Mat", 300], ["Dold text", 600]]);
 });

@@ -27,6 +27,7 @@ export const kr = (n: number) =>
 
 const dayMonth = (iso: string) => { const p = parts(iso); return `${p.d} ${sv.months[p.m - 1]}`; };
 export const shortDate = (iso: string) => `${dayMonth(iso)} ${parts(iso).y}`;
+export const dayLabel = (iso: string) => `${sv.weekdays[parts(iso).wd]} ${dayMonth(iso)}`; // BG-21
 
 export function tripDates(t: { days: { date: string }[]; dateLabel?: string }) {
   if (t.dateLabel) return t.dateLabel;

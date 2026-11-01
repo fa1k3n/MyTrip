@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { balanceText, balances, budgetVsActual, parseAmount, settle, sharedByValue } from "../src/money.ts";
+import { balanceText, balances, parseAmount, settle, sharedByValue } from "../src/money.ts";
 
 const people = [{ id: "a", name: "Anna" }, { id: "b", name: "Erik" }, { id: "c", name: "Lisa" }];
 
@@ -44,19 +44,6 @@ test("MI-05 settle", () => {
   for (const x of t) { after[x.from] += x.amount; after[x.to] -= x.amount; }
   assert.ok(Object.values(after).every((v) => Math.abs(v) < 0.005));
   assert.deepEqual(settle({ a: 0, b: 0 }), []);
-});
-
-// REQ: MI-07 planned budget against actual expenses per category, with over-plan marked
-test("MI-07 budgetVsActual", () => {
-  const rows = budgetVsActual(
-    [{ category: "Boende", amount: 5200, paid: true }, { category: "Mat/Fritid", amount: 3000, paid: false }],
-    [{ category: "Mat/Fritid", amount: 3100 }, { category: "Boende", amount: 5000 }, { category: "Parkering", amount: 180 }],
-  );
-  assert.deepEqual(rows, [
-    { category: "Boende", planned: 5200, actual: 5000, over: false },
-    { category: "Mat/Fritid", planned: 3000, actual: 3100, over: true },
-    { category: "Parkering", planned: 0, actual: 180, over: true },
-  ]);
 });
 
 // REQ: MI-08 balances are described in words

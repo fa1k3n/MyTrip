@@ -51,3 +51,13 @@ test("DP-10 only the named trips are loaded, and only their links and images", a
   assert.deepEqual(pickTrips(trips, []).map((t) => t.id), ["berlin", "hostlov", "skane"]); // none named: all
   assert.throws(() => pickTrips(trips, ["nope"]), /nope/);
 });
+
+// REQ: DP-02 unknown paths outside /api go to the web files, whose start page answers them (not_found_handling in wrangler.jsonc);
+// unknown paths under /api stay API errors
+test("DP-02 links into the app reach the web files, unknown API paths do not", async () => {
+  const e = { ...env(), ASSETS: { fetch: async (r: Request) => new Response(new URL(r.url).pathname.includes(".") ? "file" : "start page") } };
+  for (const p of ["/berlin", "/trip/berlin/nala", "/x/y/z?q=1"]) assert.equal(await (await worker.fetch(new Request(`https://x.workers.dev${p}`), e)).text(), "start page", p);
+  const api = await worker.fetch(new Request("https://x.workers.dev/api/no-such-thing", { headers: { authorization: "Bearer admin-token-1234" } }), e);
+  assert.equal(api.status, 404);
+  assert.notEqual(await api.text(), "start page");
+});

@@ -17,7 +17,7 @@ import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.t
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
-import { activityCategory, activityExpense, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
+import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
 import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
 import { Gear, IconButton } from "./Icons.tsx";
 
@@ -31,6 +31,7 @@ const WishImage = lazy(() => import("./WishImage.tsx")); // DB-05..DB-08
 const WishView = lazy(() => import("./Dreams.tsx").then((m) => ({ default: m.WishView }))); // DB-15
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 import { newWish, toFill } from "./wishes.ts";
 
 const filling = new Set<string>(); // wishes already sent for an automatic image on this page (DB-07)
@@ -92,7 +93,6 @@ export function App() {
   const [tripId, setTripId] = useState("");
   const [tab, setTab] = useState<Tab>("nala");
   const [open, setOpen] = useState<Open>({});
-  const [chart, setChart] = useState(true);
   const [dlg, setDlg] = useState<Dlg>(null);
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [upDay, setUpDay] = useState<string | null>(null);
@@ -205,7 +205,7 @@ export function App() {
     load();
   };
   const removeTrip = async () => {
-    if (!confirm(sv.confirmDelete)) return;
+    if (!(await ask(sv.confirmDelete))) return;
     await api.remove(tripId); setView("portal"); load();
   };
   const saveDream = (form: HTMLFormElement) => {
@@ -279,7 +279,7 @@ export function App() {
     } else if (kind === "expense") {
       const short = dlg?.kind === "expense" ? dlg.short : undefined, activity = short?.activity; // the short form (UP-22, UP-30, MI-13)
       const payer = self ?? (short?.payer ? str("paidBy") : adder()); // a personal link pays and adds in its own name; the superuser picks who paid in Summera (UP-13, AU-13)
-      const all = t!.travelers.map((x) => x.id);
+      const all = defaultSharers(t!.travelers); // shared by all who share costs (MI-02, MI-38)
       const cur = str("currency") || t!.currency;
       const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
       if (rate === null) return setErr(sv.up.noRate(cur));
@@ -355,14 +355,14 @@ export function App() {
   else page = (
     <TripView
       t={withWaiting(t, waiting) as Trip} waiting={waiting} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
-      cover={covers[t.id]} tab={tab} open={open} chart={chart} forecast={forecast} forecastAt={forecastAt}
+      cover={covers[t.id]} tab={tab} open={open} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
-      jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
+      jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
-      addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
+      addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self}
       memoryBy={self ?? (permsFor(role, t).superuser ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }

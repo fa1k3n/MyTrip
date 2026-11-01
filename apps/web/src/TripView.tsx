@@ -160,11 +160,11 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
 }
 
 export type TripViewProps = {
-  t: Trip; cover?: string; tab: Tab; open: Open; chart: boolean; forecast: Record<string, Forecast>;
-  setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; toggleChart: () => void;
+  t: Trip; cover?: string; tab: Tab; open: Open; forecast: Record<string, Forecast>;
+  setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void;
   place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; back: () => void; admin: () => void;
   today: string; upDay: string | null; setUpDay: (id: string) => void;
-  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }, pick?: { choices: { id: string; text: string; category?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void; addPerson: () => void;
+  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }, pick?: { choices: { id: string; text: string; category?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
@@ -184,6 +184,10 @@ export function TripView(p: TripViewProps) {
   const [miView, setMiView] = useState<MinnasView>(() => minnasView(storedView(), true)); // MI-15
   const shownMi = seesMemories ? miView : "budget";
   const pickMi = (v: MinnasView) => { setMiView(v); keepView(v); };
+  const views = seesMemories && <span className="viewpick" role="group" aria-label={sv.minnas.views}>{/* Upplevt or Pengar, on the right under the tabs (MI-37) */}
+    <IconButton icon="ok" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
+    <IconButton icon="banknote" label={sv.minnas.budget} pressed={shownMi === "budget"} onClick={() => pickMi("budget")} tip="left" />
+  </span>;
   const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)
   const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
@@ -204,14 +208,14 @@ export function TripView(p: TripViewProps) {
           editing={perms.view.nala.plan === "write" && part(`day:${x.id}`).on} toggleLock={perms.view.nala.plan === "write" ? part(`day:${x.id}`).toggle : undefined} />
       ))}</div>
       <div><Suspense fallback={null}>
-        <Side t={t} today={p.today} chart={p.chart} toggleChart={p.toggleChart} edit={p.edit} run={p.run} onPlace={p.place} part={part} parts={perms.view.nala} />
+        <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} part={part} parts={perms.view.nala} />
       </Suspense></div>
     </div>
   </>;
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
-  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Minnas t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
-    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
-    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} self={p.self} /></Suspense>;
+  else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Minnas t={t} addExpense={p.addExpense} addPayment={p.addPayment}
+    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
+    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} views={views || undefined} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} self={p.self} /></Suspense>;
   return <>
     <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}
@@ -226,10 +230,6 @@ export function TripView(p: TripViewProps) {
     </div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1>
-      {tab === "mi" && seesMemories && <span className="viewpick" role="group" aria-label={sv.minnas.views}>{/* Upplevt or Pengar, no second row of tabs (MI-15) */}
-        <IconButton icon="ok" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
-        <IconButton icon="banknote" label={sv.minnas.budget} pressed={shownMi === "budget"} onClick={() => pickMi("budget")} tip="left" />
-      </span>}
       {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
     </div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
     <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <>{t.purpose || sv.noPurpose}<TextEye t={t} texts={[t.purpose]} /></>}</div> {/* AU-30 */}

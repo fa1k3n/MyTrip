@@ -1,13 +1,13 @@
 // Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
 import { useEffect, useState } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
-import { adjacentDay, bookingsOn, budgetStatus, clockIn, dayHeading, pickDay } from "./today.ts";
+import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.ts";
 import { clashes, durationText, nowAt, upDayTime, upTime } from "./upday.ts";
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
 import { geocodeUrl } from "./weather.ts";
 import { guessActivity } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
-import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
+import { BudgetDonut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
 import { ActivityText, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
@@ -16,18 +16,17 @@ import { ticketFor } from "./tickets.ts";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import type { Trip } from "@trip/schema";
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 
 export function Uppleva(p: TripViewProps) {
   const { t } = p;
   const day = t.days.find((d) => d.id === p.upDay) ?? pickDay(t.days, p.today);
   if (!day) return <section className="card"><p className="ro">{sv.noDays}</p></section>;
-  const s = budgetStatus(t.budget, t.expenses);
   const bookings = bookingsOn(t.bookings, day.date);
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
   const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && t.info.length > 0; // practical information as in Nåla (UP-15)
   const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info; // Uppleva's components (AU-20)
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
-  const spent = p.perms.parts.expenses !== "hidden"; // the sum of expenses only when the role may see expenses somewhere
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))]; // UP-14
   const titleWho = titleHiddenFrom(day, t); // AU-29, AU-30
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
@@ -60,17 +59,14 @@ export function Uppleva(p: TripViewProps) {
       </div>
       {side && <div>{/* budget and bookings, if the role may see them (AU-17, AU-21) */}
         {parts.budget !== "hidden" && <section className={`card ${limitClass(t)}`}>
-          <div className="sechead"><h3>{sv.budget}</h3><LimitIcon t={t} big /></div>
-          <Donut t={t} />
-          <div className="row"><span>{sv.paidAhead}</span><span>{kr(s.paid)}</span></div>
-          <div className="row"><span>{sv.leftToPay}</span><span>{kr(s.left)}</span></div>
-          {spent && <div className="row"><span>{sv.spentOnTrip}</span><span>{kr(s.spent)}</span></div>}
-          {p.waiting.map((x) => ( // counted above, marked until the server has them (PW-06, PW-09)
+          <div className="sechead"><h3>{sv.tripBudget}</h3><LimitIcon t={t} big /></div>
+          <BudgetDonut t={t} />{/* UP-45 */}
+          {p.waiting.map((x) => ( // marked until the server has them, with why and Skicka nu (PW-06, PW-09, PW-18)
             <div className="row mid waiting" key={x.expense.id}>
-              <span>{String(x.expense.text ?? "")}<br /><small className={x.state === "failed" ? "over" : "ro"}>{x.state === "failed" ? sv.queue.failed(x.reason ?? "") : sv.queue.waiting}</small></span>
-              <span className="end">{expenseAmountText(x.expense, t.currency)}{x.state === "failed" && <>
-                <IconButton icon="refresh" look="bare" tip="left" label={`${sv.queue.retry}: ${String(x.expense.text ?? "")}`} onClick={() => p.retryWaiting(x.expense.id)} />
-                <IconButton icon="trash" look="bare" tip="left" label={`${sv.queue.remove}: ${String(x.expense.text ?? "")}`} onClick={() => { if (confirm(sv.queue.removeAsk)) p.removeWaiting(x.expense.id); }} /></>}</span>
+              <span>{String(x.expense.text ?? "")}<br /><small className={x.state === "failed" ? "over" : "ro"}>{x.state === "failed" ? sv.queue.failed(x.reason ?? "") : [sv.queue.waiting, x.reason].filter(Boolean).join(". ") /* PW-18 */}</small></span>
+              <span className="end">{expenseAmountText(x.expense, t.currency)}
+                <IconButton icon="refresh" look="bare" tip="left" label={`${x.state === "failed" ? sv.queue.retry : sv.queue.sendNow}: ${String(x.expense.text ?? "")}`} onClick={() => p.retryWaiting(x.expense.id)} />
+                <IconButton icon="trash" look="bare" tip="left" label={`${sv.queue.remove}: ${String(x.expense.text ?? "")}`} onClick={async () => { if (await ask(sv.queue.removeAsk)) p.removeWaiting(x.expense.id); }} /></span>
             </div>
           ))}
           {/* expenses are added from the day, not here (UP-30) */}

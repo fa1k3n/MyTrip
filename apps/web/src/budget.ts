@@ -1,4 +1,4 @@
-// Budget display: amounts in their own currency, paid items with a subtotal per currency (BG-03..BG-08).
+// Budget display: amounts in their own currency (BG-06, BG-07), and plan, utfall and prognos per category (BG-15..BG-19).
 import { sv } from "./sv.ts";
 
 type Item = { amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean };
@@ -14,50 +14,79 @@ export function amountText(i: Item, tripCurrency: string) {
   return i.estimate ? `ca ${text}` : text;
 }
 
-/** Paid items with known amounts, their subtotal per currency, and everything else (estimates, unpaid, unknown). */
-export function budgetRows<T extends Item>(items: T[], tripCurrency: string) {
-  const isPaid = (i: T) => i.paid && !i.estimate && i.amount !== undefined;
-  const paid = items.filter(isPaid), sums = new Map<string, number>();
-  for (const i of paid) {
-    const c = i.currency ?? tripCurrency;
-    sums.set(c, (sums.get(c) ?? 0) + Math.round(i.amount! * 100));
-  }
-  return { paid, totals: [...sums].map(([currency, s]) => ({ currency, sum: s / 100 })), other: items.filter((i) => !isPaid(i)) };
-}
+type Slice = { label: string; value: number; kind: "cat" | "unused" };
 
-type LimitTrip = { currency: string; budgetMax?: number; budget: { amount?: number; currency?: string }[]; expenses: { amount: number }[] };
+type PlanTrip = {
+  currency: string; budgetMax?: number;
+  budget: { category: string; amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean }[];
+  expenses: { category: string; amount: number }[];
+};
+export type PlanRow = { category: string; planned: number; actual: number; forecast: number; spent: number; over: boolean };
 
-/** Planned budget in the trip's currency plus expenses, against the maximum budget: warning from 80 %, over above 100 % (BG-13). */
-export function budgetLimit(t: LimitTrip) {
-  if (!t.budgetMax) return null;
+/** Plan, utfall (paid in advance plus expenses) and prognos per category and in total, in the trip's currency (BG-15), in the order
+ * of MI-30 and then the trip's own (BG-16), against the maximum budget (BG-19). `used`: only categories with an amount (Uppleva, Minnas). */
+export function budgetPlan(t: PlanTrip, used = false) {
   const cents = (n: number) => Math.round(n * 100);
-  const planned = t.budget.filter((i) => !i.currency || i.currency === t.currency).reduce((a, i) => a + cents(i.amount ?? 0), 0);
-  const used = planned + t.expenses.reduce((a, e) => a + cents(e.amount), 0), max = cents(t.budgetMax);
-  const level: "ok" | "near" | "over" = used > max ? "over" : used * 5 >= max * 4 ? "near" : "ok";
-  return { used: used / 100, max: max / 100, percent: Math.round((used / max) * 100), left: (max - used) / 100, level };
-}
-
-type Slice = { label: string; value: number; kind: "cat" | "spent" | "unused" };
-
-/** The donut: planned budget per category in the trip's currency (BG-09); with a maximum also the expenses and the unused part (BG-14). */
-export function donutSlices(t: LimitTrip & { budget: { category: string }[] }) {
-  const cents = (n: number) => Math.round(n * 100);
-  const cats = new Map<string, number>();
-  for (const i of t.budget) if (i.amount !== undefined && (!i.currency || i.currency === t.currency)) {
-    const label = i.category || sv.hiddenText; // a hidden budget item reaches the viewer without its category (AU-30)
-    cats.set(label, (cats.get(label) ?? 0) + cents(i.amount));
+  const rows = new Map<string, { planned: number; actual: number; spent: number }>();
+  for (const c of sv.budgetCategories) rows.set(c, { planned: 0, actual: 0, spent: 0 });
+  const seen = new Set<string>();
+  const row = (c: string) => (seen.add(c), rows.get(c) ?? rows.set(c, { planned: 0, actual: 0, spent: 0 }).get(c)!);
+  for (const i of t.budget) {
+    const r = row(i.category || sv.hiddenText); // a hidden budget item reaches the viewer without its category (AU-30)
+    if (i.currency && i.currency !== t.currency) continue; // listed, not counted (BG-07)
+    r.planned += cents(i.amountMax ?? i.amount ?? 0);
+    if (i.paid && !i.estimate && i.amount !== undefined) r.actual += cents(i.amount);
   }
-  const slices: Slice[] = [...cats].map(([label, v]) => ({ label, value: v, kind: "cat" }));
-  const planned = [...cats.values()].reduce((a, v) => a + v, 0);
-  let used = planned;
-  if (t.budgetMax) {
-    const spent = t.expenses.reduce((a, e) => a + cents(e.amount), 0), max = cents(t.budgetMax);
-    used += spent;
-    if (spent > 0) slices.push({ label: sv.spentOnTrip, value: spent, kind: "spent" });
-    if (max > used) slices.push({ label: sv.unused, value: max - used, kind: "unused" });
+  for (const e of t.expenses) {
+    const r = row(e.category || sv.hiddenText);
+    r.actual += cents(e.amount); r.spent += cents(e.amount);
   }
+  const six = new Set<string>(sv.budgetCategories); // always shown (BG-16)
+  const list: PlanRow[] = [...rows].filter(([c, r]) => six.has(c) || (seen.has(c) && (!used || r.planned > 0 || r.actual > 0))).map(([category, r]) => ({
+    category, planned: r.planned / 100, actual: r.actual / 100, forecast: Math.max(r.planned, r.actual) / 100, spent: r.spent / 100, over: r.actual > r.planned,
+  }));
+  const sum = (k: "planned" | "actual" | "forecast") => [...rows].filter(([c]) => seen.has(c)).reduce((a, [, r]) => a + (k === "forecast" ? Math.max(r.planned, r.actual) : r[k]), 0);
+  const forecast = sum("forecast"), max = t.budgetMax ? cents(t.budgetMax) : undefined;
+  const level: "ok" | "near" | "over" = max === undefined ? "ok" : forecast > max ? "over" : forecast * 5 >= max * 4 ? "near" : "ok";
   return {
-    slices: slices.map((x) => ({ ...x, value: x.value / 100 })),
-    total: slices.reduce((a, x) => a + x.value, 0) / 100, used: used / 100, max: t.budgetMax,
+    rows: list, planned: sum("planned") / 100, actual: sum("actual") / 100, forecast: forecast / 100, level,
+    ...(max !== undefined && { max: max / 100, left: (max - forecast) / 100, percent: Math.round((forecast / max) * 100) }),
   };
+}
+export type BudgetPlan = ReturnType<typeof budgetPlan>;
+
+/** The donut: the prognos per category, with a maximum also the unused part; the centre shows the prognos (BG-18). */
+export function planSlices(p: BudgetPlan) {
+  const slices: Slice[] = p.rows.filter((r) => r.forecast > 0).map((r) => ({ label: r.category, value: r.forecast, kind: "cat" }));
+  if (p.max !== undefined && p.left! > 0) slices.push({ label: sv.unused, value: p.left!, kind: "unused" });
+  return { slices, total: Math.round(slices.reduce((a, x) => a + x.value * 100, 0)) / 100, sum: p.forecast, max: p.max };
+}
+
+type ActivityTrip = { days: { id: string; date: string; activities: { id: string; text: string; hidden?: boolean }[] }[]; expenses: { amount: number; activityId?: string; date?: string }[] };
+export type ActivityRow = { title: string; hidden?: boolean; activityId?: string; sum: number };
+export type DayGroup = { date?: string; dayId?: string; sum: number; rows: ActivityRow[] };
+
+/** The expenses per day and activity, in date and day order, with the day's expenses without an activity last (BG-21). */
+export function byActivity(t: ActivityTrip): DayGroup[] {
+  const cents = (n: number) => Math.round(n * 100);
+  const dayOf = new Map(t.days.flatMap((d) => d.activities.map((a) => [a.id, { d, a }] as const)));
+  const groups = new Map<string, { date?: string; dayId?: string; acts: Map<string, number>; none: number }>();
+  const group = (date?: string) => {
+    const key = date ?? "";
+    if (!groups.has(key)) groups.set(key, { date, dayId: t.days.find((d) => d.date === date)?.id, acts: new Map(), none: 0 });
+    return groups.get(key)!;
+  };
+  for (const e of t.expenses) {
+    const hit = e.activityId ? dayOf.get(e.activityId) : undefined;
+    if (hit) { const g = group(hit.d.date); g.acts.set(hit.a.id, (g.acts.get(hit.a.id) ?? 0) + cents(e.amount)); }
+    else group(e.date).none += cents(e.amount);
+  }
+  return [...groups.values()].sort((a, b) => (a.date ? (b.date ? a.date.localeCompare(b.date) : -1) : 1)).map((g) => {
+    const day = t.days.find((d) => d.id === g.dayId);
+    const rows: ActivityRow[] = (day?.activities ?? []).filter((a) => g.acts.has(a.id))
+      .map((a) => ({ title: a.text, ...(a.hidden ? { hidden: true } : {}), activityId: a.id, sum: g.acts.get(a.id)! / 100 }));
+    if (g.none) rows.push({ title: g.date ? sv.plan.none : sv.plan.noDate, sum: g.none / 100 });
+    const sum = (rows.reduce((s, r) => s + cents(r.sum), 0)) / 100;
+    return { ...(g.date ? { date: g.date } : {}), ...(g.dayId ? { dayId: g.dayId } : {}), sum, rows };
+  });
 }

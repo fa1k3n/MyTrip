@@ -43,8 +43,17 @@ export function keptForecast<F>(c: Copy | null, tripId: string): { days: Record<
 /** An expense on the phone that the server does not have yet (PW-06), or that it rejected, with the reason (PW-09). */
 export type Expense = { id: string; amount: number; [k: string]: unknown };
 export type Waiting = { expense: Expense; state: "waiting" | "failed"; reason?: string };
-/** What sending one expense gave: recorded, no network (try later), or rejected with a reason. */
-export type Sent = { ok: true } | { offline: true } | { failed: string };
+/** What sending one expense gave: recorded, not now (try later, with why: PW-18), or rejected with a reason. */
+export type Sent = { ok: true } | { offline: true; why?: string } | { failed: string };
+
+/** A failed send: no contact, a conflict or a server error waits and says why (PW-18); any other answer rejects it (PW-09). */
+export function sendError(x: unknown): Sent {
+  const status = x instanceof Error && typeof (x as { status?: unknown }).status === "number" ? (x as unknown as { status: number }).status : undefined;
+  if (status === undefined) return { offline: true, why: sv.queue.noContact };
+  if (status === 409 || status >= 500) return { offline: true, why: sv.queue.server(status) };
+  const problems = (x as unknown as { problems?: string[] }).problems ?? [];
+  return { failed: status === 403 ? sv.queue.forbidden : problems.join(" ") || sv.queue.rejected(status) };
+}
 
 const QUEUE = "mytrip.queue.";
 export function loadQueue(s: Store, link: string): Waiting[] {
@@ -72,7 +81,7 @@ export async function flush(q: Waiting[], send: (e: Expense) => Promise<Sent>): 
   for (const x of q) {
     if (stop || x.state === "failed") { out.push(x); continue; }
     const r = await send(x.expense);
-    if ("offline" in r) { stop = true; out.push(x); } else if ("failed" in r) out.push({ ...x, state: "failed", reason: r.failed });
+    if ("offline" in r) { stop = true; out.push(r.why ? { ...x, reason: r.why } : x); } else if ("failed" in r) out.push({ ...x, state: "failed", reason: r.failed });
   }
   return out;
 }

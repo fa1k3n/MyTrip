@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, Trip } from "@trip/schema";
-import { activityCategory, guessActivity, linkChoices, mayRelink, relinkOps } from "../src/money.ts";
+import { activityCategory, guessActivity, linkChoices, mayRelink, mayRemove, relinkOps, removeExpense, removePayment } from "../src/money.ts";
 import { burstLabel } from "../src/celebrate.ts";
 import { sv } from "../src/sv.ts";
 
@@ -20,7 +20,7 @@ test("UP-43 guessing the activity", () => {
   assert.equal(guessActivity(day, "13:10"), "lunch");
   assert.equal(guessActivity(day, "07:00"), undefined, "before the first");
   assert.equal(guessActivity(day, undefined), undefined, "not today");
-  assert.deepEqual([sv.up.applies, sv.up.noActivity], ["Gäller", "Ingen"]);
+  assert.deepEqual([sv.up.applies, sv.up.noActivity], ["Aktivitet", "Ingen"]);
 });
 
 // REQ: UP-43 choosing an activity chooses its category
@@ -76,4 +76,20 @@ test("MI-32 who may change an expense's activity", () => {
   assert.equal(mayRelink(e, { manager: false, self: "bo" }), true);
   assert.equal(mayRelink(e, { manager: false, self: "anna" }), false);
   assert.equal(mayRelink(e, { manager: false }), false);
+});
+
+// REQ: MI-34 removing an expense: only a Planerare or the superuser, and the change removes exactly that expense
+test("MI-34 removeExpense", () => {
+  const t = { expenses: [{ id: "a" }, { id: "b" }] };
+  assert.deepEqual(removeExpense(t, "b"), [{ op: "remove", path: "expenses/1" }]);
+  assert.deepEqual(removeExpense(t, "x"), []);
+  assert.equal(mayRemove({ manager: false }), false, "a traveler, not even their own (AU-13)");
+  assert.equal(mayRemove({ manager: true }), true);
+});
+
+// REQ: MI-35 removing a payment removes exactly that payment
+test("MI-35 removePayment", () => {
+  const t = { payments: [{ id: "a" }, { id: "b" }] };
+  assert.deepEqual(removePayment(t, "b"), [{ op: "remove", path: "payments/1" }]);
+  assert.deepEqual(removePayment(t, "x"), []);
 });

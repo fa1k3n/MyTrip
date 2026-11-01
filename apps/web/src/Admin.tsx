@@ -7,12 +7,14 @@ import { DEFAULT_ACCESS, levelsFor, PAGE_PARTS, PAGES, type Level, type Page } f
 import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
 import { money } from "./budget.ts";
+import { sharesOps } from "./money.ts";
 import { IconButton } from "./Icons.tsx";
 import { qr, qrSvgPath } from "./qr.ts";
 import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 import { svAdmin } from "./sv-admin.ts";
 
 /** AU-04, AU-05, AU-07: the admin login, also shown when a link is missing or no longer valid. */
@@ -92,7 +94,7 @@ function ShareLink({ t }: { t: Trip }) {
   useEffect(() => { api.link(t.id).then((r) => setSecret(r.secret), () => setSecret(null)); }, [t.id]);
   const url = secret ? shareUrl(location.origin, t.id, secret) : "";
   const make = async () => {
-    if (secret && !confirm(svAdmin.share.confirmReplace)) return;
+    if (secret && !(await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace }))) return;
     setSecret((await api.newLink(t.id)).secret);
     setCopied(false);
   };
@@ -126,7 +128,7 @@ function Inbox({ t }: { t: Trip }) {
   useEffect(() => { api.inbox(t.id).then(setBox, () => setBox({ enabled: false })); }, [t.id]);
   if (!box) return null;
   const make = async () => {
-    if (box.address && !confirm(svAdmin.inbox.confirmReplace)) return;
+    if (box.address && !(await ask(svAdmin.inbox.confirmReplace, { ok: sv.askOk.replace }))) return;
     setBox({ enabled: true, address: (await api.newInbox(t.id)).address });
     setCopied(false);
   };
@@ -183,7 +185,7 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
                   onClick={() => setShowQr({ url: personUrl(location.origin, t.id, l.travelerId, l.secret), name: x.name })} />
                 <IconButton icon="copy" look="bare" tip="left" label={svAdmin.people.copy(x.name)} onClick={() => copy(l, x.name)} />
                 <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.people.replace(x.name)}
-                  onClick={async () => { if (confirm(svAdmin.share.confirmReplace)) put(await api.renewPerson(t.id, x.id)); }} />
+                  onClick={async () => { if (await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace })) put(await api.renewPerson(t.id, x.id)); }} />
               </>}
             </span>
           </div>
@@ -192,6 +194,25 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
       <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={add} tip="right" /></div> {/* AU-26, UI-09 */}
       {copied && <p className="ro" role="status">{svAdmin.people.copied(copied)}</p>}
       {showQr && <QrDialog url={showQr.url} name={showQr.name} close={() => setShowQr(null)} />}
+    </div>
+  );
+}
+
+/** Who shares an expense shared by all: a dropdown per traveler, on by default, off for example for children (MI-38). */
+function Sharing({ t, run }: { t: Trip; run: Run }) {
+  if (t.travelers.length < 2) return null;
+  return (
+    <div className="card">
+      <h3>{svAdmin.shares.title}</h3>
+      <p className="ro note">{svAdmin.shares.hint}</p>
+      {t.travelers.map((x) => (
+        <div className="row mid" key={x.id}><span>{x.name}</span>
+          <span className={`rolepick ${x.shares !== false ? "lvl-read" : "lvl-hidden"}`}>{/* the pill dropdowns of the settings page */}
+            <select aria-label={`${svAdmin.shares.title}, ${x.name}`} value={x.shares !== false ? "yes" : "no"}
+              onChange={(e) => run((y) => sharesOps(y, x.id, e.target.value === "yes"), "shares")}>
+              <option value="yes">{svAdmin.shares.yes}</option><option value="no">{svAdmin.shares.no}</option>
+            </select></span></div>
+      ))}
     </div>
   );
 }
@@ -252,7 +273,7 @@ function ImageCache() {
     try {
       const s = await api.endedCache();
       if (!s.images && !s.files) setMsg(sv.wish.cacheEmpty);
-      else if (confirm(sv.wish.cacheAsk(s.images, kb(s.bytes)))) { const r = await api.clearEndedCache(); setMsg(sv.wish.cacheDone(r.images, kb(r.bytes))); }
+      else if (await ask(sv.wish.cacheAsk(s.images, kb(s.bytes)))) { const r = await api.clearEndedCache(); setMsg(sv.wish.cacheDone(r.images, kb(r.bytes))); }
     } catch { setMsg(sv.wish.failed); }
     setBusy(false);
   };
@@ -273,6 +294,7 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
       <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div>
       <div className="row mid"><span>{sv.minnas.albumLabel}: {t.album ? <a href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}</span><IconButton icon="edit" look="bare" tip="left" label={sv.minnas.editAlbum} onClick={() => edit({ kind: "album" })} /></div></div>
     <PeopleLinks t={t} add={addPerson} />
+    <Sharing t={t} run={run} />
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
     <Inbox t={t} />

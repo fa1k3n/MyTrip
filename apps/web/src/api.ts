@@ -1,7 +1,7 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, sendError, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
@@ -96,15 +96,14 @@ export const queue = {
   load: (): Waiting[] => { try { return link ? loadQueue(localStorage, link) : []; } catch { return []; } },
   save: (q: Waiting[]) => { try { if (link) saveQueue(localStorage, link, q); } catch { /* blocked */ } },
 };
-/** One expense to the server. No network, a conflict or a server error: try later; otherwise the reason (PW-07, PW-09). */
+/** One expense to the server. No network, a conflict or a server error: try later and say why; otherwise the reason (PW-07, PW-09, PW-18). */
 async function sendExpense(tripId: string, e: Expense): Promise<Sent> {
   try {
     await call(`${trip(tripId)}/changes`, { method: "POST", signal: AbortSignal.timeout(20_000), // a hanging request must not hold up the queue
       body: JSON.stringify({ baseRevision: 0, ops: [{ op: "add", path: "expenses/-", value: e }], reason: "add expense" }) });
     return { ok: true };
   } catch (x) {
-    if (!(x instanceof ApiError) || x.status === 409 || x.status >= 500) return { offline: true };
-    return { failed: x.status === 403 ? sv.queue.forbidden : x.problems.join(" ") || sv.queue.rejected(x.status) };
+    return sendError(x); // PW-09, PW-18
   }
 }
 let flushing = false;

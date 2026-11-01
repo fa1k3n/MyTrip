@@ -15,7 +15,7 @@ test("UP-42 the expense sheet", () => {
   assert.deepEqual(tiles.map((x) => x.shape), ["bed", "car", "utensils", "ferris", "bag", "ellipsis"]);
   assert.deepEqual(tiles.filter((x) => x.chosen).map((x) => x.name), ["Mat"]);
   assert.deepEqual([sv.up.sheetKicker, sv.newExpense, sv.up.what, sv.up.whatExample, sv.up.saveExpense],
-    ["Utlägg", "Nytt utlägg", "Vad gäller det?", "Till exempel: bensin", "Spara utlägg"]);
+    ["Utlägg", "Nytt utlägg", "Beskrivning", "Till exempel: bensin", "Spara utlägg"]);
 });
 
 // REQ: MI-30 six categories for budget items and expenses, in a fixed order

@@ -19,11 +19,12 @@ import { readBooking } from "@trip/schema/src/mailbooking.ts";
 import { api, type MailProposal } from "./api.ts";
 import { checkPick } from "./tickets.ts";
 import { MAX_NOTE, memoryOps, mineOf, saveAlbum } from "./memories.ts";
-import { linkChoices, relinkOps, splitOps } from "./money.ts";
+import { defaultSharers, linkChoices, relinkOps, splitOps } from "./money.ts";
 import { ActivityAndCategory } from "./ExpenseFields.tsx";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 
 import type { EditDlg } from "./editKinds.ts";
 export type { EditDlg };
@@ -53,7 +54,7 @@ function useSave({ save, close }: Props) {
     setBusy(false);
     if (e) setErr(e); else close(); // ED-10: a rejected change keeps the form open
   };
-  const remove = (ops: Op[], reason: string) => { if (confirm(sv.confirmRemove)) submit({ ok: true, ops }, reason); }; // ED-09
+  const remove = async (ops: Op[], reason: string) => { if (await ask(sv.confirmRemove)) submit({ ok: true, ops }, reason); }; // ED-09
   return { err, busy, submit, remove, setErr };
 }
 
@@ -131,7 +132,7 @@ function MemoryForm(p: Props & { dreamId: string; by: string }) {
 function SplitForm(p: Props & { id: string }) {
   const s = useSave(p);
   const e = p.t.expenses.find((x) => x.id === p.id);
-  const [picked, setPicked] = useState<string[]>(e && e.sharedBy.length ? e.sharedBy : p.t.travelers.map((x) => x.id));
+  const [picked, setPicked] = useState<string[]>(e && e.sharedBy.length ? e.sharedBy : defaultSharers(p.t.travelers) /* MI-38 */);
   const flip = (id: string) => setPicked((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
   return (
     <Form title={sv.minnas.split(e?.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(splitOps(p.t, p.id, picked), "split expense")}>
@@ -160,10 +161,10 @@ function DatesForm(p: Props) {
   const s = useSave(p);
   const r = tripRange(p.t);
   const { f, text } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
-  const submit = () => {
+  const submit = async () => {
     const res = setTripDates(p.t, f);
     const gone = res.ok ? daysOutside(p.t, f.from, f.to) : [];
-    if (gone.length && !confirm([sv.confirmRemoveDays, ...gone.map((d) => `${shortDate(d.date)} ${d.title}`)].join("\n"))) return;
+    if (gone.length && !(await ask(sv.confirmRemoveDays, { details: gone.map((d) => `${shortDate(d.date)} ${d.title}`) }))) return;
     s.submit(res, "trip dates");
   };
   return (
@@ -309,7 +310,7 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
     if (mail && p.approveMail) s.submit(r, "", (ops) => p.approveMail!(mail.id, ops)); // BK-17: saving approves the mail
     else s.submit(r, p.id ? "edit booking" : "add booking");
   };
-  const remove = mail && p.rejectMail ? () => { if (confirm(sv.mail.confirmReject)) p.rejectMail!(mail.id).then(p.close); }
+  const remove = mail && p.rejectMail ? async () => { if (await ask(sv.mail.confirmReject)) p.rejectMail!(mail.id).then(p.close); }
     : p.id ? () => s.remove(removeBooking(p.t, p.id!), "remove booking") : undefined;
   return (
     <Form title={mail ? sv.mail.review : p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close} onSubmit={submit} onRemove={remove}>
@@ -351,7 +352,7 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
           <div className="row mid" key={x.id}>
             <span><Icon name={x.type === "application/pdf" ? "file" : "ticket"} /> {x.name} <small className="ro">{Math.max(1, Math.round(x.size / 1024))} kB</small></span>
             <IconButton icon="trash" look="bare" tip="left" label={sv.tickets.remove(x.name)}
-              onClick={() => { if (confirm(sv.tickets.confirmRemove)) setF((o) => ({ ...o, files: (o.files ?? []).filter((y) => y.id !== x.id) })); }} />
+              onClick={async () => { if (await ask(sv.tickets.confirmRemove)) setF((o) => ({ ...o, files: (o.files ?? []).filter((y) => y.id !== x.id) })); }} />
           </div>
         ))}
         <input ref={pick} type="file" hidden multiple accept="application/pdf,image/*" onChange={(e) => addFiles(e.target.files)} />

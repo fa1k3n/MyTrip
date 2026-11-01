@@ -25,14 +25,14 @@ export const sv = {
     noteHint: "Bara planerarna ser kommentarerna, utan namn.", dream: "Önskan", noDream: "Ingen önskan",
     tooLong: (n: number) => `Högst ${n} tecken.`,
     albumLabel: "Länk till delat album", noAlbum: "Ingen", editAlbum: "Ändra länken till albumet", albumHint: "En https-adress till ett album ni delar. Lämna tomt för att ta bort den.", badAlbum: "Ange en adress som börjar med https://.",
-    outcome: "Utfall", used: (used: string, max: string) => `${used} av ${max}`, left: (s: string) => `${s} kvar`, over: (s: string) => `${s} över`,
-    spent: "Utlägg totalt",
     relink: (text: string) => `Ändra vilken aktivitet ${text} gäller`, relinkTitle: "Gäller", relinkGone: "Utlägget eller aktiviteten finns inte längre.", // MI-32
+    remove: (text: string) => `Ta bort utlägget ${text}`, removeAsk: (text: string) => `Ta bort utlägget ”${text}”? Det går inte att ångra.`, // MI-34
+    removePayment: (s: string) => `Ta bort inbetalningen ${s}`, removePaymentAsk: (s: string) => `Ta bort inbetalningen ${s}? Det går inte att ångra.`, // MI-35
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",
   },
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
-    applies: "Gäller", noActivity: "Ingen", // UP-43, MI-32
-    sheetKicker: "Utlägg", what: "Vad gäller det?", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
+    applies: "Aktivitet", noActivity: "Ingen", // UP-43, MI-32
+    sheetKicker: "Utlägg", what: "Beskrivning", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
     now: "Nu",
     place: "Visa platsen",
     expenseTitle: (name: string) => `Nytt utlägg för ${name}`, shortText: "Kort beskrivning (valfri)", shortTextNeeded: "Kort beskrivning",
@@ -42,21 +42,22 @@ export const sv = {
   },
   today: "Idag", startsToday: "börjar idag", noBookingsToday: "Inga bokningar den här dagen.",
   noActivities: "Inga aktiviteter inlagda.", noDays: "Resan har inga dagar ännu. Lägg in dem under Nåla.",
-  planned: "Planerat", paidAhead: "Betalt i förväg", leftToPay: "Kvar att betala", spentOnTrip: "Utlägg under resan",
+  spentOnTrip: "Utlägg under resan",
   balance: "Saldo", owedBack: "får tillbaka", owes: "ska betala", even: "kvitt", settleUp: "Förslag på betalningar", allEven: "Alla är kvitt.",
   register: "Registrera betalning:", expenses: "Utlägg", addExpense: "Lägg till utlägg", newExpense: "Nytt utlägg", noExpenses: "Inga utlägg ännu.",
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
   payments: "Inbetalningar", addPayment: "Registrera inbetalning", newPayment: "Ny inbetalning", noPayments: "Inga inbetalningar ännu.",
   from: "Från", to: "Till", note: "Notering",
   addPerson: "Lägg till person", newPerson: "Ny person", name: "Namn", noPeople: "Lägg till personerna som delar på kostnaderna.",
-  budgetVsActual: "Budget mot utfall", of: "av", overPlan: "över plan", sum: "Summa", badAmount: "Ange ett belopp större än noll, t.ex. 640,50.",
+  of: "av", overPlan: "över plan", badAmount: "Ange ett belopp större än noll, t.ex. 640,50.",
   budgetCategories: ["Boende", "Transport", "Mat", "Upplevelse", "Shopping", "Övrigt"], // MI-30
   expandAll: "Visa alla dagar", collapseAll: "Fäll ihop alla", travelTime: "restid på dagen",
-  bookings: "Bokningar", budget: "Budget", paidSoFar: "Betalt hittills:", showList: "Visa lista", showChart: "Visa diagram",
+  bookings: "Bokningar", budget: "Budget", tripBudget: "Resans budget", // UP-45: the whole trip, not the day
+  plan: { planned: "Plan", actual: "Utfall", forecast: "Prognos", max: "Max", left: "Kvar", over: "Över max", byActivity: "Utlägg per dag", none: "Utan aktivitet", noDate: "Utan datum", items: "Budgetposter" }, // BG-17, BG-20, BG-21
   budgetChart: "Budget per kategori", total: "totalt",
   budgetMax: "Maxbudget", editBudgetMax: "Ändra maxbudget", noBudgetMax: "Ingen maxbudget",
-  budgetMaxHint: "Planerad budget plus utlägg under resan jämförs med maxbudgeten. Lämna tomt för att ta bort den.",
-  unused: "Oanvänt", // BG-14
+  budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",
+  unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   fullApp: "Öppna hela appen i Safari", // PW-15
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
@@ -78,7 +79,8 @@ export const sv = {
     approve: (text: string) => `Godkänn ${text}`, reject: (text: string) => `Avvisa ${text}`, rejectAsk: (text: string) => `Avvisa och ta bort ${text}?`,
   },
   queue: { // PW-06, PW-09
-    waiting: "Ej skickat", failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
+    waiting: "Ej skickat", noContact: "Ingen kontakt med servern.", server: (n: number) => `Servern svarade ${n}.`, sendNow: "Skicka nu", // PW-18
+    failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
     removeAsk: "Ta bort utlägget? Det har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot det (${status}).`,
   },
   offline: { // PW-04, PW-10
@@ -116,7 +118,8 @@ export const sv = {
     web: ["Söka på webben", "Öppettider, adresser och telefonnummer till platser"],
     location: ["Använda min plats", "Visa önskningar i närheten under resan"],
   },
-  remove: "Ta bort", confirmRemove: "Ta bort? Det går inte att ångra.", couldNotSave: "Kunde inte spara.",
+  remove: "Ta bort", askOk: { replace: "Byt", reject: "Avvisa" }, // UI-11
+  confirmRemove: "Ta bort? Det går inte att ångra.", couldNotSave: "Kunde inte spara.",
   conflict: "Resan ändrades samtidigt av någon annan. Den är nu uppdaterad, försök igen.", edit: "Ändra",
   tripDetails: "Resan", tripDates: "Datum", editDates: "Ändra datum", firstDay: "Första dagen", lastDay: "Sista dagen",
   datesHint: "Nya datum får en tom dag. Dagar utanför datumen tas bort.", confirmRemoveDays: "Dessa dagar tas bort:",
@@ -176,7 +179,7 @@ export const sv = {
   noBreaks: "Tiderna är uppskattningar utan pauser.", openRoute: "Öppna rutten i Google Maps",
   vehicleNames: { "🚗": "Bil", "🚢": "Färja", "🚆": "Tåg", "🚇🚶": "Kollektivtrafik och promenad" } as Record<string, string>,
   estimateLabel: "Uppskattning", amountMax: "Upp till (för ett intervall)", currency: "Valuta", currencies: ["SEK", "EUR", "DKK", "NOK", "USD", "GBP"],
-  description: "Beskrivning", budgetNote: "Grå rader är uppskattningar eller saknar belopp och räknas inte in i Betalt hittills.",
+  description: "Beskrivning",
   errors: {
     title: "Ange en titel.", date: "Ange ett datum.", dateTaken: "Det finns redan en dag med det datumet.",
     summary: "Skriv en kort sammanfattning av dagen.", icons: "Ange en eller två ikoner, t.ex. 🚗🏛️.",

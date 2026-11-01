@@ -5,6 +5,7 @@ import type { Op, Trip } from "@trip/schema";
 import { api, type WishCredit } from "./api.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 import { cardImage, removeImage, wishUrl } from "./wishes.ts";
 import { WishPicture } from "./Dreams.tsx";
 import { shrinkPhoto } from "./photo.ts";
@@ -49,7 +50,7 @@ export default function WishImage({ t, id, change, done }: { t: Trip; id: string
     <form onSubmit={(e) => { e.preventDefault(); find(); }}>
       <h3>{sv.wish.image(w.title)}</h3>
       {now && <div className="wishnow"><WishPicture tripId={t.id} file={now.file} whole={now.whole} />
-        <IconButton icon="trash" look="red" tip="left" label={sv.wish.remove} onClick={() => { if (confirm(sv.wish.removeAsk)) act(sv.wish.remove, () => change(removeImage(i), "remove wish image")); }} /></div>}
+        <IconButton icon="trash" look="red" tip="left" label={sv.wish.remove} onClick={async () => { if (await ask(sv.wish.removeAsk)) act(sv.wish.remove, () => change(removeImage(i), "remove wish image")); }} /></div>}
       <p className="ro note">{sv.wish.hint}</p>
       <div className="lblrow"><label>{sv.wish.query}<input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus /></label>
         <button className="btn" type="submit" disabled={!!busy || !query.trim()}>{busy === sv.wish.finding ? busy : sv.wish.find}</button></div>

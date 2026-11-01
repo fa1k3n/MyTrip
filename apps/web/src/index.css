@@ -22,7 +22,21 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .trip{cursor:pointer;text-align:left;border:0;display:block;width:100%}
 .new{border:2px dashed var(--acc);background:transparent;box-shadow:none;color:var(--acct);font-weight:600;display:flex;align-items:center;justify-content:center;min-height:110px}
 .donutbox{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
-.legend div{display:flex;gap:8px;align-items:center;font-size:.9rem}.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.bplan .donutbox{gap:12px 20px;margin-bottom:12px;flex-wrap:nowrap}
+.btot{display:grid;grid-template-columns:1fr auto;gap:4px 18px;margin:0 0 4px;padding-top:10px;border-top:1px solid var(--line)}.btot div{display:contents}
+.btot dt{color:var(--mute)}.btot dd{margin:0;text-align:right;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
+.bacts h4,.bitems h4{margin:16px 0 4px;font-size:.95rem}
+.bcat{display:block;padding:9px 0;border-top:1px solid var(--line)}
+.bline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex:1}.bline>span:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bcat>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px}.bcat>summary::-webkit-details-marker{display:none}
+.bcat>summary::after{content:"";width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin:-4px 4px 0 0}
+.bcat[open]>summary::after{transform:rotate(225deg);margin:4px 4px 0 0}
+.bcat>summary:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.bcat>.row{margin-left:18px;margin-right:23px}.bcat>.row:last-child{border-bottom:0}
+.blegend{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:.9rem}.blegend li{display:flex;align-items:center;gap:8px}
+.blegend i{width:10px;height:10px;border-radius:50%;display:inline-block}.blegend i.unused{box-shadow:inset 0 0 0 1px var(--mute)}
+.blegend.sums{flex:1;min-width:0;max-width:280px}.blegend.sums span{margin-left:auto;padding-left:16px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.asklist{margin:0 0 12px;padding-left:20px}
 .manifest{font-family:Fraunces,Georgia,serif;font-size:1.1rem;line-height:1.7;padding:22px;border-left:5px solid var(--acc)}
 .tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;background:var(--bg);padding:8px 0;margin-bottom:8px}
 .tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px;font-weight:600}
@@ -230,7 +244,6 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .limiticon.near{color:var(--cautionT)}
 .limiticon.big svg{width:22px;height:22px;stroke-width:2.2}
 .sechead{display:flex;align-items:center;margin-bottom:8px}.sechead h3{margin:0}
-.legend i.unused{box-shadow:inset 0 0 0 1px var(--mute)}
 /* Who is looking, in the header: the traveler coloured by permission (Resenär sage, Planerare terracotta), or Följare in grey (AU-16). */
 .topend{display:flex;align-items:center;gap:10px}
 .who{display:inline-flex;align-items:center;min-height:32px;padding:2px 14px;border-radius:16px;border:1.5px solid;font-weight:700}
@@ -374,7 +387,7 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
 .upbtns .btn.icon,.upbtns .btn.icon.bare,.upbtns .btn.icon:hover,.upbtns .btn.icon.bare:hover{background:var(--upbtn)}
 @media (max-width:399px){.wxs.big{display:flex;flex-wrap:wrap;gap:4px 14px}} /* narrow phones: the day's weather may take two rows (RS-10) */
 /* Minnas (MI-15..MI-29): Upplevt and Pengar, verdicts on wishes, comments and a calm outcome bar, never red. */
-.viewpick{display:inline-flex;gap:6px;flex:0 0 auto} /* Upplevt or Pengar in the title row (MI-15) */
+.viewpick{display:inline-flex;gap:6px;flex:0 0 auto}.vhead .viewpick{margin-left:10px} /* Upplevt or Pengar on the right under the tabs (MI-37) */
 .vhead{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;margin:4px 0 10px}.vhead h2{font-size:1.3rem}
 .verdicts{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-top:12px}.verdict{position:relative;display:inline-flex}
 .verdict>[role=img]{color:var(--acct);cursor:default}

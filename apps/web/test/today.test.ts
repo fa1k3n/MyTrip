@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bookingsOn, budgetStatus, dayHeading, defaultTab, pickDay, todayIn } from "../src/today.ts";
+import { bookingsOn, dayHeading, defaultTab, pickDay, todayIn } from "../src/today.ts";
 
 const days = [{ id: "d1", date: "2026-10-24" }, { id: "d2", date: "2026-10-25" }, { id: "d4", date: "2026-10-28" }];
 
@@ -45,10 +45,4 @@ test("UP-05 bookingsOn", () => {
   assert.deepEqual(bookingsOn([...b], "2026-10-26").map((x) => [x.id, x.startsToday]), [["hotel", false]]);
   assert.deepEqual(bookingsOn([...b], "2026-10-28").map((x) => [x.id, x.startsToday]), [["hotel", false], ["ferry", true]]);
   assert.deepEqual(bookingsOn([...b], "2026-10-25").map((x) => [x.id, x.startsToday]), [["hotel", true]]);
-});
-
-// REQ: UP-06 budget status: planned, paid in advance, left to pay, spent during the trip
-test("UP-06 budgetStatus", () => {
-  const budget = [{ amount: 5200, paid: true }, { amount: 1900, paid: false }, { amount: 600, paid: true }];
-  assert.deepEqual(budgetStatus(budget, [{ amount: 640 }, { amount: 180 }]), { planned: 7700, paid: 5800, left: 1900, spent: 820 });
 });

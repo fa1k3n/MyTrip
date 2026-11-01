@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, Trip } from "@trip/schema";
-import { budgetLimit } from "../src/budget.ts";
 import { saveBudgetMax } from "../src/edit.ts";
 import { newExpense, pickAdder } from "../src/money.ts";
 
@@ -22,16 +21,6 @@ test("BG-12 saveBudgetMax", () => {
   assert.equal(Trip.parse(applyOps(trip({ budgetMax: 15000 }), clear.ok ? clear.ops : [])).budgetMax, undefined);
   assert.deepEqual(saveBudgetMax(trip(), ""), { ok: true, ops: [] }); // nothing to clear
   assert.equal(saveBudgetMax(trip(), "mycket").ok, false);
-});
-
-// REQ: BG-13 planned budget in the trip currency plus expenses, compared with the maximum: warning from 80 %, stronger above it
-test("BG-13 budgetLimit", () => {
-  const exp = (amount: number) => [{ id: "e", text: "x", category: "Övrigt", amount, paidBy: "anna", sharedBy: [] }];
-  assert.equal(budgetLimit(trip(), ), null);
-  assert.deepEqual(budgetLimit(trip({ budgetMax: 10000, expenses: exp(500) })), { used: 7500, max: 10000, percent: 75, left: 2500, level: "ok" });
-  assert.equal(budgetLimit(trip({ budgetMax: 10000, expenses: exp(1000) }))!.level, "near"); // exactly 80 %
-  assert.equal(budgetLimit(trip({ budgetMax: 10000, expenses: exp(3000) }))!.level, "near"); // at the maximum, not over it
-  assert.deepEqual(budgetLimit(trip({ budgetMax: 10000, expenses: exp(3200.5) })), { used: 10200.5, max: 10000, percent: 102, left: -200.5, level: "over" });
 });
 
 // REQ: UP-13 the expense records who added it and when; the remembered choice is used when that traveler still exists

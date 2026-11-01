@@ -1,11 +1,10 @@
 // Shared costs for Summera. All sums are done in whole öre so balances add up to exactly zero (MI-04).
 import type { Op } from "@trip/schema";
 import { kr } from "./format.ts";
-import { budgetLimit } from "./budget.ts";
 import { sv } from "./sv.ts";
 import { activityEnd, toMin } from "./time.ts";
 
-type Person = { id: string };
+type Person = { id: string; shares?: boolean };
 type ExpenseLike = { amount: number; paidBy: string; sharedBy: string[] };
 type PaymentLike = { from: string; to: string; amount: number };
 export type Transfer = { from: string; to: string; amount: number };
@@ -18,15 +17,35 @@ export function parseAmount(s: string) {
   return /^\d+(\.\d{1,2})?$/.test(t) && Number(t) > 0 ? Number(t) : NaN;
 }
 
-/** Everyone selected is stored as [] so that travelers added later share it too (MI-02). */
-export const sharedByValue = (selected: string[], all: string[]) =>
-  all.every((id) => selected.includes(id)) ? [] : all.filter((id) => selected.includes(id));
+/** Those who share an expense shared by all: the travelers who share costs, or everyone if nobody does (MI-38). */
+export function defaultSharers(people: Person[]) {
+  const on = people.filter((p) => p.shares !== false).map((p) => p.id);
+  return on.length ? on : people.map((p) => p.id);
+}
+
+/** Exactly those who share by default is stored as [] so that travelers added later share it too (MI-02, MI-38); anything else
+ * as the chosen travelers in the order of `all`. */
+export const sharedByValue = (selected: string[], defaults: string[], all = defaults) =>
+  defaults.length === new Set(selected).size && defaults.every((id) => selected.includes(id)) ? [] : all.filter((id) => selected.includes(id));
+
+/** Who shares an expense, as Pengar says it: "alla" when everyone does, else the names (MI-38). */
+export function sharersText(sharedBy: string[], people: Person[], name: (id: string) => string) {
+  const ids = sharedBy.length ? sharedBy : defaultSharers(people);
+  return ids.length === people.length && !sharedBy.length ? sv.everyone : ids.map(name).join(", ");
+}
+
+/** Turning "Delar på kostnader" on or off for a traveler; on is stored as no value (MI-38). */
+export function sharesOps(t: { travelers: Person[] }, id: string, on: boolean): Op[] {
+  const i = t.travelers.findIndex((p) => p.id === id);
+  if (i < 0 || (t.travelers[i].shares !== false) === on) return [];
+  return [on ? { op: "remove", path: `travelers/${i}/shares` } : { op: "set", path: `travelers/${i}/shares`, value: false }];
+}
 
 /** Positive: the traveler gets money back. Negative: the traveler owes money. */
 export function balances(people: Person[], expenses: ExpenseLike[], payments: PaymentLike[]) {
   const b: Record<string, number> = Object.fromEntries(people.map((p) => [p.id, 0]));
   for (const e of expenses) {
-    const sharers = e.sharedBy.length ? e.sharedBy : people.map((p) => p.id);
+    const sharers = e.sharedBy.length ? e.sharedBy : defaultSharers(people); // MI-38
     const total = ore(e.amount), each = Math.floor(total / sharers.length);
     b[e.paidBy] = (b[e.paidBy] ?? 0) + total;
     sharers.forEach((id, i) => { b[id] = (b[id] ?? 0) - each - (i < total - each * sharers.length ? 1 : 0); });
@@ -52,15 +71,6 @@ export function settle(bal: Record<string, number>): Transfer[] {
   }
 }
 
-/** Planned budget against actual expenses per category, in first-seen order (MI-07). */
-export function budgetVsActual(budget: { category: string; amount?: number; paid?: boolean }[], expenses: { category: string; amount: number }[]) {
-  const rows = new Map<string, { category: string; planned: number; actual: number; over: boolean }>();
-  const row = (c: string) => rows.get(c) ?? rows.set(c, { category: c, planned: 0, actual: 0, over: false }).get(c)!;
-  for (const b of budget) row(b.category).planned += ore(b.amount ?? 0);
-  for (const e of expenses) row(e.category).actual += ore(e.amount);
-  return [...rows.values()].map((r) => ({ ...r, planned: r.planned / 100, actual: r.actual / 100, over: r.actual > r.planned }));
-}
-
 export const balanceText = (v: number) =>
   Math.abs(v) < 0.005 ? sv.even : v > 0 ? `${sv.owedBack} ${kr(v)}` : `${sv.owes} ${kr(-v)}`;
 
@@ -79,7 +89,7 @@ export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date
   const amount = parseAmount(input.amount);
   if (!input.text.trim()) return { ok: false, error: sv.errors.expenseText };
   if (Number.isNaN(amount)) return { ok: false, error: sv.badAmount }; // MI-03
-  const sharedBy = sharedByValue(input.sharedBy, t.travelers.map((x) => x.id));
+  const sharedBy = sharedByValue(input.sharedBy, defaultSharers(t.travelers), t.travelers.map((x) => x.id)); // MI-38
   return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, ...(input.activityId ? { activityId: input.activityId } : {}), ...converted(amount, input.foreign), addedBy: input.addedBy, addedAt: at } }] };
 }
 
@@ -118,13 +128,13 @@ const at = (t: { expenses: { id: string }[] }, id: string) => t.expenses.findInd
 /** Approving removes the mark; rejecting removes the expense (MI-11). */
 export const approveExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}/pending` }]);
 export const rejectExpense = (t: { expenses: { id: string }[] }, id: string): Op[] => (at(t, id) < 0 ? [] : [{ op: "remove", path: `expenses/${at(t, id)}` }]);
-
-/** The outcome against the maximum budget as in BG-13, the bar stopping at full; without a maximum the expenses' sum (MI-23). */
-export function outcome(t: Parameters<typeof budgetLimit>[0]): { used: number; max?: number; left?: number; percent?: number } {
-  const l = budgetLimit(t);
-  if (!l) return { used: t.expenses.reduce((a, e) => a + ore(e.amount), 0) / 100 };
-  return { used: l.used, max: l.max, left: l.left, percent: Math.min(100, l.percent) };
-}
+/** Removing a wrong or doubly entered expense (MI-34). */
+export const removeExpense = rejectExpense;
+/** Removing a wrong payment (MI-35). */
+export const removePayment = (t: { payments: { id: string }[] }, id: string): Op[] => {
+  const i = t.payments.findIndex((p) => p.id === id);
+  return i < 0 ? [] : [{ op: "remove", path: `payments/${i}` }];
+};
 
 /** Expenses by date, then by when they were added, never by amount (MI-24). */
 export const byDate = <E extends { date?: string; addedAt?: string }>(expenses: E[]) =>
@@ -135,7 +145,7 @@ export function splitOps(t: { travelers: Person[]; expenses: { id: string }[] },
   const i = at(t, id);
   if (i < 0) return { ok: false, error: sv.errors.expenseText };
   if (!selected.some((s) => t.travelers.some((x) => x.id === s))) return { ok: false, error: sv.minnas.splitNeeded };
-  return { ok: true, ops: [{ op: "set", path: `expenses/${i}/sharedBy`, value: sharedByValue(selected, t.travelers.map((x) => x.id)) }] };
+  return { ok: true, ops: [{ op: "set", path: `expenses/${i}/sharedBy`, value: sharedByValue(selected, defaultSharers(t.travelers), t.travelers.map((x) => x.id)) }] };
 }
 
 const TILE_SHAPES: Record<string, string> = { Boende: "bed", Transport: "car", Mat: "utensils", Upplevelse: "ferris", Shopping: "bag" };
@@ -179,6 +189,7 @@ export function linkChoices(t: { days: Day[] }, e: { date?: string; activityId?:
 
 /** A Planerare and the superuser change every expense's activity, a traveler only their own (MI-32). */
 export const mayRelink = (e: { addedBy?: string }, who: { manager: boolean; self?: string }) => who.manager || (!!who.self && e.addedBy === who.self);
+export const mayRemove = (who: { manager: boolean }) => who.manager; // MI-34: travelers may not remove expenses (AU-13)
 
 /** Moving an expense to another activity, or none, with the category confirmed in the same step (MI-32). */
 export function relinkOps(t: { days: Day[]; expenses: { id: string; activityId?: string; category: string }[] }, id: string, activityId: string, category: string): { ok: true; ops: Op[] } | { ok: false; error: string } {

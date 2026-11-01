@@ -1,7 +1,8 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type DragEvent } from "react";
+import { WISH_DRAG } from "./drag.ts";
 import type { Op, Trip } from "@trip/schema";
-import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
+import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
 import { stampText, type Waiting } from "./offline.ts";
 import type { Result } from "./edit.ts";
@@ -17,6 +18,9 @@ const Minnas = lazy(() => import("./Minnas.tsx").then((m) => ({ default: m.Minna
 const Side = lazy(() => import("./Side.tsx"));
 const Dreams = lazy(() => import("./Dreams.tsx"));
 const PlanActivities = lazy(() => import("./Plan.tsx")); // edit mode only (ED-16)
+const Proposals = lazy(() => import("./Proposals.tsx")); // MC-15
+const PreviewActivities = lazy(() => import("./Proposals.tsx").then((m) => ({ default: m.PreviewActivities }))); // MC-17
+import type { DayMarks, Preview } from "./Proposals.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { anyWrite, type Perms } from "./access.ts";
 import { atLeast } from "@trip/schema/src/rules.ts";
@@ -92,11 +96,14 @@ const kindIcon = { stay: "bed", ticket: "ticket", other: "file", transport: "fil
 export const TicketButton = ({ b, edit }: { b: Trip["bookings"][number]; edit?: (d: EditDlg) => void }) =>
   edit && hasTickets(b) ? <IconButton icon="ticket" look="bare" tip="left" label={`${sv.tickets.show}: ${b.name}`} onClick={() => edit({ kind: "tickets", bookingId: b.id })} /> : null;
 
+/** The pin of a fixed activity, for those who only read the plan (ED-24). */
+export const PinMark = () => <span className="pinmark" role="img" aria-label={sv.pin.mark} title={sv.pin.mark}><Icon name="pin" /></span>;
+
 export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
   const who = hiddenFromIn(x);
   return <>{x.activities.map((a) => (
     <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`} key={a.id}>
-      <ActivityWhen a={a} />
+      <ActivityWhen a={a} />{a.pinned && <PinMark />}
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />
       {(() => { const b = ticketFor(t, a.id); return b && <TicketButton b={b} edit={edit} />; })() /* BK-08 */}
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
@@ -116,20 +123,28 @@ export function Weather({ forecast, big }: { forecast?: Forecast; big?: boolean 
   );
 }
 
-/** The lock of one part of Nåla (ED-18). */
-export const PartLock = ({ on, part, toggle, tip = "left" }: { on: boolean; part: string; toggle: () => void; tip?: "left" | "right" }) =>
-  <span className="partlock"><IconButton icon={on ? "unlock" : "lock"} look="bare" tip={tip} label={unlockLabel(on, part)} onClick={toggle} pressed={on} /></span>;
-
-function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, toggleLock, run }: {
+function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, run, marks }: {
+  marks?: DayMarks | null; // set: the day as a proposal would leave it, read only; null: unchanged by it (MC-17)
   t: Trip; x: Day; today: boolean; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
-  editing: boolean; toggleLock?: () => void; run: Run; // no toggleLock: the role may not change the plan (AU-21)
+  editing: boolean; run: Run; // editing: the role may change the plan, with no lock (ED-21, AU-21)
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
   const hid = [...new Set([...hiddenFromIn(x).values()].flat())]; // a closed day shows an eye for its hidden activities (AU-25)
   const titleWho = titleHiddenFrom(x, t); // a title that resembles one has the eye instead, opening the same list (AU-29)
   const sumWho = x.hiddenSummary ? [] : dayTextWho(t, x, x.summary); // AU-30
+  const [hover, setHover] = useState(false); // a wish is dragged over the day (DB-17)
+  const wishOver = (e: DragEvent) => editing && e.dataTransfer.types.includes(WISH_DRAG);
   return (
-    <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"}`} id={`day-${x.id}`}>
+    <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"} ${hover ? "dropday" : ""}`} id={`day-${x.id}`}
+      onDragOver={(e) => { if (wishOver(e)) { e.preventDefault(); setHover(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHover(false); }} onDropCapture={() => setHover(false)}
+      onDrop={(e) => { // a drop among the open day's activities is placed there (Plan.tsx); elsewhere on the day it lands last
+        setHover(false);
+        const wish = e.dataTransfer.getData(WISH_DRAG);
+        if (!editing || !wish) return;
+        e.preventDefault();
+        import("./schedule.ts").then((m) => run((cur) => m.planWish(cur, wish, x.id), "plan wish")); // loaded on demand (PF-01)
+      }}>
       {/* The whole header toggles on click; the title is the keyboard control (DC-09). The clock opens transport and does not toggle (TM-04). */}
       <div className="hd" onClick={onToggle}>
         <div className="dcol"><div className="date"><b>{badge.d}</b><span>{badge.w}</span></div><Weather forecast={forecast} /></div>
@@ -145,11 +160,12 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
       {open && (
         <div className="tools">
           <IconButton icon="edit" look="bare" tip="left" label={sv.editDay} onClick={() => edit({ kind: "day", id: x.id })} mut />
-          {toggleLock && <PartLock on={editing} part={dayTitle(x)} toggle={toggleLock} />}
         </div>
       )}
       <div className="body">
-        {editing
+        {marks !== undefined
+          ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} />}><PreviewActivities t={t} x={x} m={marks ?? undefined} onPlace={onPlace} /></Suspense>
+          : editing
           ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} edit={edit} />}><PlanActivities t={t} x={x} onPlace={onPlace} edit={edit} run={run} /></Suspense>
           : <Activities t={t} x={x} onPlace={onPlace} edit={edit} />}
         <div className="add"><IconButton icon="plus" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut tip="right" /></div> {/* UI-09 */}
@@ -166,7 +182,6 @@ export type TripViewProps = {
   today: string; upDay: string | null; setUpDay: (id: string) => void;
   addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }, pick?: { choices: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
   edit: (d: EditDlg) => void; run: Run;
-  unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
@@ -176,6 +191,7 @@ export type TripViewProps = {
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
   memoryBy?: string; setMemoryBy?: (id: string) => void; // whose hearts and sentences in Minnen (MI-17)
   waiting: Waiting[]; sending: boolean; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
+  review?: { approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void> }; // proposals from an LLM client (MC-18)
 };
 
 export function TripView(p: TripViewProps) {
@@ -189,9 +205,11 @@ export function TripView(p: TripViewProps) {
     <IconButton icon="memories" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
     <IconButton icon="banknote" label={sv.minnas.budget} pressed={shownMi === "budget"} onClick={() => pickMi("budget")} tip="left" />
   </span>;
-  const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)
-  const part = (id: string) => ({ on: isUnlocked(p.unlock, id), toggle: () => p.setUnlock(toggleUnlock(p.unlock, id)) });
-  const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
+  const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise each part of Nåla follows the role's level, with no locks (ED-21)
+  const [preview, setPreview] = useState<Preview | null>(null); // a proposal shown in the plan (MC-17)
+  useEffect(() => { setPreview(null); }, [tab, t.revision]);
+  const reviews = !!p.review && (perms.superuser || p.who?.role === "planner"); // MC-19
+  const days = [...(preview?.next ?? t).days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
   let main;
   if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })} /></Suspense>;
@@ -202,14 +220,15 @@ export function TripView(p: TripViewProps) {
     <div className="bar top0">
       <IconButton icon={anyOpen(p.open) ? "collapse" : "expand"} label={toggleAllLabel(p.open)} onClick={p.toggleAll} tip="right" />
     </div><div style={{ height: 10 }}></div>
+    {reviews && <Suspense fallback={null}><Proposals t={t} approve={p.review!.approve} reject={p.review!.reject} preview={preview} setPreview={setPreview} /></Suspense>}
     <div className="cols">
       <div>{days.map((x) => (
-        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id]} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
-          onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run}
-          editing={perms.view.nala.plan === "write" && part(`day:${x.id}`).on} toggleLock={perms.view.nala.plan === "write" ? part(`day:${x.id}`).toggle : undefined} />
+        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
+          onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run} marks={preview ? preview.marks.get(x.id) ?? null : undefined}
+          editing={!preview && perms.view.nala.plan === "write"} />
       ))}</div>
       <div><Suspense fallback={null}>
-        <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} part={part} parts={perms.view.nala} />
+        <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} parts={perms.view.nala} wishes={perms.view.dr.dreams !== "hidden"} />
       </Suspense></div>
     </div>
   </>;
@@ -230,9 +249,7 @@ export function TripView(p: TripViewProps) {
       </span>
     </div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
-    <div className="titlerow"><h1>{t.title}</h1>
-      {tab === "nala" && writes && <IconButton icon={anyUnlocked(p.unlock) ? "unlock" : "lock"} label={editModeLabel(anyUnlocked(p.unlock))} onClick={() => p.setUnlock(toggleAllUnlock(p.unlock))} tip="left" pressed={anyUnlocked(p.unlock)} />}
-    </div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
+    <div className="titlerow"><h1>{t.title}</h1></div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
     <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <>{t.purpose || sv.noPurpose}<TextEye t={t} texts={[t.purpose]} /></>}</div> {/* AU-30 */}
     {perms.pages.length > 1 && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>

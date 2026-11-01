@@ -9,8 +9,9 @@ export type EditDlg =
   | { kind: "album" } | { kind: "memory"; dreamId: string; by: string } | { kind: "split"; id: string } | { kind: "relink"; id: string } // MI-20, MI-17, MI-25, MI-32
   | { kind: "hidden"; dayId: string; id?: string } // not a form: whom hidden activities are hidden from (AU-25)
   | { kind: "tickets"; bookingId: string } // not a form: a booking's ticket files (BK-10)
-  | { kind: "wish"; id: string }; // not a form: Om önskan (DB-15)
-export const EDIT_KINDS = ["trip", "dates", "budgetMax", "day", "activity", "booking", "budget", "task", "placeEdit", "info", "album", "memory", "split", "relink"];
+  | { kind: "wish"; id: string } // not a form: Om önskan (DB-15)
+  | { kind: "planWish"; id: string }; // Lägg på dag (DB-18)
+export const EDIT_KINDS = ["trip", "dates", "budgetMax", "day", "activity", "booking", "budget", "task", "placeEdit", "info", "album", "memory", "split", "relink", "planWish"];
 export const editTitle = (d: EditDlg) =>
   d.kind === "hidden" ? sv.hiddenActivity
   : d.kind === "wish" ? sv.wish.about
@@ -23,6 +24,7 @@ export const editTitle = (d: EditDlg) =>
   : d.kind === "memory" ? sv.minnas.note
   : d.kind === "split" ? sv.minnas.splitTitle
   : d.kind === "relink" ? sv.minnas.relinkTitle
+  : d.kind === "planWish" ? sv.wish.toDay
   : d.kind === "day" ? (d.id ? sv.editDay : sv.newDay)
   : d.kind === "activity" ? (d.id ? sv.editActivity : sv.newActivity)
   : d.kind === "booking" ? (d.id ? sv.editBooking : sv.newBooking)

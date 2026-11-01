@@ -202,6 +202,7 @@ export const api = {
   approveMail: (t: Trip, pid: string, ops: Op[]) =>
     call<unknown>(`${trip(t.id)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops }) }),
   rejectMail: (tripId: string, pid: string) => call<unknown>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/reject`, { method: "POST" }),
+  approve: (tripId: string, pid: string) => call<{ result: { problems?: string[]; revision?: number } }>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST" }), // MC-18
   inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-14
   newInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }),
   image: async (id: string, key = link) => {

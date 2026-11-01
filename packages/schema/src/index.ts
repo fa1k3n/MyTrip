@@ -7,3 +7,4 @@ export { AccessConfig } from "./access.ts"; // the schema and its type; the plai
 export * from "./rules.ts";
 export * from "./hidden.ts";
 export * from "./mailbooking.ts";
+export * from "./pins.ts";

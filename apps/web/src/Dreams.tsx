@@ -3,11 +3,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { categoryIcon } from "./categories.ts";
 import { sv } from "./sv.ts";
-import { IconButton } from "./Icons.tsx";
+import { IconButton, PlannedMark } from "./Icons.tsx";
 import { CatIcon, ICONS } from "./CatIcon.tsx";
 import { HiddenText, TextEye } from "./TripView.tsx";
 import { api } from "./api.ts";
-import { cardImage, creditMark, wishDetail } from "./wishes.ts";
+import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
 
 const pictures = new Map<string, Promise<string>>(); // object URLs of wish images, fetched once per page (DB-09)
 /** A wish's copied image, fetched with the link's credentials. */
@@ -26,14 +26,16 @@ const DREAM_BG = ["#E8D5C4", "#D5E0D8", "#EFE2BF"];
 
 /** A wish's card, the same in Önska and in Minnas (DB-01, DB-02, MI-16); without `vote` the heart is read-only, and Minnas shows none.
  * Pressing the image area opens Om önskan, where a Commons image is credited (DB-09, DB-15). */
-export function DreamCard({ t, d, i, vote, votes = true, open, children }: { t: Trip; d: Trip["dreams"][number]; i: number; vote?: () => void; votes?: boolean; open?: () => void; children?: ReactNode }) {
+/** `planned`: the wish is in the plan, marked in a corner of the image area (DB-19); Minnas leaves it out. */
+export function DreamCard({ t, d, i, vote, votes = true, open, planned, children }: { t: Trip; d: Trip["dreams"][number]; i: number; vote?: () => void; votes?: boolean; open?: () => void; planned?: boolean; children?: ReactNode }) {
   const pic = cardImage(d); // DB-09: the image in place of the icon
   const area = <>{pic ? <WishPicture tripId={t.id} file={pic.file} whole={pic.whole} /> : <CatIcon id={categoryIcon(d.category) ?? d.icon} big />}
-    {creditMark(d) && <span className="picinfo" aria-hidden="true">i</span> /* DB-09: the credit is under Om önskan */}</>;
+    {creditMark(d) && <span className="picinfo" aria-hidden="true">i</span> /* DB-09: the credit is under Om önskan */}
+    {planned && <PlannedMark />}</>;
   const bg = { background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : DREAM_BG[i % 3] };
   return (
     <article className="card dream">
-      {open && !d.hidden ? <button type="button" className="img open" style={bg} aria-label={sv.wish.more(d.title)} title={creditMark(d) ? sv.wish.credited : undefined} onClick={open}>{area}</button>
+      {open && !d.hidden ? <button type="button" className="img open" style={bg} aria-label={planned ? `${sv.wish.more(d.title)}, ${sv.wish.planned}` : sv.wish.more(d.title)} title={creditMark(d) ? sv.wish.credited : undefined} onClick={open}>{area}</button>
         : <div className="img" style={bg}>{area}</div>}
       {votes && <button className="heart" onClick={vote} aria-label={sv.vote} disabled={!vote}>♥ {d.votes}</button>}
       <div className="in"><h3>{d.hidden ? <HiddenText /> : <>{d.title}<TextEye t={t} texts={[d.title, d.source]} /></>}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div>
@@ -58,8 +60,9 @@ export function WishView({ t, id }: { t: Trip; id: string }) {
 }
 
 export default function Dreams({ t, write, vote, addDream, editImage, open }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void }) {
+  const planned = plannedWishes(t); // DB-19
   return <>
-    <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
+    <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} planned={!d.hidden && planned.has(d.id)} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
       {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} /></div> /* DB-10 */}
     </DreamCard>)}</div>
     {write && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={addDream} />}

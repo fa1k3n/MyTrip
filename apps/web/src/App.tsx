@@ -4,6 +4,8 @@ import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { forInstalled, permsFor, safariUrl, showInstallHint } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
+import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
+import { tripChanges } from "./changes.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
 // Dialog contents load on first use, which keeps the page file under 200 KB (PF-01).
@@ -12,7 +14,7 @@ const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.Pl
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
 const TicketView = lazy(() => import("./TicketView.tsx"));
-import { anyUnlocked, excerpt, jumpTo, LOCKED, scrollBehavior, toggleAll, toggleOne, tripDates, type Open, type Unlock } from "./format.ts";
+import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
@@ -96,9 +98,9 @@ export function App() {
   const [dlg, setDlg] = useState<Dlg>(null);
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [upDay, setUpDay] = useState<string | null>(null);
-  const [unlock, setUnlock] = useState<Unlock>(LOCKED); // ED-13, ED-18: a trip opens with every part locked
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
+  const [undo, setUndo] = useState<{ text: string; before: Trip; after: Trip } | null>(null); // ED-22: for 10 seconds after a change
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
   const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -155,6 +157,7 @@ export function App() {
     return () => clearInterval(id);
   }, [load, me]);
   useEffect(() => { if (!notice) return; const id = setTimeout(() => setNotice(""), 6000); return () => clearTimeout(id); }, [notice]);
+  useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), 10000); return () => clearTimeout(id); }, [undo]);
   const saveSettings = (next: Settings) => {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
     api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
@@ -190,7 +193,7 @@ export function App() {
 
   const openTrip = (id: string, nextTab?: Tab) => {
     const x = trips?.find((y) => y.id === id);
-    setTripId(id); setView("trip"); setOpen({}); setUpDay(null); setUnlock(LOCKED);
+    setTripId(id); setView("trip"); setOpen({}); setUpDay(null);
     const tab = nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala"); // MT-09
     const allowed = pagePerms(x ?? {}).pages;
     setTab(allowed.includes(tab) ? tab : allowed[0] ?? "up"); // only the pages the role may see (AU-20)
@@ -226,10 +229,27 @@ export function App() {
     todo.forEach((id) => filling.add(id));
     (async () => { for (const id of todo) await api.autoWishImage(t.id, id).catch(() => {}); load(); })();
   }, [t, view, tab, role, load]);
+  /** ED-22: after a move, a planned wish or a removal in Nåla, Ångra for a while; not when the change removed files. */
+  const offerUndo = (before: Trip, ops: Op[], reason: string) => {
+    if (!UNDOABLE.has(reason)) return;
+    let after: Trip;
+    try { after = { ...applyOps(before, ops), revision: before.revision + 1 }; } catch { return; }
+    if (!canUndo(before, after)) return;
+    const c = tripChanges(before, after)[0];
+    setUndo({ text: c ? `${sv.undo.kinds[c.kind]} ${c.text}` : reason, before, after });
+  };
+  const runUndo = async () => {
+    const u = undo;
+    setUndo(null);
+    if (!u) return;
+    try { await api.change(u.after, undoOps(u.before, u.after), "undo"); } catch { setNotice(sv.undo.failed); }
+    await load();
+  };
   /** Edits from the Nåla forms: the error text or null (ED-10). */
   const apply = async (ops: Op[], reason: string): Promise<string | null> => {
     try {
       await api.change(t!, ops, reason);
+      offerUndo(t!, ops, reason);
       await load();
       return null;
     } catch (e) {
@@ -248,6 +268,17 @@ export function App() {
       return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
     }
   };
+  /** MC-18: a proposal from an LLM client is applied by the server; its problems come back in the result. */
+  const approveProposal = async (pid: string): Promise<string | null> => {
+    try {
+      const r = await api.approve(t!.id, pid);
+      await load();
+      return r.result.problems?.length ? [sv.couldNotSave, ...r.result.problems].join(" ") : null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) { await load(); return sv.proposal.stale; }
+      return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
+    }
+  };
   const rejectMail = async (pid: string) => { await api.rejectMail(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); };
   /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
   const run: Run = async (build, reason) => {
@@ -259,6 +290,7 @@ export function App() {
       setTrips((ts) => ts && ts.map((x) => (x.id === cur.id ? applyOps(x, ops) : x))); // show at once; the reload brings the server's truth
       try {
         await api.change(cur, ops, reason);
+        offerUndo(cur, ops, reason);
         await load();
         return;
       } catch (e) {
@@ -367,11 +399,12 @@ export function App() {
       addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} notices={() => setDlg({ kind: "notices" })}
-      edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self}
+      edit={setDlg} perms={pagePerms(t)} self={self}
       memoryBy={self ?? (permsFor(role, t).superuser ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
+      review={{ approve: approveProposal, reject: rejectMail }} // MC-18
     />
   );
 
@@ -380,6 +413,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
+    {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog
       ref={dialog} className={dlg?.kind === "tickets" ? "full" : dlg?.kind === "expense" && !dlg.short.activity ? "sheet" : undefined} aria-label={!dlg ? undefined
         : dlg.kind === "place" ? t?.places.find((x) => x.id === dlg.id)?.name
@@ -393,7 +427,7 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && permsFor(role, t).view.nala.plan === "write" && view === "trip" && tab === "nala" && anyUnlocked(unlock) ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && permsFor(role, t).view.nala.plan === "write" && view === "trip" && tab === "nala" ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}

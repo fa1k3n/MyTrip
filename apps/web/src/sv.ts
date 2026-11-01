@@ -4,6 +4,16 @@ export const sv = {
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", admin: "Admin & Inställningar",
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Minnas" },
+  proposal: { // MC-15..MC-18
+    title: "Förslag", waiting: (n: number) => (n === 1 ? "1 förslag väntar" : `${n} förslag väntar`), made: (at: string) => `Gjort ${at}`,
+    show: "Visa i planen", hide: "Sluta visa i planen", approve: "Godkänn", reject: "Avvisa", rejectAsk: "Avvisa förslaget? Det går inte att ångra.",
+    stale: "Resan har ändrats sedan förslaget gjordes. Avvisa det och be om ett nytt.", problems: "Förslaget går inte att godkänna:", none: "Förslaget ändrar ingenting.",
+    pin: (title: string) => `Rubbar en nål: ${title}`,
+    other: "Övrigt", added: "Ny", changed: "Ändrad", removed: "Tas bort", preview: "Så här blir planen med förslaget. Inget är sparat än.",
+    kinds: { activity: "Aktivitet", days: "Dag", places: "Plats", bookings: "Bokning", budget: "Budgetpost", tasks: "Att göra", info: "Praktiskt", travelers: "Resenär", dreams: "Önskan", expenses: "Utlägg", payments: "Betalning" },
+  },
+  pin: { on: "Nåla fast", off: "Ta bort nålen", mark: "Nålad", ask: (title: string) => `Ta bort nålen för ${title}? Då kan den flyttas, tidsändras och tas bort.`, locked: "Aktiviteten är nålad: tid och längd ändras inte, och den flyttas eller tas inte bort förrän nålen tas bort." }, // ED-24, ED-25
+  undo: { button: "Ångra", failed: "Kunde inte ångra. Resan har ändrats sedan dess.", kinds: { add: "Lade till", change: "Ändrade", remove: "Tog bort" } }, // ED-22
   wish: { // DB-05..DB-14
     url: "Länk till sidan (valfri)", badUrl: "Ange en adress som börjar med https:// eller http://.", photoBy: "Foto:", commons: "Wikimedia Commons", about: "Om önskan", more: (title: string) => `Mer om ${title}`, openPage: "Öppna sidan", credited: "Fotograf och licens finns under Om önskan",
     image: (title: string) => `Bild för ${title}`, query: "Sök bild med orden", find: "Sök", finding: "Söker …", use: "Använd",
@@ -14,6 +24,8 @@ export const sv = {
     cache: "Bildcache", cacheText: "Ta bort automatiskt hämtade bilder från resor som är avslutade. Egna foton behålls.", cacheButton: "Töm cachen för avslutade resor",
     cacheAsk: (images: number, kb: number) => `Ta bort ${images} bilder från avslutade resor? Det frigör ${kb} kB. Egna foton behålls.`,
     cacheDone: (images: number, kb: number) => `Tog bort ${images} bilder och frigjorde ${kb} kB.`, cacheEmpty: "Det finns inga hämtade bilder i avslutade resor.",
+    planned: "Med i planen", votes: (n: number) => (n === 1 ? "1 hjärta" : `${n} hjärtan`), wishes: "Önskningar", noWishes: "Inga önskningar än. Lägg till dem i Önska.", toDay: "Lägg på dag", toDayOf: (title: string) => `Lägg ${title} på dag`, day: "Dag", // DB-16..DB-19
+    drag: (title: string) => `Dra ${title} till en dag`, dragHint: "Dra till en dag i Nåla",
   },
   minnas: { // MI-15..MI-25
     memories: "Upplevt", budget: "Pengar", views: "Upplevt eller pengar", listed: (what: string, n: number) => `${what} (${n})`,
@@ -124,7 +136,6 @@ export const sv = {
   conflict: "Resan ändrades samtidigt av någon annan. Den är nu uppdaterad, försök igen.", edit: "Ändra",
   tripDetails: "Resan", tripDates: "Datum", editDates: "Ändra datum", firstDay: "Första dagen", lastDay: "Sista dagen",
   datesHint: "Nya datum får en tom dag. Dagar utanför datumen tas bort.", confirmRemoveDays: "Dessa dagar tas bort:",
-  editModeOn: "Slå på redigeringsläge", editModeOff: "Stäng av redigeringsläge", unlockPart: "Lås upp", lockPart: "Lås",
   activityNote: "Notis (visas under rubriken)", editTrip: "Ändra namn och syfte", purpose: "Syfte",
   suggestPurpose: "Föreslå syfte utifrån planen", purposeHint: "Syftet hjälper till att ge bra förslag på aktiviteter. Förslaget bygger på dagarna i Nåla, ändra fritt innan du sparar.", noPurposeYet: "Lägg in dagar i Nåla först, så kan ett syfte föreslås.",
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
@@ -190,7 +201,7 @@ export const sv = {
     expenseText: "Beskriv utlägget.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
     taskText: "Beskriv uppgiften.", url: "Webbadressen ser inte ut att stämma, t.ex. www.exempel.se.", item: "Skriv vad som ska packas.",
     tooLong: "En resa kan vara högst 60 dagar.", activityDate: "Aktiviteten ligger inte på bokningens första datum.",
-    activityStart: "Ange när aktiviteten börjar.", duration: "Ange ungefär hur lång tid aktiviteten tar.", move: "Aktiviteten eller dagen finns inte längre.",
+    activityStart: "Ange när aktiviteten börjar.", duration: "Ange ungefär hur lång tid aktiviteten tar.", move: "Aktiviteten eller dagen finns inte längre.", pinned: "Aktiviteten är nålad. Ta bort nålen först.", planWish: "Önskan eller dagen finns inte längre.",
   },
   loading: "Laddar…", error: "Kunde inte nå servern.", weatherCredit: "Väderdata:",
   weekdays: ["sön", "mån", "tis", "ons", "tor", "fre", "lör"],

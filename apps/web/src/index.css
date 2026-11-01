@@ -192,9 +192,9 @@ dialog{position:fixed} /* fixed, not relative: a relative modal sits at the top 
 .dlg-x{position:absolute;top:8px;right:8px;z-index:2}
 dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .dh .icon{margin-top:-10px} /* line the edit pencil up with the corner X */
-/* Edit mode on: the lock button is filled terracotta (ED-13). */
+/* A pressed toggle button is filled terracotta. */
 .btn.icon[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
-/* Edit mode in Nåla: drag handles, drop line, and gap and clash rows between activities (ED-15..ED-17). */
+/* Nåla for a role that may change the plan (ED-21): drag handles, drop line, and gap and clash rows between activities (ED-15..ED-17). */
 .act.drag{position:relative}.act.drag[draggable]{cursor:grab}
 .act .grip{cursor:grab;color:var(--mute);margin:-6px 0 -6px -10px}
 .act.over-top::before,.act.over-bottom::after,.drop.over-top::before{content:"";position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--acc)}
@@ -208,14 +208,13 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 .act .what,.act .what-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 .act .what .name{font-weight:600}.act .places,.act .anote{font-size:.85rem;line-height:1.35}
 .act{align-items:flex-start}.act>.icon{align-self:center}
-/* One lock per part of Nåla (ED-18): in the day tools and in each side section's heading. */
-.sec>summary .seclock{margin-left:auto;margin-right:4px}.sec>summary h3{margin:0}
+/* A side section's heading. */
+.sec>summary h3{margin:0}
 .act .what,.act .what-col{flex:1 1 auto}.act .grip,.act>.icon{flex:none}.act .place{text-align:left}
 /* Phones (RS-01): the day tools get a row of their own under the header so the title keeps its width. */
 @media (max-width:767px){.day .tools{position:static;justify-content:flex-end;padding:0 40px 0 8px;margin-top:-46px;pointer-events:none}.day .tools > *{pointer-events:auto}.day.open .hd{padding-right:14px}}
-/* The edit mode lock sits at the right of the trip title (ED-13); a section's own lock shows only when it is open (ED-18). */
+/* The trip title row. */
 .titlerow{display:flex;align-items:center;justify-content:space-between;gap:8px}.titlerow h1{min-width:0}
-.sec:not([open])>summary .seclock{display:none}
 /* Packing lists open and close like the side sections, and their items can be checked (PK-02, PK-05). */
 .box>summary{display:flex;justify-content:space-between;align-items:center;min-height:28px}
 .box>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin:-4px 8px 0 0}
@@ -225,7 +224,6 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 /* Uppleva: previous and next day beside the day heading (UP-09). */
 .dayhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.dayhead h3{margin:0}.daynav{display:flex;gap:2px;flex:none}
 /* Opened with a share link: no locks, nothing to unlock (AU-03). */
-.guest .partlock{display:none!important}
 /* Uppleva: date badge with the day's title, icons, time and weather (one larger row) to its right (UP-11). */
 .daytitle{display:flex;align-items:center;gap:12px;min-width:0}.daytitle small{display:block}
 .dmeta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin-top:4px}
@@ -450,3 +448,24 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .cand .btn{margin:0 10px 10px;align-self:flex-start}
 .wishnow{position:relative;height:140px;border-radius:12px;overflow:hidden;margin-bottom:12px;background:var(--bg)}.wishnow .btn{position:absolute;top:8px;right:8px}
 .lblrow>label{flex:1}.lblrow>.btn{align-self:flex-end;margin-bottom:12px}.btn.upload{display:inline-block;margin:12px 0;cursor:pointer}
+/* Wishes planned in Nåla (DB-16..DB-19): a calendar with a check mark, no text; the side column lists the wishes to drag onto a day. */
+.planmark{display:inline-flex;align-items:center;justify-content:center;color:var(--sage);vertical-align:middle;margin-left:6px}.planmark svg{width:16px;height:16px}
+.dream .img .planmark{position:absolute;left:6px;bottom:6px;margin:0;width:26px;height:26px;border-radius:50%;background:var(--card);box-shadow:var(--sh)}
+.wishrow .wishname{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0}.wishrow .wishname .planmark{margin-left:0}
+.wishrow.drag[draggable]{cursor:grab}.wishrow .grip{color:var(--mute);display:inline-flex}.wishrow .grip svg{width:16px;height:16px}
+.wishrow .votes{flex:none;color:var(--ink);font-weight:700;font-size:.85rem;white-space:nowrap;margin-right:4px} /* hearts, read only (DB-16) */
+/* Proposals from an LLM client or the AI (MC-15..MC-18): a card above Nåla's days, and the plan as the proposal would leave it. */
+.proposals{margin:0 0 14px}.proposals h3{margin:0 0 6px}.prop{border-top:1px solid var(--line);padding:8px 0}.prop.on{background:color-mix(in srgb,var(--sage) 10%,transparent);border-radius:10px;padding:8px}
+.prop .end{display:flex;gap:4px;align-items:center}.prop .note.warn{color:var(--warn);font-weight:600;margin:6px 0}
+.changes{list-style:none;margin:6px 0 0;padding:0;font-size:.88rem}.changes li{padding:2px 0}.changes li.ch-remove{color:var(--warn)}
+.propmark{display:inline-block;flex:none;font-size:.72rem;font-weight:700;border-radius:99px;padding:1px 8px;background:color-mix(in srgb,var(--sage) 22%,var(--card));color:var(--ink)}
+.propmark.change{background:color-mix(in srgb,var(--caution) 35%,var(--card))}.propmark.remove{background:color-mix(in srgb,var(--warn) 18%,var(--card));color:var(--warn)}
+.plan.preview .act.prop-add{outline:2px dashed var(--sage);outline-offset:-2px;border-radius:10px}.plan.preview .act.prop-change{background:color-mix(in srgb,var(--caution) 14%,transparent);border-radius:10px}
+.plan.preview .act.prop-remove{opacity:.7}.plan.preview .act.prop-remove .what *,.plan.preview .act.prop-remove time{text-decoration:line-through}
+.plan.preview .act .propmark{align-self:center;margin-left:auto}
+/* Ångra (ED-22), pins (ED-24, ED-25), a day that takes a dragged wish (DB-17), and what an activity lacks in a muted colour (ED-23). */
+.toast.undo{display:flex;align-items:center;gap:12px}.toast.undo .btn{color:var(--bg);border-color:color-mix(in srgb,var(--bg) 50%,transparent);flex:none}
+.pinmark{display:inline-flex;color:var(--acc);margin:2px 0 0 -2px}.pinmark svg{width:15px;height:15px}
+.act.pinned .grip-gap,.act .grip-gap{display:inline-block;width:34px;flex:none}
+.day.dropday{outline:3px dashed var(--sage);outline-offset:-3px}
+.act .miss{color:var(--mute)}

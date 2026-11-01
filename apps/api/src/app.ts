@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { cacheKey, commonsImage, fetchImage, IMAGE_MAX, imageType, type CommonsImage } from "./wishimage.ts";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, TicketFile, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
+import { Settings, Trip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
@@ -663,6 +663,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     try {
       next = Trip.parse(applyOps(t, b.ops));
       problems = checkTrip(next);
+      if (!ar && c.get("role") !== "admin") problems.push(...pinBreaks(t, next).map(sv.proposal.pin)); // MC-20: an LLM client leaves pins alone, also in a dry run
     } catch (e) {
       return c.json({ ok: false, problems: describeError(e) }, 422); // MC-03
     }

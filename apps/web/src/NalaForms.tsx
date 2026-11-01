@@ -10,8 +10,8 @@ import { lookupPlace } from "./weather.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { suggestPurpose } from "./purpose.ts";
-import { shortDate } from "./format.ts";
-import { activityMissing } from "./schedule.ts";
+import { dayLabel, dayTitle, shortDate } from "./format.ts";
+import { activityMissing, planWish } from "./schedule.ts";
 import { pickedLabel } from "./hiddenView.ts";
 import { svAdmin } from "./sv-admin.ts";
 import { fmtDuration } from "./transport.ts";
@@ -158,6 +158,20 @@ function RelinkForm(p: Props & { id: string }) {
   );
 }
 
+/** Lägg på dag: a wish put last on a chosen day, the alternative to dragging it (DB-18). */
+function PlanWishForm(p: Props & { id: string }) {
+  const s = useSave(p);
+  const w = p.t.dreams.find((x) => x.id === p.id);
+  const days = [...p.t.days].sort((a, b) => a.date.localeCompare(b.date));
+  const { f, text } = useFields({ day: days[0]?.id ?? "" });
+  if (!w) return null;
+  return (
+    <Form title={sv.wish.toDayOf(w.title)} {...s} close={p.close} onSubmit={() => s.submit(planWish(p.t, w.id, f.day), "plan wish")}>
+      <label>{sv.wish.day}<select {...text("day")} autoFocus>{days.map((d) => <option key={d.id} value={d.id}>{dayLabel(d.date)} · {dayTitle(d)}</option>)}</select></label>
+    </Form>
+  );
+}
+
 /** First and last date of the trip; days follow the dates (ED-14). Removing days asks first (ED-09). */
 function DatesForm(p: Props) {
   const s = useSave(p);
@@ -225,18 +239,19 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   return (
     <Form title={p.id ? sv.editActivity : sv.newActivity} {...s} close={p.close}
       onSubmit={() => {
-        const durationMin = Number(f.duration) || undefined;
-        const miss = f.text.trim() ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
+        const durationMin = a?.pinned ? undefined : Number(f.duration) || undefined; // ED-25: a pinned activity keeps its time
+        const miss = f.text.trim() && !a?.pinned ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
         s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, dreamId: f.dreamId, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)) }, p.id), p.id ? "edit activity" : "add activity");
       }}
-      onRemove={p.id ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
+      onRemove={p.id && !a?.pinned ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
       <label>{sv.activityNote}<input {...text("note")} /></label>
+      {a?.pinned && <p className="ro note">{sv.pin.locked}</p> /* ED-25 */}
       <div className="two">
-        <label>{sv.time}<input type="time" {...text("start")} /></label>
-        <label className="check"><input type="checkbox" {...check("estimated")} />{sv.estimate}</label>
+        <label>{sv.time}<input type="time" {...text("start")} disabled={a?.pinned} /></label>
+        <label className="check"><input type="checkbox" {...check("estimated")} disabled={a?.pinned} />{sv.estimate}</label>
       </div>
-      {f.category !== TIME_POINT && <label>{sv.duration}<select {...text("duration")}> {/* a Klockslag has no duration (ED-20) */}
+      {f.category !== TIME_POINT && <label>{sv.duration}<select {...text("duration")} disabled={a?.pinned}> {/* a Klockslag has no duration (ED-20) */}
         <option value="">{sv.chooseDuration}</option>
         {[...new Set([...DURATIONS, ...(a?.durationMin ? [a.durationMin] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
       </select></label>}
@@ -469,6 +484,7 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "memory": return <MemoryForm {...p} dreamId={dlg.dreamId} by={dlg.by} />;
     case "split": return <SplitForm {...p} id={dlg.id} />;
     case "relink": return <RelinkForm {...p} id={dlg.id} />;
+    case "planWish": return <PlanWishForm {...p} id={dlg.id} />;
     default: return null;
   }
 }

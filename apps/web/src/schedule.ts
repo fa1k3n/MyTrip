@@ -1,6 +1,6 @@
 // A day's activities as a schedule: gaps and overlaps (ED-17) and moving activities by drag and drop (ED-16). Pure, so it runs under node --test.
 import type { Op, Trip } from "@trip/schema";
-import { byTime, type Result } from "./edit.ts";
+import { allIds, byTime, uniqueId, type Result } from "./edit.ts";
 import { activityEnd, fromMin, toMin } from "./time.ts";
 import { sv } from "./sv.ts";
 import { TIME_POINT } from "./categories.ts";
@@ -41,7 +41,15 @@ export function scheduleRows<A extends Timed>(list: A[]): Row<A>[] {
   return rows;
 }
 
-const length = (a: Activity) => a.durationMin ?? (a.start && a.end ? toMin(a.end) - toMin(a.start) : DEFAULT_MIN);
+const length = (a: Timed) => a.durationMin ?? (a.start && a.end ? toMin(a.end) - toMin(a.start) : DEFAULT_MIN);
+
+/** When an activity of length `len` starts at `at` in `list`: after the one before it, else ending when the next one starts (ED-16). */
+function startAt(list: Activity[], at: number, len: number, fallback: string) {
+  const before = list.slice(0, at).reverse().find((x) => x.start), after = list.slice(at).find((x) => x.start);
+  return before ? (activityEnd(before) ?? fromMin(toMin(before.start!) + length(before)))
+    : after ? fromMin(toMin(after.start!) - len)
+    : fallback;
+}
 
 /**
  * Moves an activity to `index` in a day's list (counted without the activity itself).
@@ -52,16 +60,30 @@ export function moveActivity(t: Trip, fromDay: string, id: string, toDay: string
   const fi = t.days.findIndex((d) => d.id === fromDay), ti = t.days.findIndex((d) => d.id === toDay);
   const a = t.days[fi]?.activities.find((x) => x.id === id);
   if (!a || ti < 0) return { ok: false, error: sv.errors.move };
+  if (a.pinned) return { ok: false, error: sv.errors.pinned }; // ED-25
   const target = t.days[ti].activities.filter((x) => x.id !== id);
   const at = Math.max(0, Math.min(index, target.length));
-  const before = target.slice(0, at).reverse().find((x) => x.start), after = target.slice(at).find((x) => x.start);
   const len = length(a);
-  const start = before ? (activityEnd(before) ?? fromMin(toMin(before.start!) + length(before)))
-    : after ? fromMin(toMin(after.start!) - len)
-    : a.start ?? t.days[ti].start;
+  const start = startAt(target, at, len, a.start ?? t.days[ti].start);
   const next: Activity = { ...a, start, estimated: true, ...(a.end ? { end: fromMin(toMin(start) + len) } : {}) };
   target.splice(at, 0, next);
   const ops: Op[] = [{ op: "set", path: `days/${ti}/activities`, value: byTime(target) }];
   if (fi !== ti) ops.unshift({ op: "set", path: `days/${fi}/activities`, value: t.days[fi].activities.filter((x) => x.id !== id) });
   return { ok: true, ops };
 }
+
+/**
+ * Plans a wish on a day at `index` (last when left out): a new activity with the wish's title and category, linked to it,
+ * without place or duration, placed as a move places one, with an estimated time (DB-17). A wish can be planned again.
+ */
+export function planWish(t: Trip, dreamId: string, dayId: string, index?: number): Result {
+  const w = t.dreams.find((x) => x.id === dreamId), di = t.days.findIndex((d) => d.id === dayId);
+  if (!w || w.hidden || di < 0) return { ok: false, error: sv.errors.planWish };
+  const list = [...t.days[di].activities], at = Math.max(0, Math.min(index ?? list.length, list.length));
+  const next: Activity = { id: uniqueId(w.title, allIds(t)), text: w.title, placeIds: [], category: w.category, dreamId: w.id, estimated: true,
+    start: startAt(list, at, DEFAULT_MIN, t.days[di].start) };
+  list.splice(at, 0, next);
+  return { ok: true, ops: [{ op: "set", path: `days/${di}/activities`, value: byTime(list) }] };
+}
+
+export { WISH_DRAG } from "./drag.ts";

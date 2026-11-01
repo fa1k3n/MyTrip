@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, checkTrip, Trip } from "@trip/schema";
 import { daysOutside, setTripDates, tripRange } from "../src/edit.ts";
-import { editModeLabel } from "../src/format.ts";
 import { sv } from "../src/sv.ts";
 
 const day = (id: string, date: string) => ({ id, date, title: `Dag ${date}`, summary: "Planerat.", icons: ["🚗"], start: "09:00", end: "18:00", activities: [] });
@@ -58,9 +57,4 @@ test("ED-14 the dates must be valid, in order and at most 60 days", () => {
 test("ED-14 unchanged dates give no changes", () => {
   const r = setTripDates(trip(), { from: "2026-10-24", to: "2026-10-25" });
   assert.deepEqual(r, { ok: true, ops: [] });
-});
-
-test("ED-13 the edit mode button names what it does", () => {
-  assert.equal(editModeLabel(false), sv.editModeOn);
-  assert.equal(editModeLabel(true), sv.editModeOff);
 });

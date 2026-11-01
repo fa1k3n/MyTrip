@@ -45,3 +45,10 @@ export function wishDetail(w: Wish) {
   const pic = cardImage(w);
   return { title: w.title, category: w.category, source: w.source, ...(w.url ? { url: w.url } : {}), ...(pic ? { image: { ...pic, whole: true } } : {}) };
 }
+
+/** The wishes linked to an activity the viewer sees: they get the mark "Med i planen" (DB-19). */
+export const plannedWishes = (t: { days: { activities: { dreamId?: string; hidden?: boolean }[] }[] }) =>
+  new Set(t.days.flatMap((d) => d.activities.filter((a) => a.dreamId && !a.hidden).map((a) => a.dreamId!)));
+
+/** The wishes the most voted first, ties in Önska's order, for Nåla's section "Önskningar" (DB-16). */
+export const byVotes = <W extends { votes: number }>(list: W[]) => [...list].sort((a, b) => b.votes - a.votes);

@@ -1,12 +1,14 @@
-// Nåla in edit mode: drag and drop of activities, and gap and clash rows (ED-15..ED-17). Loaded on demand (PF-01).
+// Nåla in edit mode: drag and drop of activities and wishes (DB-17), and gap and clash rows (ED-15..ED-17). Loaded on demand (PF-01).
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 import type { Trip } from "@trip/schema";
-import { moveActivity, scheduleRows } from "./schedule.ts";
+import { moveActivity, planWish, scheduleRows, WISH_DRAG } from "./schedule.ts";
 import { fmtDuration } from "./transport.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { ActivityText, ActivityWhen, type Activity, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
+import { togglePin } from "./edit.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 import { sv } from "./sv.ts";
 
 type Day = Trip["days"][number];
@@ -35,14 +37,14 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
   };
   const drop = (e: DragEvent, pos: number) => {
     e.preventDefault(); e.stopPropagation(); setOver(null);
-    const d = dragging;
+    const d = dragging, wish = e.dataTransfer.getData(WISH_DRAG);
     dragging = null;
-    if (!d) return;
+    if (!d) { if (wish) run((cur) => planWish(cur, wish, x.id, pos), "plan wish"); return; } // a wish from the side column (DB-17)
     const from = d.dayId === x.id ? x.activities.findIndex((a) => a.id === d.id) : -1;
     if (from >= 0 && (pos === from || pos === from + 1)) return; // dropped where it already is
     move(d.dayId, d.id, from >= 0 && pos > from ? pos - 1 : pos); // moveActivity counts without the moved activity
   };
-  const accept = (e: DragEvent) => { if (dragging || e.dataTransfer.types.includes(DRAG_TYPE)) e.preventDefault(); };
+  const accept = (e: DragEvent) => { if (dragging || e.dataTransfer.types.includes(DRAG_TYPE) || e.dataTransfer.types.includes(WISH_DRAG)) e.preventDefault(); };
   let n = -1;
   const who = hiddenFromIn(x); // AU-18, AU-24
   return (
@@ -56,14 +58,16 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
         );
         const a = r.a, i = ++n, miss = missing(a);
         return (
-          <div key={a.id} className={`act drag ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
-            draggable onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
+          <div key={a.id} className={`act drag ${a.pinned ? "pinned" : ""} ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
+            draggable={!a.pinned} onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => { dragging = null; setOver(null); }}
             onDragOver={(e) => { accept(e); e.stopPropagation(); setOver(posFor(e, i)); }}
             onDrop={(e) => drop(e, posFor(e, i))}>
-            <button type="button" className="btn ghost icon bare grip tip-right" aria-label={`${sv.moveActivity} ${a.text}`} data-tip={sv.moveHint} onKeyDown={(e) => onKey(e, i, a)}><Icon name="grip" /></button>
+            {a.pinned ? <span className="grip-gap" aria-hidden="true" /> /* ED-25: a pinned activity does not move */
+              : <button type="button" className="btn ghost icon bare grip tip-right" aria-label={`${sv.moveActivity} ${a.text}`} data-tip={sv.moveHint} onKeyDown={(e) => onKey(e, i, a)}><Icon name="grip" /></button>}
             <ActivityWhen a={a} />
             <span className="what-col"><ActivityText t={t} a={a} who={who.get(a.id)} eye={() => edit({ kind: "hidden", dayId: x.id, id: a.id })} onPlace={onPlace} />{miss && <small className="miss">{sv.missing.label}: {miss}</small>}</span>
+            <IconButton icon="pin" look="bare" tip="left" label={`${a.pinned ? sv.pin.off : sv.pin.on}: ${a.text}`} pressed={!!a.pinned} onClick={async () => { if (a.pinned && !(await ask(sv.pin.ask(a.text), { ok: sv.pin.off }))) return; run((cur) => togglePin(cur, x.id, a.id), a.pinned ? "unpin" : "pin"); }} mut /> {/* ED-24: unpinning asks first */}
             <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />
           </div>
         );

@@ -28,7 +28,7 @@ export function uniqueId(name: string, taken: Iterable<string>) {
 }
 
 /** Every id in the trip; ids must be unique across all lists (DM-09). */
-const allIds = (t: Trip) => [
+export const allIds = (t: Trip) => [
   ...t.days, ...t.places, ...t.bookings, ...t.tasks, ...t.travelers, ...t.dreams, ...t.budget, ...t.expenses, ...t.payments, ...t.info,
   ...t.days.flatMap((d) => d.activities),
 ].map((x) => x.id);
@@ -195,14 +195,27 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     dreamId: input.dreamId === undefined ? old?.dreamId : input.dreamId || undefined,
     end: point ? input.start : input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
+  const fixed = (a: Activity) => JSON.stringify([a.start, a.end, a.durationMin, !!a.estimated]);
+  if (old?.pinned && fixed(old) !== fixed(activity)) return fail(sv.errors.pinned); // ED-25: unpin first
   const next = old ? list.map((a) => (a.id === old.id ? activity : a)) : [...list, activity];
   ops.push({ op: "set", path: `days/${di}/activities`, value: byTime(next) });
   return ok(ops);
 }
 
+/** A pinned activity is not removed until it is unpinned (ED-25). */
 export function removeActivity(t: Trip, dayId: string, id: string): Op[] {
   const di = t.days.findIndex((d) => d.id === dayId);
-  return di < 0 ? [] : [{ op: "set", path: `days/${di}/activities`, value: t.days[di].activities.filter((a) => a.id !== id) }];
+  if (di < 0 || t.days[di].activities.find((a) => a.id === id)?.pinned) return [];
+  return [{ op: "set", path: `days/${di}/activities`, value: t.days[di].activities.filter((a) => a.id !== id) }];
+}
+
+/** Pins an activity, which fixes its time (no "ca"), or unpins it, which keeps its time (ED-24). */
+export function togglePin(t: Trip, dayId: string, id: string): Result {
+  const di = t.days.findIndex((d) => d.id === dayId), ai = t.days[di]?.activities.findIndex((a) => a.id === id) ?? -1;
+  if (ai < 0) return fail(sv.errors.move);
+  const a = t.days[di].activities[ai];
+  const { pinned: _, ...rest } = a;
+  return ok([{ op: "set", path: `days/${di}/activities/${ai}`, value: a.pinned ? rest : { ...a, pinned: true, estimated: false } }]);
 }
 
 export type BookingInput = {

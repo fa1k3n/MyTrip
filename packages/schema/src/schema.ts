@@ -19,6 +19,7 @@ export const Activity = z.object({
   hiddenFrom: z.array(Id).optional(), // the travelers it is hidden from, e.g. a surprise for the children (AU-18)
   dreamId: Id.optional(), // the wish it makes come true; experienced when its day has passed (MI-19)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: hidden from them, title and places removed (AU-18)
+  pinned: z.boolean().optional(), // nålad: fixed, not moved, retimed or removed until unpinned (ED-24, ED-25, MC-20)
 });
 export const Leg = z.object({
   vehicle: z.enum(["car", "ferry", "train", "transit", "walk"]), origin: z.string().min(1), destination: z.string().min(1),

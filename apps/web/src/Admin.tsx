@@ -198,7 +198,7 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
   );
 }
 
-/** Who shares an expense shared by all: a dropdown per traveler, on by default, off for example for children (MI-38). */
+/** Who shares an expense shared by all: a toggle button per traveler, pressed by default, off for example for children (MI-38). */
 function Sharing({ t, run }: { t: Trip; run: Run }) {
   if (t.travelers.length < 2) return null;
   return (
@@ -207,11 +207,9 @@ function Sharing({ t, run }: { t: Trip; run: Run }) {
       <p className="ro note">{svAdmin.shares.hint}</p>
       {t.travelers.map((x) => (
         <div className="row mid" key={x.id}><span>{x.name}</span>
-          <span className={`rolepick ${x.shares !== false ? "lvl-read" : "lvl-hidden"}`}>{/* the pill dropdowns of the settings page */}
-            <select aria-label={`${svAdmin.shares.title}, ${x.name}`} value={x.shares !== false ? "yes" : "no"}
-              onChange={(e) => run((y) => sharesOps(y, x.id, e.target.value === "yes"), "shares")}>
-              <option value="yes">{svAdmin.shares.yes}</option><option value="no">{svAdmin.shares.no}</option>
-            </select></span></div>
+          <span className="verdict">{/* a toggle in the style of the verdict buttons in Minnas: pressed means shares */}
+            <IconButton icon="users" tip="left" pressed={x.shares !== false} label={svAdmin.shares.toggle(x.name)}
+              onClick={() => run((y) => sharesOps(y, x.id, x.shares === false), "shares")} /></span></div>
       ))}
     </div>
   );

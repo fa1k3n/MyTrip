@@ -9,8 +9,8 @@ export const svAdmin = {
     hint: "För vänner som inte följer med: den som har länken är Följare och kan bara läsa resan. Bokningsnummer visas inte.",
     confirmReplace: "Byta länk? Den gamla länken slutar fungera direkt.",
   },
-  shares: { title: "Delar på kostnader", yes: "Delar", no: "Delar inte",
-    hint: "Ett utlägg som delas av alla delas bara av dem som delar. Välj Delar inte för till exempel barn. För ett enskilt utlägg kan du ändå välja vem som delar, under Pengar." }, // MI-38
+  shares: { title: "Delar på kostnader", toggle: (n: string) => `${n} delar på kostnader`,
+    hint: "Ett utlägg som delas av alla delas bara av dem som delar. Intryckt knapp betyder att personen delar. Släpp den för till exempel barn. För ett enskilt utlägg kan du ändå välja vem som delar, under Pengar." }, // MI-38
   people: { // AU-11
     title: "Personliga länkar", role: "Behörighet", roles: { traveler: "Resenär", planner: "Planerare" }, follower: "Följare",
     hint: "Varje resenär har en egen länk. Resenär: läsa, bocka av och lägga till egna utlägg. Planerare: dessutom ändra allt för resan.",

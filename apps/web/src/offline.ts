@@ -1,5 +1,6 @@
 // What the phone keeps for working offline: the last fetched trip per link (PW-03, PW-05, PW-17). Pure, so it runs under node --test.
 import { sv } from "./sv.ts";
+import { tripOfLink } from "./access.ts";
 
 /** Local storage, or a stand-in in the tests. */
 export type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void; key(i: number): string | null; readonly length: number };
@@ -106,3 +107,8 @@ export function timeoutSignal(ms: number, later: (f: () => void, ms: number) => 
 /** The reason with the time it was tried, as the row shows it (PW-19). */
 export const triedAt = (why: string, at: Date) =>
   sv.queue.tried(why, `${String(at.getHours()).padStart(2, "0")}.${String(at.getMinutes()).padStart(2, "0")}`);
+
+/** The trip to send the waiting expenses to: the login's, or else the link's they were added with, as when the phone is also
+ * logged in as admin (PW-20). Nothing before the login is known. */
+export const sendTrip = (me: { role: string; tripId?: string } | null | undefined, key: string | null) =>
+  !me ? undefined : me.tripId ?? (key ? tripOfLink(key) : undefined);

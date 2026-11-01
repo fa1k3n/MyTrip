@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
-import { dequeue, enqueue, keptForecast, offlineText, retry, withWaiting, type Expense, type Waiting } from "./offline.ts";
+import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { forInstalled, permsFor, safariUrl, showInstallHint } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
@@ -135,9 +135,10 @@ export function App() {
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
   const flushWaiting = useCallback(async () => {
-    if (!me || !("tripId" in me)) return;
+    const tripId = sendTrip(me, linkKey()); // also when logged in as admin with a link on the phone (PW-20)
+    if (!tripId) return;
     setSending((n) => n + 1);
-    try { if (await sendWaiting(me.tripId)) load(); } finally { setSending((n) => n - 1); } // PW-07
+    try { if (await sendWaiting(tripId)) load(); } finally { setSending((n) => n - 1); } // PW-07
     setWaiting(queue.load());
   }, [me, load]);
   const changeWaiting = (next: Waiting[]) => { queue.save(next); setWaiting(next); flushWaiting(); }; // PW-09: try again, remove

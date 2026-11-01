@@ -1,5 +1,6 @@
 // Share links, the credentials sent to the API and what each role may do (AU-01, AU-02, AU-08, AU-20). Pure, so it runs under node --test.
 import { accessFor, ALL_ACCESS, resolve, type AccessConfig, type Rules } from "@trip/schema/src/rules.ts";
+import { sv } from "./sv.ts";
 
 export type LinkHash = { kind: "link"; key: string; tripId: string } | { kind: "admin" } | null;
 
@@ -50,6 +51,8 @@ export function roleIn(me: Me, tripId: string | undefined): { role: Role; travel
   }
   return "travelerId" in me ? { role: me.role, travelerId: me.travelerId } : { role: me.role };
 }
+/** Who is logged in, in the chip on Drömmar: the user's name, or the admin password's holder (US-25). */
+export const whoChip = (me: Me) => ("user" in me ? me.user.name : sv.admin);
 /** The user's roles on a trip, as icons on its card on Drömmar (US-23). */
 export const roleIcons = (me: Me, tripId: string) => ("user" in me ? me.trips[tripId]?.roles ?? [] : []);
 /** The password link of an account (US-04): the secret after #, as for the share links. */

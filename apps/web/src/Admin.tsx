@@ -56,6 +56,7 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
       {google && installed && <p className="ro note">{sv.login.googleInstalled}</p>}
     </form>
     {installed && <PasteLink />}
+    <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a></p> {/* UI-13 */}
   </>;
 }
 

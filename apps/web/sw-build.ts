@@ -24,7 +24,7 @@ self.addEventListener("fetch", (e) => {
   const r = e.request, url = new URL(r.url);
   if (r.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
   if (r.mode === "navigate") {
-    const net = fetch(r).then((res) => { if (res.ok) { const c = res.clone(); caches.open(CACHE).then((x) => x.put("/", c)); } return res; });
+    const net = fetch(r).then((res) => { if (res.ok && url.pathname === "/") { const c = res.clone(); caches.open(CACHE).then((x) => x.put("/", c)); } return res; }); // only the app's page (PW-21)
     const slow = new Promise((ok) => setTimeout(ok, 4000)).then(() => caches.match("/"));
     e.respondWith(Promise.race([net, slow.then((hit) => hit || net)]).catch(() => caches.match("/")));
     return;

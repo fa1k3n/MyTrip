@@ -1,6 +1,6 @@
 // All interface text in one place (LC-01).
 export const sv = {
-  hub: "Drömmar", family: "Familjen", newTrip: "+ Skapa ny resa", newTripTitle: "Ny resa",
+  hub: "Drömmar", admin: "Administratör" /* US-25 */, newTrip: "+ Skapa ny resa", newTripTitle: "Ny resa",
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", tripSettings: "Resans inställningar", // MT-13
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Minnas" },
@@ -150,6 +150,7 @@ export const sv = {
     expired: "Länken gäller inte längre. Be om en ny länk, eller logga in med ditt konto.",
     email: "Mejladress", google: "Logga in med Google", // US-07, US-09
     googleInstalled: "Google-inloggning fungerar inte i appen på hemskärmen. Logga in med mejladress och lösenord här, eller med Google i Safari.", // US-19
+    about: "Om Basläger", // UI-13
     noAccount: "Det finns inget konto för den här adressen.", googleFailed: "Inloggningen med Google gick inte. Försök igen.",
     setTitle: "Välj lösenord", setFor: (name: string, email: string) => `Kontot för ${name}, ${email}.`, min: "Minst 10 tecken.", // US-05
     setSave: "Spara och logga in", setGone: "Länken gäller inte längre. Be den som skapade kontot om en ny.", setShort: "Lösenordet behöver minst 10 tecken.",

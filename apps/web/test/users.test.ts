@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseLinkHash, parseSetupHash, permsFor, roleIcons, roleIn, setupUrl } from "../src/access.ts";
+import { parseLinkHash, parseSetupHash, permsFor, roleIcons, roleIn, setupUrl, whoChip } from "../src/access.ts";
 
 const me = {
   role: "account" as const, user: { id: "olle", name: "Olle", superuser: false },
@@ -46,4 +46,10 @@ test("US-23 US-24 the role icons of a trip card", () => {
   assert.deepEqual(roleIcons(me, "berlin"), ["planner"]);
   assert.deepEqual(roleIcons(me, "nope"), []);
   assert.deepEqual(roleIcons({ role: "admin" }, "egen"), []); // the admin password has no account
+});
+
+// REQ: US-25 the chip on Drömmar names who is logged in
+test("US-25 the chip on Drömmar shows the user, or Administratör for the admin password", () => {
+  assert.equal(whoChip(me), "Olle");
+  assert.equal(whoChip({ role: "admin" }), "Administratör");
 });

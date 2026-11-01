@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { forInstalled, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint } from "./access.ts";
+import { forInstalled, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -379,7 +379,7 @@ export function App() {
     {me && roleIn(me, undefined).role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13, US-02 */}
   </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{me && "user" in me ? me.user.name : sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr">{me && <span className="chip">{whoChip(me)}</span>}<Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
       <IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div></div>
     <div className="grid">
       {trips.map((x) => (

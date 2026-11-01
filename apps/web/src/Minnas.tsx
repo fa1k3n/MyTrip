@@ -80,9 +80,9 @@ function Minnen({ t, memories, run, today, edit, by, setBy, views }: Props) {
     </div>;
   };
   return <>
-    <div className="vhead"><h2>{sv.minnas.memories}</h2>
+    <div className="vhead"><span className="vtitle"><h2>{sv.minnas.memories}</h2>{/* the album beside the heading, so the view buttons are the same in both views (MI-39) */}
+        {t.album && <a className="btn ghost icon tip-right" href={t.album} target="_blank" rel="noopener noreferrer" aria-label={sv.minnas.album} data-tip={sv.minnas.album}><Icon name="image" /></a>}</span>
       <span className="end">
-        {t.album && <a className="btn ghost icon tip-left" href={t.album} target="_blank" rel="noopener noreferrer" aria-label={sv.minnas.album} data-tip={sv.minnas.album}><Icon name="image" /></a>}
         {wider && <><IconButton icon="prev" label={sv.minnas.prev} onClick={() => step(-1)} tip="left" /><IconButton icon="next" label={sv.minnas.next} onClick={() => step(1)} tip="left" /></>}
         {views}
       </span></div>

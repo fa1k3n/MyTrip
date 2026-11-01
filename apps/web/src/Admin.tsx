@@ -105,10 +105,10 @@ function ShareLink({ t }: { t: Trip }) {
     <div className="card">
       <h3>{svAdmin.share.title}</h3>
       <p className="ro note">{svAdmin.share.hint}</p>
-      {secret && <input readOnly value={url} aria-label={svAdmin.share.title} onFocus={(e) => e.currentTarget.select()} />}
       {secret !== undefined && (
-        <div className="row mid">
-          <span className="ro">{copied ? svAdmin.share.copied : secret ? "" : svAdmin.share.none}</span>
+        <div className="row mid">{/* the field and its buttons on one row, as for the personal links */}
+          {secret ? <input className="linkfield" readOnly value={url} aria-label={svAdmin.share.title} onFocus={(e) => e.currentTarget.select()} />
+            : <span className="ro">{svAdmin.share.none}</span>}
           <span className="end">
             {secret && <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(svAdmin.people.follower)} onClick={() => setShowQr(true)} />}
             {secret && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.share.copy} onClick={copy} />}
@@ -116,6 +116,7 @@ function ShareLink({ t }: { t: Trip }) {
           </span>
         </div>
       )}
+      {copied && <p className="ro" role="status">{svAdmin.share.copied}</p>}
       {showQr && url && <QrDialog url={url} name={svAdmin.people.follower} close={() => setShowQr(false)} />}
     </div>
   );
@@ -137,14 +138,15 @@ function Inbox({ t }: { t: Trip }) {
     <div className="card">
       <h3>{svAdmin.inbox.title}</h3>
       <p className="ro note">{box.enabled ? svAdmin.inbox.hint : svAdmin.inbox.off}</p>
-      {box.address && <input readOnly value={box.address} aria-label={svAdmin.inbox.title} onFocus={(e) => e.currentTarget.select()} />}
       {box.enabled && <div className="row mid">
-        <span className="ro">{copied ? svAdmin.inbox.copied : box.address ? "" : svAdmin.inbox.none}</span>
+        {box.address ? <input className="linkfield" readOnly value={box.address} aria-label={svAdmin.inbox.title} onFocus={(e) => e.currentTarget.select()} />
+          : <span className="ro">{svAdmin.inbox.none}</span>}
         <span className="end">
           {box.address && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.inbox.copy} onClick={copy} />}
           <IconButton icon={box.address ? "refresh" : "plus"} look="bare" tip="left" label={box.address ? svAdmin.inbox.replace : svAdmin.inbox.create} onClick={make} />
         </span>
       </div>}
+      {copied && <p className="ro" role="status">{svAdmin.inbox.copied}</p>}
     </div>
   );
 }
@@ -287,10 +289,10 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
 }) {
   return <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={back} tip="right" /></div><h1>{sv.admin}</h1>
-    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
+    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{sv.name}: {t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
       <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
       <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div>
-      <div className="row mid"><span>{sv.minnas.albumLabel}: {t.album ? <a href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}</span><IconButton icon="edit" look="bare" tip="left" label={sv.minnas.editAlbum} onClick={() => edit({ kind: "album" })} /></div></div>
+      <div className="row mid"><span>{sv.minnas.albumLabel}: {t.album ? <a className="place" href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}</span><IconButton icon="edit" look="bare" tip="left" label={sv.minnas.editAlbum} onClick={() => edit({ kind: "album" })} /></div></div>
     <PeopleLinks t={t} add={addPerson} />
     <Sharing t={t} run={run} />
     {superuser && <Permissions t={t} run={run} />}

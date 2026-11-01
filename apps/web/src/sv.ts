@@ -4,6 +4,17 @@ export const sv = {
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", admin: "Admin & Inställningar",
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Minnas" },
+  wish: { // DB-05..DB-14
+    url: "Länk till sidan (valfri)", badUrl: "Ange en adress som börjar med https:// eller http://.", photoBy: "Foto:", commons: "Wikimedia Commons", about: "Om önskan", more: (title: string) => `Mer om ${title}`, openPage: "Öppna sidan", credited: "Fotograf och licens finns under Om önskan",
+    image: (title: string) => `Bild för ${title}`, query: "Sök bild med orden", find: "Sök", finding: "Söker …", use: "Använd",
+    none: "Hittade ingen bild med fri licens. Prova andra ord eller ladda upp ett eget foto.", busy: "Wikimedia svarar inte just nu. Försök igen om en stund.",
+    upload: "Ladda upp eget foto", uploading: "Laddar upp …", badPhoto: "Kunde inte läsa fotot. Prova ett annat.", failed: "Kunde inte spara bilden.",
+    remove: "Ta bort bilden", removeAsk: "Ta bort bilden från önskan?", saveLink: "Spara länken",
+    hint: "Bilder hämtas bara från Wikimedia Commons med fri licens, utan AI, och sparas hos oss med fotograf och licens.",
+    cache: "Bildcache", cacheText: "Ta bort automatiskt hämtade bilder från resor som är avslutade. Egna foton behålls.", cacheButton: "Töm cachen för avslutade resor",
+    cacheAsk: (images: number, kb: number) => `Ta bort ${images} bilder från avslutade resor? Det frigör ${kb} kB. Egna foton behålls.`,
+    cacheDone: (images: number, kb: number) => `Tog bort ${images} bilder och frigjorde ${kb} kB.`, cacheEmpty: "Det finns inga hämtade bilder i avslutade resor.",
+  },
   minnas: { // MI-15..MI-25
     memories: "Upplevt", budget: "Pengar", views: "Upplevt eller pengar", listed: (what: string, n: number) => `${what} (${n})`,
     notYet: "Här hamnar önskningarna ni har fått uppleva, när deras dag har varit.", album: "Öppna det delade albumet",
@@ -16,9 +27,12 @@ export const sv = {
     albumLabel: "Länk till delat album", noAlbum: "Ingen", editAlbum: "Ändra länken till albumet", albumHint: "En https-adress till ett album ni delar. Lämna tomt för att ta bort den.", badAlbum: "Ange en adress som börjar med https://.",
     outcome: "Utfall", used: (used: string, max: string) => `${used} av ${max}`, left: (s: string) => `${s} kvar`, over: (s: string) => `${s} över`,
     spent: "Utlägg totalt",
+    relink: (text: string) => `Ändra vilken aktivitet ${text} gäller`, relinkTitle: "Gäller", relinkGone: "Utlägget eller aktiviteten finns inte längre.", // MI-32
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",
   },
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
+    applies: "Gäller", noActivity: "Ingen", // UP-43, MI-32
+    sheetKicker: "Utlägg", what: "Vad gäller det?", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
     now: "Nu",
     place: "Visa platsen",
     expenseTitle: (name: string) => `Nytt utlägg för ${name}`, shortText: "Kort beskrivning (valfri)", shortTextNeeded: "Kort beskrivning",
@@ -36,7 +50,7 @@ export const sv = {
   from: "Från", to: "Till", note: "Notering",
   addPerson: "Lägg till person", newPerson: "Ny person", name: "Namn", noPeople: "Lägg till personerna som delar på kostnaderna.",
   budgetVsActual: "Budget mot utfall", of: "av", overPlan: "över plan", sum: "Summa", badAmount: "Ange ett belopp större än noll, t.ex. 640,50.",
-  budgetCategories: ["Boende", "Transport", "Mat/Fritid", "Övrigt"],
+  budgetCategories: ["Boende", "Transport", "Mat", "Upplevelse", "Shopping", "Övrigt"], // MI-30
   expandAll: "Visa alla dagar", collapseAll: "Fäll ihop alla", travelTime: "restid på dagen",
   bookings: "Bokningar", budget: "Budget", paidSoFar: "Betalt hittills:", showList: "Visa lista", showChart: "Visa diagram",
   budgetChart: "Budget per kategori", total: "totalt",

@@ -3,6 +3,7 @@ import type { Op } from "@trip/schema";
 import { kr } from "./format.ts";
 import { budgetLimit } from "./budget.ts";
 import { sv } from "./sv.ts";
+import { activityEnd, toMin } from "./time.ts";
 
 type Person = { id: string };
 type ExpenseLike = { amount: number; paidBy: string; sharedBy: string[] };
@@ -82,13 +83,17 @@ export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date
   return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, ...(input.activityId ? { activityId: input.activityId } : {}), ...converted(amount, input.foreign), addedBy: input.addedBy, addedAt: at } }] };
 }
 
-/** An activity's budget category for its expenses: Resa is Transport, Klockslag and unknown ones Övrigt, the rest Mat/Fritid (UP-22). */
-const EXPENSE_CATEGORY: Record<string, string> = { Resa: "Transport", Klockslag: "Övrigt", Mat: "Mat/Fritid", Utsikt: "Mat/Fritid", Aktivitet: "Mat/Fritid",
-  Avkoppling: "Mat/Fritid", Museum: "Mat/Fritid", Bad: "Mat/Fritid", Shopping: "Mat/Fritid", Natur: "Mat/Fritid" };
+/** An activity's budget category for its expenses (UP-22, MI-30): Resa is Transport, Mat Mat, Shopping Shopping, Klockslag and unknown ones
+ * Övrigt, the rest Upplevelse. */
+const EXPENSE_CATEGORY: Record<string, string> = { Resa: "Transport", Klockslag: "Övrigt", Mat: "Mat", Shopping: "Shopping", Utsikt: "Upplevelse", Aktivitet: "Upplevelse",
+  Avkoppling: "Upplevelse", Museum: "Upplevelse", Bad: "Upplevelse", Natur: "Upplevelse" };
+
+/** The budget category an activity's expenses get (UP-22, UP-43). */
+export const activityCategory = (category?: string) => EXPENSE_CATEGORY[category ?? ""] ?? "Övrigt";
 
 /** The short form for an activity: only the amount and an optional description, which falls back to the activity's title (UP-22). */
 export function activityExpense(a: { id: string; text: string; category?: string }, f: { text: string; amount: string }, payer: string, sharedBy: string[]): ExpenseInput {
-  return { text: f.text.trim() || a.text, amount: f.amount, category: EXPENSE_CATEGORY[a.category ?? ""] ?? "Övrigt", paidBy: payer, sharedBy, addedBy: payer, activityId: a.id };
+  return { text: f.text.trim() || a.text, amount: f.amount, category: activityCategory(a.category), paidBy: payer, sharedBy, addedBy: payer, activityId: a.id };
 }
 
 /** Summera's and Uppleva's short form without an activity: the category from the form (MI-13, UP-30). */
@@ -131,4 +136,56 @@ export function splitOps(t: { travelers: Person[]; expenses: { id: string }[] },
   if (i < 0) return { ok: false, error: sv.errors.expenseText };
   if (!selected.some((s) => t.travelers.some((x) => x.id === s))) return { ok: false, error: sv.minnas.splitNeeded };
   return { ok: true, ops: [{ op: "set", path: `expenses/${i}/sharedBy`, value: sharedByValue(selected, t.travelers.map((x) => x.id)) }] };
+}
+
+const TILE_SHAPES: Record<string, string> = { Boende: "bed", Transport: "car", Mat: "utensils", Upplevelse: "ferris", Shopping: "bag" };
+/** The category tiles of the form for an expense without an activity, Mat chosen at first (UP-42, MI-30). */
+export const expenseTiles = () => sv.budgetCategories.map((name) => ({ name, shape: TILE_SHAPES[name] ?? "ellipsis", chosen: name === "Mat" }));
+
+const FORMER = "Mat/Fritid";
+/** Ops that convert the former category Mat/Fritid once: an activity's expense becomes Upplevelse or Shopping when its activity leads
+ * there, everything else Mat (MI-31). */
+export function recategorizeOps(t: { days: { activities: { id: string; category?: string }[] }[]; budget: { category: string }[]; expenses: { category: string; activityId?: string }[] }): Op[] {
+  const acts = new Map(t.days.flatMap((d) => d.activities.map((a) => [a.id, a.category ?? ""] as const)));
+  const ops: Op[] = [];
+  t.budget.forEach((b, i) => { if (b.category === FORMER) ops.push({ op: "set", path: `budget/${i}/category`, value: "Mat" }); });
+  t.expenses.forEach((e, i) => {
+    if (e.category !== FORMER) return;
+    const via = EXPENSE_CATEGORY[acts.get(e.activityId ?? "") ?? ""];
+    ops.push({ op: "set", path: `expenses/${i}/category`, value: via === "Upplevelse" || via === "Shopping" ? via : "Mat" });
+  });
+  return ops;
+}
+
+type Planned = { id: string; start?: string; end?: string; durationMin?: number; hidden?: boolean };
+/** The activity an expense added now most likely belongs to: the one going on by the plan, else the one that started most recently,
+ * less than an hour ago; never a hidden one; none without a clock (another day than today) (UP-43). */
+export function guessActivity(list: Planned[], now: string | undefined) {
+  if (!now) return undefined;
+  const at = toMin(now), started = list.filter((a) => !a.hidden && a.start && toMin(a.start) <= at);
+  const going = started.filter((a) => { const end = activityEnd(a); return end && at < toMin(end); });
+  const last = (xs: Planned[]) => xs.reduce<Planned | undefined>((b, a) => (!b || toMin(a.start!) >= toMin(b.start!) ? a : b), undefined);
+  const recent = last(started);
+  return last(going)?.id ?? (recent && at - toMin(recent.start!) < 60 ? recent.id : undefined);
+}
+
+type Day = { date: string; activities: (Planned & { text: string; category?: string })[] };
+/** The activities an expense can be moved to: those of its day that are not hidden, and its current one (MI-32). */
+export function linkChoices(t: { days: Day[] }, e: { date?: string; activityId?: string }) {
+  const own = t.days.find((d) => d.date === e.date)?.activities.filter((a) => !a.hidden) ?? [];
+  const current = own.some((a) => a.id === e.activityId) ? undefined : t.days.flatMap((d) => d.activities).find((a) => a.id === e.activityId);
+  return current ? [...own, current] : own;
+}
+
+/** A Planerare and the superuser change every expense's activity, a traveler only their own (MI-32). */
+export const mayRelink = (e: { addedBy?: string }, who: { manager: boolean; self?: string }) => who.manager || (!!who.self && e.addedBy === who.self);
+
+/** Moving an expense to another activity, or none, with the category confirmed in the same step (MI-32). */
+export function relinkOps(t: { days: Day[]; expenses: { id: string; activityId?: string; category: string }[] }, id: string, activityId: string, category: string): { ok: true; ops: Op[] } | { ok: false; error: string } {
+  const i = t.expenses.findIndex((e) => e.id === id), e = t.expenses[i];
+  if (!e || (activityId && !t.days.some((d) => d.activities.some((a) => a.id === activityId)))) return { ok: false, error: sv.minnas.relinkGone };
+  const ops: Op[] = [];
+  if ((e.activityId ?? "") !== activityId) ops.push(activityId ? { op: "set", path: `expenses/${i}/activityId`, value: activityId } : { op: "remove", path: `expenses/${i}/activityId` });
+  if (e.category !== category) ops.push({ op: "set", path: `expenses/${i}/category`, value: category });
+  return { ok: true, ops };
 }

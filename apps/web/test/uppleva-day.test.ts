@@ -47,11 +47,11 @@ test("UP-20 newExpense with activityId", () => {
 test("UP-22 activityExpense", () => {
   const lunch = { id: "a7", text: "Lunch i Lübeck", category: "Mat" };
   assert.deepEqual(activityExpense(lunch, { text: " ", amount: "420" }, "anna", ["anna", "bo"]),
-    { text: "Lunch i Lübeck", amount: "420", category: "Mat/Fritid", paidBy: "anna", sharedBy: ["anna", "bo"], addedBy: "anna", activityId: "a7" });
+    { text: "Lunch i Lübeck", amount: "420", category: "Mat", paidBy: "anna", sharedBy: ["anna", "bo"], addedBy: "anna", activityId: "a7" });
   assert.equal(activityExpense(lunch, { text: " Glass ", amount: "60" }, "anna", []).text, "Glass");
   assert.equal(activityExpense({ ...lunch, category: "Resa" }, { text: "", amount: "1" }, "anna", []).category, "Transport");
   assert.equal(activityExpense({ ...lunch, category: "Klockslag" }, { text: "", amount: "1" }, "anna", []).category, "Övrigt");
-  assert.equal(activityExpense({ ...lunch, category: "Museum" }, { text: "", amount: "1" }, "anna", []).category, "Mat/Fritid");
+  assert.equal(activityExpense({ ...lunch, category: "Museum" }, { text: "", amount: "1" }, "anna", []).category, "Upplevelse");
   assert.equal(activityExpense({ id: "x", text: "Okänd" }, { text: "", amount: "1" }, "anna", []).category, "Övrigt");
   assert.equal(sv.up.expenseTitle("Lunch i Lübeck"), "Nytt utlägg för Lunch i Lübeck");
 });

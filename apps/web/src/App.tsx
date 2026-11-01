@@ -17,7 +17,8 @@ import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.t
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
-import { activityExpense, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
+import { activityCategory, activityExpense, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
+import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
 import { Gear, IconButton } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
@@ -26,11 +27,16 @@ const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Adm
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
+const WishImage = lazy(() => import("./WishImage.tsx")); // DB-05..DB-08
+const WishView = lazy(() => import("./Dreams.tsx").then((m) => ({ default: m.WishView }))); // DB-15
 import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
+import { newWish, toFill } from "./wishes.ts";
 
-type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string }; payer?: boolean } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | EditDlg;
-const dlgTitle = { dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
+const filling = new Set<string>(); // wishes already sent for an automatic image on this page (DB-07)
+
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string }; payer?: boolean; choices?: Choice[]; guess?: string } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | { kind: "wishImage"; id: string } | EditDlg;
+const dlgTitle = { wishImage: sv.wish.find, dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
 const ADDER_KEY = "mytrip.adder";
 const HINT_KEY = "mytrip.installHint";
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}`;
@@ -203,13 +209,20 @@ export function App() {
     await api.remove(tripId); setView("portal"); load();
   };
   const saveDream = (form: HTMLFormElement) => {
-    const f = new FormData(form), title = String(f.get("title") ?? "").trim();
-    if (!title) return;
-    const id = `dream-${Date.now().toString(36)}`;
-    const category = String(f.get("category"));
-    change([{ op: "add", path: "dreams/-", value: { id, title, category, source: sv.manual, icon: "✨", votes: 0 } }], "add dream");
+    const f = new FormData(form), str = (k: string) => String(f.get(k) ?? "");
+    const id = `dream-${Date.now().toString(36)}`, r = newWish({ title: str("title"), category: str("category"), url: str("url") }, id); // DB-05
+    if (!r.ok) return setErr(r.error);
+    filling.add(id);
+    change(r.ops, "add dream").then(() => api.autoWishImage(t!.id, id)).then(load, () => {}); // DB-07: an image at once, changed with the image button
     setDlg(null);
   };
+  useEffect(() => { // DB-07: wishes without an image get one once, one at a time, when someone who changes wishes opens Önska
+    if (!t || view !== "trip" || tab !== "dr" || permsFor(role, t).view.dr.dreams !== "write") return;
+    const todo = toFill(t).filter((id) => !filling.has(id));
+    if (!todo.length) return;
+    todo.forEach((id) => filling.add(id));
+    (async () => { for (const id of todo) await api.autoWishImage(t.id, id).catch(() => {}); load(); })();
+  }, [t, view, tab, role, load]);
   /** Edits from the Nåla forms: the error text or null (ED-10). */
   const apply = async (ops: Op[], reason: string): Promise<string | null> => {
     try {
@@ -271,7 +284,9 @@ export function App() {
       const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
       if (rate === null) return setErr(sv.up.noRate(cur));
       const foreign = rate && { currency: cur, rate: rate.rate, rateDate: rate.date };
-      const input = { ...(activity ? activityExpense(activity, { text: str("text"), amount: str("amount") }, payer, all) // UP-22, UP-23
+      const chosen = activity ?? short?.choices?.find((x) => x.id === str("activity")); // the card's activity, or the one chosen in the sheet (UP-43)
+      const input = { ...(chosen ? { ...activityExpense(chosen, { text: str("text"), amount: str("amount") }, payer, all), // UP-22, UP-23
+        ...(activity ? {} : { category: str("category") || activityCategory(chosen.category) }) } // the sheet's tiles can change the category
         : plainExpense({ text: str("text"), amount: str("amount"), category: str("category") }, payer, all)), ...(foreign ? { foreign } : {}) }; // shared by all; split in Summera (MI-02)
       const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
@@ -282,7 +297,7 @@ export function App() {
         flushWaiting();
       } else change(r.ops, "add expense");
       { // after the dialog has closed, over the button that opened it (UP-35)
-        const at = origin.current, label = burstLabel(r.ops[0].value as Expense, t!.currency);
+        const at = origin.current, label = burstLabel(r.ops[0].value as Expense, t!.currency, chosen?.text); // UP-44
         setTimeout(() => burst(at, label), 80);
       }
     } else {
@@ -293,6 +308,8 @@ export function App() {
     }
     setDlg(null);
   };
+  const currencyField = (preset: string) => <label>{sv.currency}<span className="rolepick field"><select name="currency" defaultValue={preset}>
+    {[...new Set([preset, t!.currency, ...sv.currencies])].map((c) => <option key={c}>{c}</option>)}</select></span></label>; // UP-23, UP-34
   const people = (field: string, pick = 0, value = t?.travelers[pick]?.id) => (
     <select name={field} defaultValue={value}>{t?.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
   );
@@ -343,9 +360,9 @@ export function App() {
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} toggleChart={() => setChart((c) => !c)}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
-      addDream={() => setDlg({ kind: "dream" })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
+      addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
-      addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity } }); }} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
+      addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} addPerson={() => setDlg({ kind: "person" })} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} unlock={unlock} setUnlock={setUnlock} perms={pagePerms(t)} self={self}
       memoryBy={self ?? (permsFor(role, t).superuser ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
@@ -360,7 +377,7 @@ export function App() {
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
     <dialog
-      ref={dialog} className={dlg?.kind === "tickets" ? "full" : undefined} aria-label={!dlg ? undefined
+      ref={dialog} className={dlg?.kind === "tickets" ? "full" : dlg?.kind === "expense" && !dlg.short.activity ? "sheet" : undefined} aria-label={!dlg ? undefined
         : dlg.kind === "place" ? t?.places.find((x) => x.id === dlg.id)?.name
         : dlg.kind === "transport" ? sv.transport
         : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
@@ -377,11 +394,15 @@ export function App() {
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}
       {dlg?.kind === "tickets" && t && <TicketView t={t} bookingId={dlg.bookingId} />}
+      {dlg?.kind === "wish" && t && <WishView t={t} id={dlg.id} />}
+      {dlg?.kind === "wishImage" && t && <WishImage key={dlg.id} t={t} id={dlg.id} change={change} done={() => { setDlg(null); load(); }} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>
           <h3>{sv.newDream}</h3>
           <label>{sv.title}<input name="title" autoFocus /></label>
           <label>{sv.category}<select name="category">{CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
+          <label>{sv.wish.url}<input name="url" type="url" inputMode="url" placeholder="https://" /></label>
+          {err && <p className="err" role="alert">{err}</p>}
           <button className="btn" type="submit">{sv.save}</button>
         </form>
       )}
@@ -391,19 +412,19 @@ export function App() {
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
         <form key={JSON.stringify(dlg)} onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
-          <h3>{dlg.kind === "expense" && dlg.short?.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlgTitle[dlg.kind]}</h3>
+          {dlg.kind === "expense" && !dlg.short.activity && <small className="kicker">{sv.up.sheetKicker}</small> /* UP-42 */}
+          <h3>{dlg.kind === "expense" && dlg.short.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlgTitle[dlg.kind]}</h3>
           {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus /></label>}
-          {dlg.kind === "expense" && dlg.short && <> {/* amount, currency and a short description; a category without an activity (UP-22, UP-30) */}
+          {dlg.kind === "expense" && dlg.short.activity && <> {/* an activity's expense: amount, currency and a short description (UP-22, UP-30) */}
             <div className="two">
               <label>{sv.amount.replace(" (kr)", "")}<input name="amount" inputMode="decimal" autoFocus /></label>
-              <label>{sv.currency}<span className="rolepick field"><select name="currency" defaultValue={dlg.short.currency}>{[...new Set([dlg.short.currency, t!.currency, ...sv.currencies])].map((c) => <option key={c}>{c}</option>)}</select></span></label>
+              {currencyField(dlg.short.currency)}
             </div>
-            {dlg.short.activity ? <label>{sv.up.shortText}<input name="text" maxLength={60} placeholder={dlg.short.activity.text} /></label> : <>
-              <label>{sv.up.shortTextNeeded}<input name="text" maxLength={60} /></label>
-              <label>{sv.category}<span className="rolepick field"><select name="category">{sv.budgetCategories.map((c) => <option key={c}>{c}</option>)}</select></span></label> {/* like the settings (UP-34) */}
-            </>}
-            {dlg.short.payer && !self && <label>{sv.paidBy}<span className="rolepick field">{people("paidBy", 0, adder())}</span></label> /* Summera: the superuser picks who paid (MI-13, UP-13) */}
+            <label>{sv.up.shortText}<input name="text" maxLength={60} placeholder={dlg.short.activity.text} /></label>
           </>}
+          {dlg.kind === "expense" && !dlg.short.activity && /* without a fixed activity: its own sheet, guessing the activity (UP-30, UP-42, UP-43) */
+            <ExpenseSheet choices={dlg.short.choices} guess={dlg.short.guess} currency={currencyField(dlg.short.currency)}
+              payer={dlg.short.payer && !self ? <label>{sv.paidBy}<span className="rolepick field">{people("paidBy", 0, adder())}</span></label> : undefined /* Summera: the superuser picks who paid (MI-13, UP-13) */} />}
           {dlg.kind === "payment" && <>
             <label>{sv.from}{people("from")}</label>
             <label>{sv.to}{people("to", 1)}</label>
@@ -411,7 +432,7 @@ export function App() {
             <label>{sv.note}<input name="note" /></label>
           </>}
           {err && <p className="err" role="alert">{err}</p>}
-          <button className="btn" type="submit">{sv.save}</button>
+          <button className={`btn${dlg.kind === "expense" && !dlg.short.activity ? " wide" : ""}`} type="submit">{dlg.kind === "expense" && !dlg.short.activity ? sv.up.saveExpense : sv.save}</button>
         </form>
       )}
     </dialog>

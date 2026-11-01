@@ -41,7 +41,7 @@
     },
     {
       "id": "bg-2",
-      "category": "Mat/Fritid",
+      "category": "Mat",
       "amount": 4100,
       "paid": true,
       "owner": "Erik"
@@ -67,7 +67,7 @@
     {
       "id": "exp-2",
       "text": "Glass och fika",
-      "category": "Mat/Fritid",
+      "category": "Mat",
       "amount": 640,
       "paidBy": "lisa",
       "sharedBy": [],
@@ -85,7 +85,7 @@
     {
       "id": "exp-4",
       "text": "Middag i Ystad",
-      "category": "Mat/Fritid",
+      "category": "Mat",
       "amount": 2310,
       "paidBy": "lisa",
       "sharedBy": [],

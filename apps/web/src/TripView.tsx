@@ -162,9 +162,9 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
 export type TripViewProps = {
   t: Trip; cover?: string; tab: Tab; open: Open; chart: boolean; forecast: Record<string, Forecast>;
   setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; toggleChart: () => void;
-  place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; back: () => void; admin: () => void;
+  place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; back: () => void; admin: () => void;
   today: string; upDay: string | null; setUpDay: (id: string) => void;
-  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }) => void; /* Uppleva (UP-22, UP-30) */ addPayment: (prefill?: Transfer) => void; addPerson: () => void;
+  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }, pick?: { choices: { id: string; text: string; category?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void; addPerson: () => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
@@ -189,7 +189,7 @@ export function TripView(p: TripViewProps) {
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
   let main;
-  if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} /></Suspense>;
+  if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })} /></Suspense>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
       <button className="stop" key={`${s.dayId}-${i}`} aria-current={s.dayId === now ? "date" : undefined} onClick={() => p.jump(s.dayId)}><b>{stopLabel(s)}</b><small>{s.sub}</small></button>
@@ -211,7 +211,7 @@ export function TripView(p: TripViewProps) {
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Minnas t={t} addExpense={p.addExpense} addPayment={p.addPayment} addPerson={p.addPerson}
     expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} people={perms.settings} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
-    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} /></Suspense>;
+    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} self={p.self} /></Suspense>;
   return <>
     <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}

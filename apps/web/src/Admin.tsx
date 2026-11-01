@@ -242,6 +242,25 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
   );
 }
 
+/** Emptying the image cache of ended trips, for the superuser, with the count and size in the confirmation (DB-13). */
+function ImageCache() {
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const kb = (b: number) => Math.round(b / 1024);
+  const empty = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const s = await api.endedCache();
+      if (!s.images && !s.files) setMsg(sv.wish.cacheEmpty);
+      else if (confirm(sv.wish.cacheAsk(s.images, kb(s.bytes)))) { const r = await api.clearEndedCache(); setMsg(sv.wish.cacheDone(r.images, kb(r.bytes))); }
+    } catch { setMsg(sv.wish.failed); }
+    setBusy(false);
+  };
+  return <div className="card"><h3>{sv.wish.cache}</h3><p className="ro">{sv.wish.cacheText}</p>
+    <button className="btn ghost" type="button" disabled={busy} onClick={empty}>{sv.wish.cacheButton}</button>
+    {msg && <p className="ro note" role="status">{msg}</p>}</div>;
+}
+
 /** The trip's settings. A Planerare sees the trip's own settings; the app settings, API key and deleting are for the superuser (AU-14). */
 export function AdminPage({ t, superuser, settings, back, edit, addPerson, change, run, removeTrip, openSettings }: {
   t: Trip; superuser: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
@@ -258,6 +277,7 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
     <ShareLink t={t} />
     <Inbox t={t} />
     {superuser && maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
+    {superuser && <ImageCache />}
     {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
     {superuser && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;

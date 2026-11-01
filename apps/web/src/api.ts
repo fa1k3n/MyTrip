@@ -63,6 +63,8 @@ const headers = (key = link) => {
 };
 
 /** A failed call, with the server's list of problems when it sent one (ED-10). */
+export type WishCredit = { page: string; author?: string; licence: string; licenceUrl?: string }; // DB-07
+export type CacheSummary = { trips: number; images: number; files: number; bytes: number }; // DB-13
 export class ApiError extends Error {
   status: number;
   problems: string[];
@@ -181,6 +183,18 @@ export const api = {
     if (!r.ok) throw new ApiError(r.status, []);
     return r.blob();
   },
+  // DB-07, DB-12, DB-13: wish images from Commons through our own server, own photos, and the cache of ended trips.
+  findWishImage: (tripId: string, wid: string, query: string) =>
+    call<{ found?: WishCredit | null; preview?: string; failed?: true }>(`${trip(tripId)}/dreams/${encodeURIComponent(wid)}/image/find`, { method: "POST", body: JSON.stringify({ query }) }),
+  chooseWishImage: (tripId: string, wid: string, query: string) =>
+    call<{ revision: number }>(`${trip(tripId)}/dreams/${encodeURIComponent(wid)}/image`, { method: "POST", body: JSON.stringify({ query }) }),
+  autoWishImage: (tripId: string, wid: string) => call<unknown>(`${trip(tripId)}/dreams/${encodeURIComponent(wid)}/image/auto`, { method: "POST", body: "{}" }),
+  uploadWishImage: async (tripId: string, wid: string, blob: Blob) => {
+    const r = await fetch(`${trip(tripId)}/dreams/${encodeURIComponent(wid)}/image/upload`, { method: "POST", headers: { ...headers(), "content-type": blob.type }, body: blob });
+    if (!r.ok) throw new ApiError(r.status, []);
+  },
+  endedCache: () => call<CacheSummary>("/api/image-cache/ended"),
+  clearEndedCache: () => call<CacheSummary>("/api/image-cache/ended", { method: "POST" }),
   proposals: (id: string) => call<MailProposal[]>(`${trip(id)}/proposals`), // BK-17
   approveMail: (t: Trip, pid: string, ops: Op[]) =>
     call<unknown>(`${trip(t.id)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops }) }),

@@ -3,7 +3,7 @@
 import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Settings, Trip } from "@trip/schema";
-import { bySubscriber, isFileId, pushMatch, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
+import { bySubscriber, isFileId, pushMatch, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -79,6 +79,9 @@ export function fileStore(dir: string): Store {
     saveSettings: (s) => writeJson("settings.json", s),
     links: () => readJson<Record<string, string>>("links.json", {}),
     saveLinks: (l) => writeJson("links.json", l),
+    imageCache: () => readJson<CacheEntry[]>("image-cache.json", []), // DB-11
+    saveImageCache: (e) => serial(async () => writeJson("image-cache.json", [...(await readJson<CacheEntry[]>("image-cache.json", [])).filter((x) => x.key !== e.key), e])),
+    removeImageCache: (keys) => serial(async () => writeJson("image-cache.json", (await readJson<CacheEntry[]>("image-cache.json", [])).filter((x) => !keys.includes(x.key)))),
     personLinks: () => readJson<PersonLink[]>("person-links.json", []),
     savePersonLinks: (l) => writeJson("person-links.json", l),
     pushSubs: async (tripId) => (await readJson<PushSub[]>("push-subs.json", [])).filter((x) => x.tripId === tripId).sort(bySubscriber),

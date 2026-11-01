@@ -1,7 +1,7 @@
 // The store on Cloudflare: trips, settings, links, personal links, push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import { isFileId, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
+import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -74,6 +74,16 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
     async removeFiles(ids) {
       const ok = ids.filter(isFileId);
       if (ok.length) await db.batch(ok.map((id) => db.prepare("DELETE FROM files WHERE id = ?").bind(id)));
+    },
+    async imageCache() { // DB-11
+      const { results } = await db.prepare("SELECT json FROM image_cache ORDER BY key").all<{ json: string }>();
+      return results.map((r) => JSON.parse(r.json) as CacheEntry);
+    },
+    async saveImageCache(e) {
+      await db.prepare("INSERT INTO image_cache (key, json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET json = excluded.json").bind(e.key, JSON.stringify(e)).run();
+    },
+    async removeImageCache(keys) {
+      if (keys.length) await db.batch(keys.map((k) => db.prepare("DELETE FROM image_cache WHERE key = ?").bind(k)));
     },
     async loadSettings() {
       const row = await db.prepare("SELECT json FROM settings WHERE key = 'settings'").first<{ json: string }>();

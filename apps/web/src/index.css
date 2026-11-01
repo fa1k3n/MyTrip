@@ -392,6 +392,27 @@ dialog[open]{transition:opacity .2s,transform .22s cubic-bezier(.22,1,.36,1)}
 @starting-style{dialog[open]{opacity:0;transform:translateY(10px) scale(.98)}}
 dialog[open]::backdrop{transition:background-color .2s}
 @starting-style{dialog[open]::backdrop{background-color:rgba(0,0,0,0)}}
+/* An expense without an activity: its own sheet with category tiles (UP-42), opened from the floating button (UP-41). */
+.upday.withfab{padding-bottom:72px} /* the last card's buttons never under the floating button */
+@media (min-width:600px){ /* on a wide screen in the day's column, following the scroll, not far out in the window's corner (UP-41) */
+  .upday.withfab{padding-bottom:0}
+  .fabdock{position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:flex-end;margin-top:12px;pointer-events:none;z-index:3}
+  .fabdock .btn.fab.icon,.fabdock .btn.fab.icon[data-tip]{position:relative;right:auto;bottom:auto;pointer-events:auto}
+}
+dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px}dialog .kicker+h3{font-size:1.6rem;margin:0 0 14px}
+.tiles{border:0;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.tiles legend{padding:0;margin-bottom:6px;font-size:.9rem;color:var(--mute)}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;margin:0;padding:10px 4px;border:1.5px solid var(--line);border-radius:14px;font-size:.8rem;text-align:center;cursor:pointer;
+  transition:border-color .15s,background-color .15s,transform .18s cubic-bezier(.34,1.56,.64,1)}
+.tile input{position:absolute;opacity:0;pointer-events:none}.tile .cat{width:38px;height:38px}.tile .cat svg{width:19px;height:19px}
+.tile:has(:checked){border-color:var(--sage);background:color-mix(in srgb,var(--sage) 16%,var(--card))}.tile:has(:focus-visible){outline:3px solid var(--sage);outline-offset:2px}
+.tile:active{transform:scale(.95)}
+.btn.wide{display:block;width:100%;margin-top:6px;padding:14px}
+@media (max-width:599px){
+  dialog.sheet{margin:auto 0 0;width:100%;max-width:none;border-radius:22px 22px 0 0;padding:26px 20px calc(20px + env(safe-area-inset-bottom,0px))}
+  dialog.sheet::before{content:"";position:absolute;top:9px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line)} /* the grab handle */
+  @starting-style{dialog.sheet[open]{opacity:1;transform:translateY(100%)}}
+}
+@media (prefers-reduced-motion:reduce){.tile{transition:none}.tile:active{transform:none}}
 /* The wishes as a carousel that is swiped or stepped with the arrows (MI-27); wide enough for all buttons on one row. */
 .cstrip{display:grid;grid-auto-flow:column;grid-auto-columns:min(300px,86%);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
   padding:6px 4px 14px;margin:0 -4px;scrollbar-width:thin}
@@ -401,3 +422,14 @@ dialog[open]::backdrop{transition:background-color .2s}
 .said{margin:6px 0 0;font-size:.9rem;font-family:Fraunces,Georgia,serif;font-style:italic}.said small{font-style:normal}
 .calmbar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px}.calmbar span{display:block;height:100%;background:var(--sage);border-radius:99px}
 .calm{color:inherit}
+/* Wish images (DB-09): an own photo fills the card's image area; a Commons image is shown whole; the credit links licence and file. */
+.dream .img{position:relative;overflow:hidden}.wishpic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.wishpic.whole{object-fit:contain}
+.credit-s{display:block;margin-top:4px;font-size:.72rem;color:var(--mute)}.credit-s a{color:inherit}
+.img.open{width:100%;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.img.open:focus-visible{outline:3px solid var(--sage);outline-offset:-3px}.picinfo{position:absolute;right:6px;bottom:6px;width:18px;height:18px;border-radius:50%;background:var(--card);color:var(--mute);font:italic 700 .72rem/18px Georgia,serif;text-align:center;box-shadow:var(--sh);opacity:.85} /* DB-09: the credit lives under Om önskan */
+.wishbig{position:relative;margin:0 0 10px;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:var(--bg)} /* DB-15 */
+.wishtools{position:absolute;top:6px;left:6px}.wishtools .btn.icon{background:var(--card);box-shadow:var(--sh)} /* top left, opposite the heart, never under the add button */
+.cand{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.cand img{width:100%;height:160px;object-fit:contain;background:var(--bg)}.cand figcaption{padding:8px 10px;font-size:.78rem;color:var(--mute)}
+.cand .btn{margin:0 10px 10px;align-self:flex-start}
+.wishnow{position:relative;height:140px;border-radius:12px;overflow:hidden;margin-bottom:12px;background:var(--bg)}.wishnow .btn{position:absolute;top:8px;right:8px}
+.lblrow>label{flex:1}.lblrow>.btn{align-self:flex-end;margin-bottom:12px}.btn.upload{display:inline-block;margin:12px 0;cursor:pointer}

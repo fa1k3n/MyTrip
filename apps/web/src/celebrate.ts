@@ -2,10 +2,10 @@
 import { money } from "./budget.ts";
 import { kr } from "./format.ts";
 
-/** "+28,50 €": the amount as entered, in its own currency. */
-export function burstLabel(e: { amount: number; foreign?: { amount: number; currency: string } }, tripCurrency: string) {
-  if (e.foreign) return `+${money(e.foreign.amount, e.foreign.currency)}`;
-  return `+${tripCurrency === "SEK" ? kr(e.amount) : money(e.amount, tripCurrency)}`;
+/** "+28,50 €": the amount as entered, in its own currency; "+45 kr · Museum" with the activity it went to (UP-44). */
+export function burstLabel(e: { amount: number; foreign?: { amount: number; currency: string } }, tripCurrency: string, activity?: string) {
+  const sum = `+${e.foreign ? money(e.foreign.amount, e.foreign.currency) : tripCurrency === "SEK" ? kr(e.amount) : money(e.amount, tripCurrency)}`;
+  return activity ? `${sum} · ${activity}` : sum;
 }
 
 /** Where each coin flies: spread evenly over an arc above the button, from 160° to 20°. */

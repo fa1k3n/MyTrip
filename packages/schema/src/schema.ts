@@ -62,7 +62,16 @@ export const Traveler = z.object({
   packed: z.array(z.string()).default([]), // the items in `packing` that are checked (PK-05)
 });
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });
-export const Dream = z.object({ id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative(), hidden: z.boolean().optional() }); // hidden: AU-30
+export const Dream = z.object({
+  id: Id, title: z.string().min(1), category: z.string().min(1), source: z.string(), icon: z.string().min(1), votes: z.number().int().nonnegative(),
+  url: z.string().url().regex(/^https?:\/\//).optional(), // the wish's web page (DB-05)
+  image: z.object({ // a stored copy (DB-08): from Wikimedia Commons with its credit, or an own photo (DB-12)
+    file: z.string().regex(/^[a-z0-9]{16,40}$/), kind: z.enum(["commons", "own"]),
+    page: z.string().url().optional(), author: z.string().max(200).optional(), licence: z.string().max(100).optional(), licenceUrl: z.string().url().optional(),
+  }).optional(),
+  imageTried: z.boolean().optional(), // no image found automatically, or the user removed it: not tried again automatically (DB-07)
+  hidden: z.boolean().optional(), // AU-30
+});
 export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)

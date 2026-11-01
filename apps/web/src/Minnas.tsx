@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
-import { approveExpense, balanceText, balances, budgetVsActual, byDate, outcome, rejectExpense, settle, settled, unhandled, type Transfer, activityTitle } from "./money.ts";
+import { approveExpense, balanceText, balances, budgetVsActual, byDate, mayRelink, outcome, rejectExpense, settle, settled, unhandled, type Transfer, activityTitle } from "./money.ts";
 import { experienced, memoryOps, mineOf, notesOf, verdictCounts, VERDICTS, type MinnasView } from "./memories.ts";
 import { DreamCard } from "./Dreams.tsx";
 import { IconButton, Icon } from "./Icons.tsx";
@@ -19,6 +19,7 @@ type Props = {
   approver: boolean; run: Run; // a Planerare or the superuser approves unhandled expenses (MI-11) and splits them (MI-25)
   today: string; edit: (d: EditDlg) => void;
   by?: string; setBy?: (id: string) => void; // whose memories: the link's traveler, or the one the superuser picks (MI-17)
+  self?: string; // a personal link's traveler, who may move their own expenses to another activity (MI-32)
 };
 
 
@@ -86,7 +87,7 @@ function Minnen({ t, memories, run, today, edit, by, setBy }: Props) {
         {t.travelers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></span></label>}
     {!wishes.length ? <section className="card"><p className="ro">{sv.minnas.notYet}</p></section> : <>
       <div className="cstrip" ref={strip} role="region" aria-roledescription={sv.minnas.carousel} aria-label={sv.minnas.memories} tabIndex={0}>{wishes.map((d) => (
-        <DreamCard key={d.id} t={t} d={d} i={t.dreams.indexOf(d)} votes={false}>
+        <DreamCard key={d.id} t={t} d={d} i={t.dreams.indexOf(d)} votes={false} open={() => edit({ kind: "wish", id: d.id })}>
           {verdicts(d.id, d.title)}
           {notesOf(t, d.id).map((x) => <p className="said" key={x}>”{x}”</p>)}
         </DreamCard>
@@ -96,7 +97,7 @@ function Minnen({ t, memories, run, today, edit, by, setBy }: Props) {
 }
 
 /** Money follows the role's level on expenses and budget; adding travelers belongs to the trip's settings (AU-21, AU-22). */
-function Budget({ t, addExpense, addPayment, addPerson, expenses, budget, people, canAdd, approver, run, edit }: Props) {
+function Budget({ t, addExpense, addPayment, addPerson, expenses, budget, people, canAdd, approver, run, edit, self }: Props) {
   if (expenses === "hidden") return <section className="card"><h3>{sv.balance}</h3>{t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span></div>)}
     {people && <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={addPerson} tip="right" /></div>}</section>;
   const pays = expenses === "write";
@@ -117,8 +118,13 @@ function Budget({ t, addExpense, addPayment, addPerson, expenses, budget, people
       <span className="end">{expenseAmountText(e, t.currency)}{actions}</span>
     </div>
   );
-  const split = (e: Trip["expenses"][number]) => approver && group && !("waiting" in e) // MI-25
-    ? <IconButton icon="users" look="bare" tip="left" label={sv.minnas.split(e.text || sv.hiddenText)} onClick={() => edit({ kind: "split", id: e.id })} /> : undefined;
+  const relink = (e: Trip["expenses"][number]) => !("waiting" in e) && !e.hidden && mayRelink(e, { manager: approver, self }) && /* MI-32 */
+    <IconButton icon="link" look="bare" tip="left" label={sv.minnas.relink(e.text)} onClick={() => edit({ kind: "relink", id: e.id })} />;
+  const split = (e: Trip["expenses"][number]) => <>
+    {relink(e)}
+    {approver && group && !("waiting" in e) && /* MI-25 */
+      <IconButton icon="users" look="bare" tip="left" label={sv.minnas.split(e.text || sv.hiddenText)} onClick={() => edit({ kind: "split", id: e.id })} />}
+  </>;
   return <>
     <div className="vhead"><h2>{sv.minnas.budget}</h2></div>
     <div className="cols">
@@ -133,9 +139,10 @@ function Budget({ t, addExpense, addPayment, addPerson, expenses, budget, people
         {open.length > 0 && <section className="card">{/* MI-11: unhandled expenses wait for a Planerare */}
           <h3>{sv.unhandled.title}</h3>
           {byDate(open).map((e) => row(e, approver ? <>
+            {relink(e)}
             <IconButton icon="check" look="bare" tip="left" label={sv.unhandled.approve(e.text)} onClick={() => run((x) => approveExpense(x, e.id), "approve expense")} />
             <IconButton icon="trash" look="bare" tip="left" label={sv.unhandled.reject(e.text)} onClick={() => { if (confirm(sv.unhandled.rejectAsk(e.text))) run((x) => rejectExpense(x, e.id), "reject expense"); }} />
-          </> : <> <span className="badge">{sv.unhandled.waiting}</span></>))}
+          </> : <> <span className="badge">{sv.unhandled.waiting}</span>{relink(e)}</>))}
           {approver && <p className="ro note">{sv.unhandled.note}</p>}
         </section>}
         <details className="card sec">{/* closed at first, so settling up is near the top (MI-29) */}

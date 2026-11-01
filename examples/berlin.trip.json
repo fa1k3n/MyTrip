@@ -456,7 +456,7 @@
     },
     {
       "id": "bg-4",
-      "category": "Mat/Fritid",
+      "category": "Mat",
       "amount": 3000,
       "paid": false,
       "owner": "Anna"
@@ -482,7 +482,7 @@
     {
       "id": "exp-2",
       "text": "Lunch på Torvehallerne",
-      "category": "Mat/Fritid",
+      "category": "Mat",
       "amount": 640,
       "paidBy": "anna",
       "sharedBy": [],

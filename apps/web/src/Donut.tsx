@@ -5,7 +5,7 @@ import { budgetLimit, donutSlices, money } from "./budget.ts";
 import { Icon } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" };
+const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", Mat: "#D9B26F", Upplevelse: "#5E8C8A", Shopping: "#B9867C", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" }; // MI-30
 const SPENT = "#8E6C8A", UNUSED = "var(--line)";
 
 export function Donut({ t }: { t: Trip }) {

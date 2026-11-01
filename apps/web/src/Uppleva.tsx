@@ -5,6 +5,7 @@ import { adjacentDay, bookingsOn, budgetStatus, clockIn, dayHeading, pickDay } f
 import { clashes, durationText, nowAt, upDayTime, upTime } from "./upday.ts";
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
 import { geocodeUrl } from "./weather.ts";
+import { guessActivity } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { Donut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
@@ -131,7 +132,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
   const at = nowAt(day.activities, now), clash = clashes(day.activities), who = hiddenFromIn(day);
   const currency = useDayCurrency(day, t.currency, p.today);
   const line = now && <li className="nowline" key="now"><span>{sv.up.now} {now.replace(":", ".")}</span></li>;
-  return <ol className="upday">
+  return <><ol className={`upday${add ? " withfab" : ""}`}>
     {day.activities.map((a, i) => {
       const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false); // UP-36
       const hid = who.get(a.id), eye = p.edit && (() => p.edit({ kind: "hidden", dayId: day.id, id: a.id }));
@@ -156,6 +157,8 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
       return i === at ? [line, card] : card;
     })}
     {at === day.activities.length && line}
-    {add && <li><button className="addrow" onClick={() => p.addShortExpense(currency)}><Icon name="banknote" /><span>{sv.addExpense}</span><Icon name="plus" /></button></li>}
-  </ol>;
+  </ol>
+  {add && <div className="fabdock"><IconButton icon="money" look="fab" tip="up" label={sv.addExpense} onClick={() => p.addShortExpense(currency, undefined, { // the day's activities, the one going on now guessed (UP-43)
+    choices: day.activities.filter((a) => !a.hidden).map((a) => ({ id: a.id, text: a.text, category: a.category })), guess: guessActivity(day.activities, now) })} /></div> /* the phone's corner, else the day's column (UP-41) */}
+  </>;
 }

@@ -19,7 +19,8 @@ import { readBooking } from "@trip/schema/src/mailbooking.ts";
 import { api, type MailProposal } from "./api.ts";
 import { checkPick } from "./tickets.ts";
 import { MAX_NOTE, memoryOps, mineOf, saveAlbum } from "./memories.ts";
-import { splitOps } from "./money.ts";
+import { linkChoices, relinkOps, splitOps } from "./money.ts";
+import { ActivityAndCategory } from "./ExpenseFields.tsx";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
@@ -137,6 +138,19 @@ function SplitForm(p: Props & { id: string }) {
       <fieldset><legend>{sv.minnas.splitTitle}</legend>
         {p.t.travelers.map((x) => <label className="check" key={x.id}><input type="checkbox" checked={picked.includes(x.id)} onChange={() => flip(x.id)} />{x.name}</label>)}
       </fieldset>
+    </Form>
+  );
+}
+
+/** Which activity an expense applies to, and its category, confirmed together (MI-32). */
+function RelinkForm(p: Props & { id: string }) {
+  const s = useSave(p);
+  const e = p.t.expenses.find((x) => x.id === p.id);
+  const [v, setV] = useState({ activity: e?.activityId ?? "", category: e?.category ?? "" });
+  if (!e) return null;
+  return (
+    <Form title={sv.minnas.relink(e.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(relinkOps(p.t, p.id, v.activity, v.category), "relink expense")}>
+      <ActivityAndCategory choices={linkChoices(p.t, e).map((a) => ({ id: a.id, text: a.text, category: a.category }))} activity={v.activity} category={v.category} onChange={setV} />
     </Form>
   );
 }
@@ -451,6 +465,7 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "album": return <AlbumForm {...p} />;
     case "memory": return <MemoryForm {...p} dreamId={dlg.dreamId} by={dlg.by} />;
     case "split": return <SplitForm {...p} id={dlg.id} />;
+    case "relink": return <RelinkForm {...p} id={dlg.id} />;
     default: return null;
   }
 }

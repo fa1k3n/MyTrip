@@ -2,6 +2,8 @@
 // The shapes are static strings copied from lucide-static 0.460.0, so no icon package is bundled.
 
 const SHAPES: Record<string, string> = {
+  bed: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>', // UP-42
+  ellipsis: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>', // UP-42
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   cloudSun: '<path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
@@ -57,11 +59,15 @@ export function CatIcon({ id, big }: { id: string; big?: boolean }) {
   if (!i) return <span className={`cat emoji ${big ? "big" : ""}`} aria-hidden="true">{id}</span>;
   return (
     <span className={`cat ${big ? "big" : ""}`} style={{ "--c": i.color } as React.CSSProperties} role="img" aria-label={i.label} title={i.label}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-        dangerouslySetInnerHTML={{ __html: SHAPES[i.shape] }} />
+      <Shape shape={i.shape} />
     </span>
   );
 }
+
+const Shape = ({ shape }: { shape: string }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+  dangerouslySetInnerHTML={{ __html: SHAPES[shape] ?? "" }} />;
+/** A shape in a terracotta badge, without a name of its own: the label beside it names it (UP-42). */
+export const ShapeIcon = ({ shape }: { shape: string }) => <span className="cat" style={{ "--c": TERRACOTTA } as React.CSSProperties} aria-hidden="true"><Shape shape={shape} /></span>;
 
 /** Several icons in a row, e.g. a day's icons. */
 export const CatIcons = ({ ids }: { ids: string[] }) => <span className="cats">{ids.map((id) => <CatIcon key={id} id={id} />)}</span>;

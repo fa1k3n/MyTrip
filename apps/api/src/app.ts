@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { cacheKey, commonsImage, fetchImage, IMAGE_MAX, imageType, type CommonsImage } from "./wishimage.ts";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { Settings, Trip, TicketFile, accessFor, applyOps, atLeast, checkTrip, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
@@ -13,7 +14,7 @@ export type Proposal = {
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
 };
 /** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
-export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] };
+export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] | "image/webp" }; // webp: wish images (DB-08); tripId "_commons": the shared cache (DB-11)
 export type LogEntry = { at: string; tripId: string; actor: string; reason: string; ops: Op[] };
 /** A traveler's personal link to one trip, with the permission Resenär (traveler) or Planerare (planner) (AU-11). */
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner" };
@@ -47,7 +48,13 @@ export interface Store {
   file(id: string): Promise<(FileMeta & { bytes: Uint8Array<ArrayBuffer> }) | undefined>;
   saveFile(meta: FileMeta, bytes: Uint8Array): Promise<void>;
   removeFiles(ids: string[]): Promise<void>;
+  /** The Commons lookups that all trips share, by normalised title (DB-11). */
+  imageCache(): Promise<CacheEntry[]>;
+  saveImageCache(e: CacheEntry): Promise<void>;
+  removeImageCache(keys: string[]): Promise<void>;
 }
+/** A Commons lookup: the stored file with its credit and size, or nothing found (DB-11). */
+export type CacheEntry = { key: string; at: string; found?: { file: string; page: string; author?: string; licence: string; licenceUrl?: string; size: number } };
 /** The form of a ticket file id; checked before any store uses it. */
 export const isFileId = (id: string) => /^[a-z0-9]{16,40}$/.test(id);
 export type Tokens = { read: string; propose: string; admin: string };
@@ -66,10 +73,14 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   const proposals = new Map<string, Proposal>(), log: LogEntry[] = [];
   let subs: PushSub[] = [];
   const files = new Map<string, FileMeta & { bytes: Uint8Array<ArrayBuffer> }>();
+  const cache = new Map<string, CacheEntry>();
   return {
     file: async (id) => { const f = files.get(id); return f && { ...f, bytes: f.bytes.slice() }; },
     saveFile: async (m, bytes) => void files.set(m.id, { ...m, bytes: Uint8Array.from(bytes) }),
     removeFiles: async (ids) => ids.forEach((id) => files.delete(id)),
+    imageCache: async () => [...cache.values()],
+    saveImageCache: async (e) => void cache.set(e.key, e),
+    removeImageCache: async (keys) => keys.forEach((k) => cache.delete(k)),
     pushSubs: async (tripId) => structuredClone(subs.filter((x) => x.tripId === tripId).sort(bySubscriber)),
     savePushSub: async (x) => { subs = [...subs.filter((y) => !(y.tripId === x.tripId && y.endpoint === x.endpoint)), structuredClone(x)]; },
     removePushSubs: async (tripId, m) => { subs = subs.filter((x) => !(x.tripId === tripId && pushMatch(x, m))); },
@@ -114,15 +125,21 @@ const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new U
 const accessRole = (role: Role): AccessRole | undefined => (role === "link" ? "follower" : role === "traveler" || role === "planner" ? role : undefined);
 /** Whether a link's role may make all these changes under the trip's permissions (AU-21, AU-22). Below "write" on expenses,
  * an expense is added one at a time and alone (AU-13). The permissions themselves belong to the superuser. */
-function linkMayChange(t: Trip, ar: AccessRole, ops: Op[]) {
+function linkMayChange(t: Trip, ar: AccessRole, ops: Op[], travelerId?: string) {
   const rules = accessFor(t, ar);
   const ok = ops.length > 0 && ops.every((o) => {
+    if (relinksOwn(t, o, travelerId)) return true; // MI-32
     const n = opNeeds(o);
     return n.part === "access" ? false : n.part === "trip" ? ar === "planner"
       : n.part === "memories" ? atLeast(rules.view.mi.memories ?? "hidden", n.level) : atLeast(rules.parts[n.part], n.level); // MI-21
   });
   const adds = ops.some((o) => o.op === "add" && o.path === "expenses/-");
   return ok && (!adds || rules.parts.expenses === "write" || ops.length === 1);
+}
+/** A traveler moves an expense they added to another activity or none, and confirms its category; nothing else of it (MI-32). */
+function relinksOwn(t: Trip, o: Op, travelerId?: string) {
+  const m = /^expenses\/(\d+)\/(activityId|category)$/.exec(o.path);
+  return !!m && !!travelerId && (o.op === "set" || (o.op === "remove" && m[2] === "activityId")) && t.expenses[Number(m[1])]?.addedBy === travelerId;
 }
 type Activity = Trip["days"][number]["activities"][number];
 /** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18).
@@ -152,7 +169,8 @@ function masked<T extends Omit<Trip, "budgetMax">>(t: T, hiddenFor: (a: Activity
     : { ...i, ...(unsuitable !== undefined ? { unsuitable } : {}), ...(placeId ? { placeId } : {}) }));
   const expenses = t.expenses.map((e) => (gives([e.text]) ? { ...e, text: "", hidden: true } : e));
   const payments = t.payments.map(({ note, ...x }) => (gives([note]) ? { ...x, hidden: true } : { ...x, ...(note !== undefined ? { note } : {}) }));
-  const dreams = t.dreams.map((w) => (gives([w.title, w.source]) ? { ...w, title: "", source: "", hidden: true } : w));
+  const dreams = t.dreams.map(({ url, image, ...w }) => (gives([w.title, w.source, url]) ? { ...w, title: "", source: "", hidden: true } // DB-10: no link or image either
+    : { ...w, ...(url ? { url } : {}), ...(image ? { image } : {}) }));
   // MI-21: kept in place, so that the viewer's own memories keep their positions, but without verdict or comment
   const secretWishes = new Set(dreams.filter((w) => w.hidden).map((w) => w.id));
   const memories = t.memories.map((m) => (secretWishes.has(m.dreamId) ? { id: m.id, dreamId: m.dreamId, by: m.by } : m));
@@ -205,6 +223,10 @@ function ownExpenses(ops: Op[], travelerId: string): Op[] | null {
 const withoutInbox = ({ inbox: _inbox, ...t }: Trip): Trip => t;
 /** The ticket files that bookings use. */
 const fileIdsOf = (bookings: Trip["bookings"]) => bookings.flatMap((b) => (b.files ?? []).map((f) => f.id));
+/** The image files of wishes; only own photos belong to the trip, Commons files to the shared cache (DB-08, DB-11). */
+const wishFiles = (dreams: Trip["dreams"], own = false) => dreams.flatMap((w) => (w.image && (!own || w.image.kind === "own") ? [w.image.file] : []));
+/** The owner of the files that the image cache shares between trips (DB-11). */
+const COMMONS_FILES = "_commons";
 /** The ticket files of a trip's pending proposals, which the reviewer opens before approving (BK-17). */
 const proposalFiles = (ps: Proposal[]) => ps.filter((p) => p.status === "pending").flatMap((p) => (p.booking?.files ?? []).map((f) => f.id));
 /** The types a ticket may have, each with the first bytes its content starts with (BK-09). */
@@ -344,9 +366,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (problems.length) return { problems };
     if (!(await store.save({ ...next, id: base.id, revision: base.revision + 1 }, base.revision))) return { conflict: true as const }; // DP-03
     await store.appendLog({ at: new Date().toISOString(), tripId: base.id, actor, reason, ops });
-    const kept = new Set([...fileIdsOf(next.bookings), ...proposalFiles(await store.proposals(base.id))]);
-    const gone = fileIdsOf(base.bookings).filter((id) => !kept.has(id));
-    if (gone.length) await store.removeFiles(gone); // BK-13
+    const kept = new Set([...fileIdsOf(next.bookings), ...wishFiles(next.dreams, true), ...proposalFiles(await store.proposals(base.id))]);
+    const gone = [...fileIdsOf(base.bookings), ...wishFiles(base.dreams, true)].filter((id) => !kept.has(id));
+    if (gone.length) await store.removeFiles(gone); // BK-13, DB-08
     if (notice) later(notice.c, notify(base, next, notice.who, notice.who === "admin" ? sv.notice.admin : actor, new URL(notice.c.req.url).origin));
     return { revision: base.revision + 1 };
   }
@@ -487,12 +509,118 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   // BK-11: a file only for those who get its booking with the reference, and for managers while a proposal holds it.
   app.get("/api/trips/:id/files/:fid", async (c) => {
     const id = c.req.param("fid"), t = await load(c.req.param("id"));
-    const seen = fileIdsOf(view(t, c.get("role"), c.get("travelerId")).bookings).includes(id)
+    const shown = view(t, c.get("role"), c.get("travelerId"));
+    const seen = fileIdsOf(shown.bookings).includes(id) || wishFiles(shown.dreams).includes(id) // DB-10
       || (manager(c) && proposalFiles(await store.proposals(t.id)).includes(id));
     const f = seen ? await store.file(id) : undefined;
-    if (!f || f.tripId !== t.id) return c.json({ error: "not found" }, 404);
+    if (!f || (f.tripId !== t.id && f.tripId !== COMMONS_FILES)) return c.json({ error: "not found" }, 404); // a cached file serves every trip that uses it (DB-11)
     return c.body(f.bytes, 200, { "content-type": f.type, "cache-control": "private, max-age=31536000, immutable" }); // a file never changes under its id
   });
+  /** Whether the caller may change wishes: the superuser, or a link whose role has Ändra on them (DB-10). */
+  const changesWishes = (c: Context<Env>, t: Trip) => {
+    const ar = accessRole(c.get("role"));
+    return ar ? accessFor(t, ar).parts.dreams === "write" : c.get("role") === "admin";
+  };
+  const now = () => opts.now?.() ?? new Date();
+  const actorOf = (c: Context<Env>, t: Trip) => (c.get("travelerId") ? t.travelers.find((x) => x.id === c.get("travelerId"))?.name ?? "link" : "user");
+  /** A Commons image for a title: from the cache, else looked up, copied and cached; "nothing found" is kept 30 days (DB-06, DB-11). */
+  async function lookup(title: string): Promise<{ found?: NonNullable<CacheEntry["found"]>; failed?: true }> {
+    const key = cacheKey(title);
+    if (!key) return {};
+    const hit = (await store.imageCache()).find((e) => e.key === key);
+    if (hit?.found && await store.file(hit.found.file)) return { found: hit.found };
+    if (hit && !hit.found && now().getTime() - Date.parse(hit.at) < 30 * 86_400_000) return {};
+    let img: CommonsImage | undefined, got: Awaited<ReturnType<typeof fetchImage>>;
+    try {
+      img = await commonsImage(title, opts.fetch);
+      got = img && await fetchImage(img.image, opts.fetch);
+    } catch { return { failed: true }; } // a busy service: asked again next time (DB-07)
+    if (!img || !got) { await store.saveImageCache({ key, at: now().toISOString() }); return {}; }
+    const file = newFileId();
+    await store.saveFile({ id: file, tripId: COMMONS_FILES, type: got.type }, got.bytes);
+    const { image: _from, ...credit } = img;
+    const found = { file, ...credit, size: got.bytes.length };
+    await store.saveImageCache({ key, at: now().toISOString(), found });
+    return { found };
+  }
+  const commonsValue = ({ size: _size, ...f }: NonNullable<CacheEntry["found"]>) => ({ ...f, kind: "commons" as const });
+  /** Keeps an image with the wish and clears "tried" (DB-07, DB-08). */
+  const setImage = (c: Context<Env>, t: Trip, i: number, image: NonNullable<Trip["dreams"][number]["image"]>, reason: string) =>
+    apply(t, [{ op: "set", path: `dreams/${i}/image`, value: image }, ...(t.dreams[i]!.imageTried ? [{ op: "remove" as const, path: `dreams/${i}/imageTried` }] : [])], actorOf(c, t), reason);
+  const answer = (c: Context<Env>, r: Awaited<ReturnType<typeof apply>>, extra: object = {}) =>
+    "revision" in r ? c.json({ ...r, ...extra }) : "conflict" in r ? c.json({ error: "conflict" }, 409) : c.json({ ok: false, problems: r.problems }, 422);
+  /** The trip and the wish's index, or the answer for a missing wish or a caller without Ändra on wishes (DB-10). */
+  const wishOf = async (c: Context<Env>) => {
+    const t = await load(c.req.param("id")!), i = t.dreams.findIndex((x) => x.id === c.req.param("wid"));
+    if (i < 0) return c.json({ error: "not found" }, 404);
+    if (!changesWishes(c, t)) return c.json({ error: "forbidden" }, 403);
+    return { t, i };
+  };
+  // DB-07: searching with own words; the preview comes from our own server, and nothing changes before the user chooses.
+  app.post("/api/trips/:id/dreams/:wid/image/find", async (c) => {
+    const w = await wishOf(c);
+    if (w instanceof Response) return w;
+    const b = await c.req.json<{ query?: unknown }>().catch(() => ({} as { query?: unknown }));
+    const r = await lookup(typeof b.query === "string" && b.query.trim() ? b.query : w.t.dreams[w.i]!.title);
+    if (r.failed) return c.json({ failed: true });
+    const file = r.found && await store.file(r.found.file);
+    if (!r.found || !file) return c.json({ found: null });
+    return c.json({ found: commonsValue(r.found), preview: `data:${file.type};base64,${btoa(String.fromCharCode(...file.bytes))}` });
+  });
+  // DB-07: the user chose the image found for these words.
+  app.post("/api/trips/:id/dreams/:wid/image", async (c) => {
+    const w = await wishOf(c);
+    if (w instanceof Response) return w;
+    const b = await c.req.json<{ query?: unknown }>().catch(() => ({} as { query?: unknown }));
+    const r = await lookup(typeof b.query === "string" && b.query.trim() ? b.query : w.t.dreams[w.i]!.title);
+    if (r.failed) return c.json({ error: "unavailable" }, 503);
+    if (!r.found) return c.json({ error: "not found" }, 404);
+    return answer(c, await setImage(c, w.t, w.i, commonsValue(r.found), "wish image"));
+  });
+  // DB-07: the first image found, once, for a wish without one; nothing found marks it as tried, a busy service does not.
+  app.post("/api/trips/:id/dreams/:wid/image/auto", async (c) => {
+    const w = await wishOf(c);
+    if (w instanceof Response) return w;
+    const wish = w.t.dreams[w.i]!;
+    if (wish.image || wish.imageTried) return c.json({ skipped: true });
+    const r = await lookup(wish.title);
+    if (r.failed) return c.json({ failed: true });
+    if (r.found) return answer(c, await setImage(c, w.t, w.i, commonsValue(r.found), "wish image (automatic)"), { image: commonsValue(r.found) });
+    return answer(c, await apply(w.t, [{ op: "set", path: `dreams/${w.i}/imageTried`, value: true }], actorOf(c, w.t), "no wish image found"));
+  });
+  // DB-12: an own photo, scaled down on the phone; checked as in DB-08 and stored with the trip.
+  app.post("/api/trips/:id/dreams/:wid/image/upload", async (c) => {
+    const w = await wishOf(c);
+    if (w instanceof Response) return w;
+    const bytes = new Uint8Array(await c.req.arrayBuffer());
+    if (bytes.length > IMAGE_MAX) return c.json({ error: "too large" }, 413);
+    const type = imageType(bytes);
+    if (!type) return c.json({ error: "JPEG, PNG or WebP only" }, 415);
+    const file = newFileId();
+    await store.saveFile({ id: file, tripId: w.t.id, type }, bytes);
+    const r = await setImage(c, w.t, w.i, { file, kind: "own" }, "own wish photo");
+    if (!("revision" in r)) await store.removeFiles([file]);
+    return answer(c, r);
+  });
+  /** The Commons images of ended trips and the cached files no trip would use without them; with `clear`, removes them (DB-13). */
+  async function endedCache(clear: boolean) {
+    const today = (tz: string) => new Intl.DateTimeFormat("sv-SE", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now());
+    const trips = await store.list();
+    const ended = trips.filter((t) => t.days.length > 0 && t.days.every((d) => d.date < today(t.timezone)));
+    const commons = (t: Trip) => t.dreams.flatMap((w, i) => (w.image?.kind === "commons" ? [i] : []));
+    const images = ended.reduce((a, t) => a + commons(t).length, 0);
+    for (const t of clear ? ended : []) {
+      const idx = commons(t);
+      if (idx.length) await apply(t, idx.flatMap((i) => [{ op: "remove" as const, path: `dreams/${i}/image` }, { op: "set" as const, path: `dreams/${i}/imageTried`, value: true }]), "user", "empty image cache");
+    }
+    const after: Trip[] = clear ? await store.list() : trips.map((t) => (ended.includes(t) ? { ...t, dreams: t.dreams.map((w) => (w.image?.kind === "commons" ? { ...w, image: undefined } : w)) } : t));
+    const used = new Set(after.flatMap((t) => t.dreams.flatMap((w) => (w.image?.kind === "commons" ? [w.image.file] : []))));
+    const unused = (await store.imageCache()).filter((e) => e.found && !used.has(e.found.file));
+    if (clear && unused.length) { await store.removeFiles(unused.map((e) => e.found!.file)); await store.removeImageCache(unused.map((e) => e.key)); }
+    return { trips: ended.length, images, files: unused.length, bytes: unused.reduce((a, e) => a + e.found!.size, 0) };
+  }
+  app.get("/api/image-cache/ended", async (c) => (need(c, "admin") ? c.json(await endedCache(false)) : c.json({ error: "forbidden" }, 403)));
+  app.post("/api/image-cache/ended", async (c) => (need(c, "admin") ? c.json(await endedCache(true)) : c.json({ error: "forbidden" }, 403)));
   // BK-14: the trip's inbox address, under the instance's mail domain; a new one replaces the old at once.
   app.get("/api/trips/:id/inbox", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
@@ -518,7 +646,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const b = await c.req.json<{ baseRevision: number; ops: Op[]; reason?: string; dryRun?: boolean }>();
     const role = c.get("role"), travelerId = c.get("travelerId"), ar = accessRole(role);
     const t = await load(c.req.param("id"));
-    if (!(ar ? linkMayChange(t, ar, b.ops) : need(c, "propose"))) return c.json({ error: "forbidden" }, 403); // MC-10, AU-21
+    if (!(ar ? linkMayChange(t, ar, b.ops, travelerId) : need(c, "propose"))) return c.json({ error: "forbidden" }, 403); // MC-10, AU-21
     if (travelerId) { // AU-13: a personal link adds expenses only in its own name
       const own = ownExpenses(b.ops, travelerId);
       if (!own) return c.json({ error: "forbidden" }, 403);

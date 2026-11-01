@@ -6,7 +6,7 @@ import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
-import { importMail } from "./mail.ts";
+import { importMail, importWish } from "./mail.ts";
 
 export type Proposal = {
   id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
@@ -221,6 +221,7 @@ function ownExpenses(ops: Op[], travelerId: string): Op[] | null {
 }
 
 const withoutInbox = ({ inbox: _inbox, ...t }: Trip): Trip => t;
+const withoutWishInbox = ({ wishInbox: _w, ...t }: Trip): Trip => t;
 /** The ticket files that bookings use. */
 const fileIdsOf = (bookings: Trip["bookings"]) => bookings.flatMap((b) => (b.files ?? []).map((f) => f.id));
 /** The image files of wishes; only own photos belong to the trip, Commons files to the shared cache (DB-08, DB-11). */
@@ -307,7 +308,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
    * references never reach a Följare (AU-22), activities hidden from the viewer are masked (AU-18), and the link gets only its
    * own role's rules (AU-20). Read-only tokens get no booking references (MC-11). */
   const view = (t: Trip, role: Role, travelerId?: string, mask = true): Trip => {
-    if (role === "read") return { ...withoutInbox(t), bookings: t.bookings.map(({ reference, files, ...b }) => b) }; // MC-11, BK-11
+    if (role === "read") return { ...withoutWishInbox(withoutInbox(t)), bookings: t.bookings.map(({ reference, files, ...b }) => b) }; // MC-11, BK-11
     const ar = accessRole(role);
     if (!ar) return t;
     const rules = accessFor(t, ar), hide = (p: Part) => rules.parts[p] === "hidden";
@@ -320,7 +321,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (hide("expenses")) { out.expenses = []; out.payments = []; }
     if (hide("tasks")) out.tasks = [];
     if (hide("info")) out.info = [];
-    if (hide("dreams")) out.dreams = [];
+    if (hide("dreams")) { out.dreams = []; delete out.wishInbox; }
+    if (ar === "follower") delete out.wishInbox; // DB-21
     if ((rules.view.mi.memories ?? "hidden") === "hidden") { out.memories = []; delete out.album; } // MI-21
     else if (ar !== "planner") out.memories = t.memories.map(({ note, ...m }) => (note !== undefined && m.by === travelerId ? { ...m, note } : m)); // MI-18: only one's own comment
     if (hide("packing")) { out.packing = []; out.packed = []; out.travelers = t.travelers.map((x) => ({ ...x, packing: [], packed: [] })); }
@@ -640,6 +642,22 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const r = await importMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
     return "proposalId" in r ? c.json(r, 202) : c.json(r, 429);
+  });
+
+  // DB-21: the trip's wish address, apart from the booking inbox; a new one replaces the old at once.
+  app.post("/api/trips/:id/wish-inbox", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    if (!opts.inboxDomain) return c.json({ error: "mail import is off" }, 404);
+    const t = await load(c.req.param("id"));
+    const address = `${t.id.slice(0, 40)}-onska-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
+    const r = await apply(t, [{ op: "set", path: "wishInbox", value: address }], actorName(c, t), "new wish address");
+    return "revision" in r ? c.json({ address }) : c.json({ error: "conflict" }, 409);
+  });
+  // DB-23: on the Node server a manager posts a raw message; on Cloudflare mail arrives through the Worker's email handler.
+  app.post("/api/trips/:id/wish-mail", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const r = await importWish(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
+    return "wishId" in r ? c.json(r, 201) : c.json(r, r.error === "too many" ? 429 : 422);
   });
 
   app.post("/api/trips/:id/changes", async (c) => {

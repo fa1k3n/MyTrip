@@ -122,24 +122,28 @@ function ShareLink({ t }: { t: Trip }) {
   );
 }
 
-/** BK-14: the trip's inbox address for booking confirmations, to copy or replace; off without a mail domain on the server. */
-function Inbox({ t }: { t: Trip }) {
+/** BK-14, DB-21: the trip's inbox address for booking confirmations, or its wish address, to copy or replace; off without a
+ * mail domain on the server. */
+function Inbox({ t, kind }: { t: Trip; kind: "bookings" | "wishes" }) {
   const [box, setBox] = useState<{ enabled: boolean; address?: string } | null>(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { api.inbox(t.id).then(setBox, () => setBox({ enabled: false })); }, [t.id]);
+  const text = kind === "wishes" ? svAdmin.wishInbox : svAdmin.inbox;
+  useEffect(() => {
+    api.inbox(t.id).then((b) => setBox(kind === "wishes" ? { enabled: b.enabled, ...(t.wishInbox ? { address: t.wishInbox } : {}) } : b), () => setBox({ enabled: false }));
+  }, [t.id, kind]); // eslint-disable-line react-hooks/exhaustive-deps -- the address is kept here after a replace
   if (!box) return null;
   const make = async () => {
-    if (box.address && !(await ask(svAdmin.inbox.confirmReplace, { ok: sv.askOk.replace }))) return;
-    setBox({ enabled: true, address: (await api.newInbox(t.id)).address });
+    if (box.address && !(await ask(text.confirmReplace, { ok: sv.askOk.replace }))) return;
+    setBox({ enabled: true, address: (await (kind === "wishes" ? api.newWishInbox(t.id) : api.newInbox(t.id))).address });
     setCopied(false);
   };
   const copy = async () => { try { await navigator.clipboard.writeText(box.address ?? ""); setCopied(true); } catch { /* the field can still be copied by hand */ } };
   return (
     <div className="card">
-      <h3>{svAdmin.inbox.title}</h3>
-      <p className="ro note">{box.enabled ? svAdmin.inbox.hint : svAdmin.inbox.off}</p>
+      <h3>{text.title}</h3>
+      <p className="ro note">{box.enabled ? text.hint : svAdmin.inbox.off}</p>
       {box.enabled && <div className="row mid">
-        {box.address ? <input className="linkfield" readOnly value={box.address} aria-label={svAdmin.inbox.title} onFocus={(e) => e.currentTarget.select()} />
+        {box.address ? <input className="linkfield" readOnly value={box.address} aria-label={text.title} onFocus={(e) => e.currentTarget.select()} />
           : <span className="ro">{svAdmin.inbox.none}</span>}
         <span className="end">
           {box.address && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.inbox.copy} onClick={copy} />}
@@ -278,7 +282,8 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
     <Sharing t={t} run={run} />
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
-    <Inbox t={t} />
+    <Inbox t={t} kind="bookings" />
+    <Inbox t={t} kind="wishes" />
     {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
     {superuser && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;

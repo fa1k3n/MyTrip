@@ -73,6 +73,7 @@ export const Dream = z.object({
   }).optional(),
   imageTried: z.boolean().optional(), // no image found automatically, or the user removed it: not tried again automatically (DB-07)
   hidden: z.boolean().optional(), // AU-30
+  mailedAt: z.string().datetime().optional(), // came by mail to the wish address, and when (DB-23, DB-25)
 });
 export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
@@ -111,6 +112,7 @@ export const Trip = z.object({
   image: z.string().regex(/^[a-z0-9][a-z0-9-]*\.(jpg|jpeg|png|webp)$/).optional(), imageAlt: z.string().optional(),
   dateLabel: z.string().optional(), // shown when the trip has no days, e.g. "jul 2026 · avslutad"
   note: z.string().optional(), inbox: z.string().email().optional(),
+  wishInbox: z.string().email().optional(), // the address whose mail becomes wishes (DB-21)
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency

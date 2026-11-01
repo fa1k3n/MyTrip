@@ -6,7 +6,7 @@ export type CommonsImage = { image: string; page: string; author?: string; licen
 
 export const IMAGE_MAX = 300 * 1024; // DB-08
 const TIMEOUT_MS = 8000, THUMB_PX = 500; // Wikimedia serves only its standard thumbnail widths: 500, not 640
-const UA = "MyTrip/0.1 (https://github.com/fa1k3n/MyTrip; wish images)"; // Wikimedia asks every client to name itself with a contact
+const UA = "Baslager/0.1 (https://github.com/fa1k3n/MyTrip; wish images)"; // Wikimedia asks every client to name itself with a contact
 const HOSTS = /^(sv|en|de)\.wikipedia\.org$|^(commons|upload|thumb)\.wikimedia\.org$/;
 
 /** Fetches a Wikimedia address, following redirects only within Wikimedia. A busy service is an error, not "nothing" (DB-07). */

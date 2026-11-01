@@ -205,6 +205,7 @@ export const api = {
   approve: (tripId: string, pid: string) => call<{ result: { problems?: string[]; revision?: number } }>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST" }), // MC-18
   inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-14
   newInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }),
+  newWishInbox: (id: string) => call<{ address: string }>(`${trip(id)}/wish-inbox`, { method: "POST" }), // DB-21
   image: async (id: string, key = link) => {
     const r = await fetch(`${trip(id)}/image`, { headers: headers(key) });
     if (!r.ok) throw new Error(`${r.status} image`);

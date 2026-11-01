@@ -34,7 +34,7 @@ self.addEventListener("fetch", (e) => {
 // NT-01: a notice from the server; NT-04: a tap opens the app on its trip.
 self.addEventListener("push", (e) => {
   const n = e.data ? e.data.json() : {};
-  e.waitUntil(self.registration.showNotification(n.title || "MyTrip", { body: n.body || "", data: { tripId: n.tripId }, icon: "/icon-192.png" }));
+  e.waitUntil(self.registration.showNotification(n.title || "Basläger", { body: n.body || "", data: { tripId: n.tripId }, icon: "/icon-192.png" }));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();

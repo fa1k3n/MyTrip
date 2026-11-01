@@ -17,6 +17,12 @@ export type WorkerEnv = {
 /** The parts of an incoming mail the Worker uses (Cloudflare Email Routing). */
 export type IncomingMail = { to: string; raw: ReadableStream; setReject(reason: string): void };
 
+/** What the sender's mail server is told when a mail is rejected. */
+const REJECT = {
+  "unknown address": "Unknown address", "too many": "Too many mails for this trip right now",
+  "no title": "The mail needs a subject", invalid: "The mail could not be added",
+};
+
 // One app per set of bindings, kept while the Worker instance lives; state that must last is in D1.
 const apps = new WeakMap<WorkerEnv, ReturnType<typeof createApp>>();
 const appFor = (env: WorkerEnv) => {
@@ -37,9 +43,10 @@ export default {
     if (new URL(req.url).pathname.startsWith("/api/")) return appFor(env).fetch(req, env, ctx); // ctx keeps notices going after the answer (NT-05)
     return env.ASSETS ? env.ASSETS.fetch(req) : new Response("Not found", { status: 404 });
   },
-  /** BK-15: a mail to a trip's inbox address becomes a proposed booking; an unknown address or a full inbox is rejected. */
+  /** BK-15: a mail to a trip's inbox address becomes a proposed booking; DB-23: one to its wish address a wish.
+   * An unknown address, a full inbox, too many wishes in a day (DB-25) or a mail without a title is rejected. */
   async email(message: IncomingMail, env: WorkerEnv): Promise<void> {
     const r = await receiveMail(d1Store(env.DB, env.IMAGES), await new Response(message.raw).arrayBuffer(), message.to);
-    if ("error" in r) message.setReject(r.error === "too many" ? "Too many bookings waiting for review" : "Unknown address");
+    if ("error" in r) message.setReject(REJECT[r.error]);
   },
 };

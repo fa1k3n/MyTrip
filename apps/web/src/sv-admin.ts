@@ -23,6 +23,11 @@ export const svAdmin = {
     off: "Mejlimport är inte inställd på servern: den behöver en egen domän (INBOX_DOMAIN).",
     confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram.",
   },
+  wishInbox: { // DB-21
+    title: "Mejla in önskningar",
+    hint: "Planerare och resenärer kan mejla eller dela sidor hit. Varje mejl blir en önskan direkt i Önska. Den som har adressen kan skicka, så byt den om den har spridits.",
+    confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram, och alla behöver den nya.",
+  },
   qr: { // AU-31
     show: (n: string) => `Visa QR-kod för ${n}`, title: (n: string) => `Länk för ${n}`, label: (n: string) => `QR-kod med länken för ${n}`,
     hint: "Låt den andra skanna koden med kameran i sin telefon.",

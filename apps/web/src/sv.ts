@@ -15,6 +15,11 @@ export const sv = {
   pin: { on: "Nåla fast", off: "Ta bort nålen", mark: "Nålad", ask: (title: string) => `Ta bort nålen för ${title}? Då kan den flyttas, tidsändras och tas bort.`, locked: "Aktiviteten är nålad: tid och längd ändras inte, och den flyttas eller tas inte bort förrän nålen tas bort." }, // ED-24, ED-25
   undo: { button: "Ångra", failed: "Kunde inte ångra. Resan har ändrats sedan dess.", kinds: { add: "Lade till", change: "Ändrade", remove: "Tog bort" } }, // ED-22
   wish: { // DB-05..DB-14
+    fromMail: (name?: string) => (name ? `Mejl från ${name}` : "Mejl"), // DB-23
+    mail: { // DB-22
+      open: "Mejla in en önskan", copy: "Kopiera adressen", copied: "Kopierad.",
+      hint: "Mejla eller dela en sida hit, så blir den en önskan direkt. Ämnesraden blir titel, första länken blir önskans länk och en bifogad bild blir dess foto.",
+    },
     url: "Länk till sidan (valfri)", badUrl: "Ange en adress som börjar med https:// eller http://.", photoBy: "Foto:", commons: "Wikimedia Commons", about: "Om önskan", more: (title: string) => `Mer om ${title}`, openPage: "Öppna sidan", credited: "Fotograf och licens finns under Om önskan",
     image: (title: string) => `Bild för ${title}`, query: "Sök bild med orden", find: "Sök", finding: "Söker…", use: "Använd",
     none: "Hittade ingen bild med fri licens. Prova andra ord eller ladda upp ett eget foto.", busy: "Wikimedia svarar inte just nu. Försök igen om en stund.",

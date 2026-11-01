@@ -67,13 +67,14 @@ function kind(text: string): BookingReading["kind"] {
   return stay > ticket ? "stay" : ticket > stay ? "ticket" : undefined;
 }
 
-const PREFIX = /^\s*((fwd?|fw|vb|vs|sv|re|tr|aw|wg)\s*:\s*)+/i;
+/** Forwarding and reply prefixes such as Fwd:, VB: and Re: at the start of a subject. */
+export const FORWARD_PREFIX = /^\s*((fwd?|fw|vb|vs|sv|re|tr|aw|wg)\s*:\s*)+/i;
 const GENERIC = new RegExp("^(bokningsbekräftelse|orderbekräftelse|bekräftelse på din (bokning|beställning)|bekräftelse|din bokning|din beställning"
   + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?)"
   + "\\s*(?:[-–—:|,]\\s*|\\s+(?:hos|till|på|från)\\s+)", "i");
 /** The subject without forwarding prefixes and words that only say it is a confirmation. */
 function subjectName(subject: string): string | undefined {
-  let s = subject.replace(PREFIX, "").trim();
+  let s = subject.replace(FORWARD_PREFIX, "").trim();
   for (let g = GENERIC.exec(s); g && s.length > g[0].length; g = GENERIC.exec(s)) s = s.slice(g[0].length).trim();
   return s || undefined;
 }

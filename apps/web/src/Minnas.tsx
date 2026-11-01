@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
-import { approveExpense, balanceText, balances, byDate, mayRelink, mayRemove, rejectExpense, removeExpense, removePayment, settle, settled, sharersText, unhandled, type Transfer, activityTitle } from "./money.ts";
+import { approveExpense, balances, byDate, mayRelink, mayRemove, rejectExpense, removeExpense, removePayment, settle, settled, sharersText, paidTotals, unhandled, type Transfer, activityTitle } from "./money.ts";
 import { experienced, memoryOps, mineOf, notesOf, verdictCounts, VERDICTS, type MinnasView } from "./memories.ts";
 import { DreamCard } from "./Dreams.tsx";
 import { BudgetPlanView } from "./Donut.tsx";
@@ -108,6 +108,7 @@ function Budget({ t, addExpense, addPayment, expenses, budget, canAdd, approver,
   const name = (id: string) => t.travelers.find((x) => x.id === id)?.name ?? id;
   const counted = settled(t.expenses).filter((e) => !("waiting" in e)), open = unhandled(t.expenses); // MI-10: only approved ones are settled
   const bal = balances(t.travelers, counted, t.payments);
+  const paid = paidTotals(t.travelers, counted); // MI-40
   const transfers = settle(bal);
   const group = t.travelers.length > 1;
   const row = (e: Trip["expenses"][number], actions?: ReactNode) => (
@@ -149,7 +150,7 @@ function Budget({ t, addExpense, addPayment, expenses, budget, canAdd, approver,
         <section className="card">
           <h3>{sv.balance}</h3>
           {!t.travelers.length && <p className="ro">{sv.noPeople}</p>}
-          {t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span><span>{balanceText(bal[x.id] ?? 0)}</span></div>)}
+          {t.travelers.map((x) => <div className="row" key={x.id}><span>{x.name}</span><span>{kr(paid[x.id] ?? 0)}</span></div>) /* each one's total, not what they get back (MI-40) */}
         </section>
         {group && (
           <section className="card">

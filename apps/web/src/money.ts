@@ -75,6 +75,7 @@ export const balanceText = (v: number) =>
   Math.abs(v) < 0.005 ? sv.even : v > 0 ? `${sv.owedBack} ${kr(v)}` : `${sv.owes} ${kr(-v)}`;
 
 export type ExpenseInput = { text: string; amount: string; category: string; paidBy: string; sharedBy: string[]; addedBy: string; activityId?: string;
+  dreamId?: string; // the wish it was for (UP-47)
   foreign?: { currency: string; rate: number; rateDate: string }; // `amount` is then in this currency (UP-25)
 };
 
@@ -90,7 +91,7 @@ export function newExpense(t: { travelers: Person[] }, input: ExpenseInput, date
   if (!input.text.trim()) return { ok: false, error: sv.errors.expenseText };
   if (Number.isNaN(amount)) return { ok: false, error: sv.badAmount }; // MI-03
   const sharedBy = sharedByValue(input.sharedBy, defaultSharers(t.travelers), t.travelers.map((x) => x.id)); // MI-38
-  return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, ...(input.activityId ? { activityId: input.activityId } : {}), ...converted(amount, input.foreign), addedBy: input.addedBy, addedAt: at } }] };
+  return { ok: true, ops: [{ op: "add", path: "expenses/-", value: { id, text: input.text.trim(), category: input.category, amount, paidBy: input.paidBy, sharedBy, date, ...(input.activityId ? { activityId: input.activityId } : {}), ...(input.dreamId ? { dreamId: input.dreamId } : {}), ...converted(amount, input.foreign), addedBy: input.addedBy, addedAt: at } }] };
 }
 
 /** An activity's budget category for its expenses (UP-22, MI-30): Resa is Transport, Mat Mat, Shopping Shopping, Klockslag and unknown ones
@@ -102,8 +103,37 @@ const EXPENSE_CATEGORY: Record<string, string> = { Resa: "Transport", Klockslag:
 export const activityCategory = (category?: string) => EXPENSE_CATEGORY[category ?? ""] ?? "Övrigt";
 
 /** The short form for an activity: only the amount and an optional description, which falls back to the activity's title (UP-22). */
-export function activityExpense(a: { id: string; text: string; category?: string }, f: { text: string; amount: string }, payer: string, sharedBy: string[]): ExpenseInput {
-  return { text: f.text.trim() || a.text, amount: f.amount, category: activityCategory(a.category), paidBy: payer, sharedBy, addedBy: payer, activityId: a.id };
+export function activityExpense(a: { id: string; text: string; category?: string; dreamId?: string }, f: { text: string; amount: string }, payer: string, sharedBy: string[]): ExpenseInput {
+  return { text: f.text.trim() || a.text, amount: f.amount, category: activityCategory(a.category), paidBy: payer, sharedBy, addedBy: payer, activityId: a.id,
+    ...(a.dreamId ? { dreamId: a.dreamId } : {}) }; // the activity's wish too (UP-47)
+}
+
+/** A wish to choose in the sheet, with its first activity on the shown day when it is planned there (UP-47). */
+export type WishChoice = { id: string; text: string; category?: string; activityId?: string };
+
+/** The sheet's wishes: those planned on the day through an activity the viewer sees first, then the rest of the trip's (UP-47). */
+export function wishChoices(day: { activities: { id: string; dreamId?: string; hidden?: boolean }[] }, dreams: { id: string; title: string; category?: string }[]): WishChoice[] {
+  const first = new Map<string, string>();
+  for (const a of day.activities) if (a.dreamId && !a.hidden && !first.has(a.dreamId)) first.set(a.dreamId, a.id);
+  const choice = (d: (typeof dreams)[number]): WishChoice => ({ id: d.id, text: d.title, ...(d.category ? { category: d.category } : {}), ...(first.has(d.id) ? { activityId: first.get(d.id) } : {}) });
+  return [...dreams.filter((d) => first.has(d.id)), ...dreams.filter((d) => !first.has(d.id))].map(choice);
+}
+
+/** The wish of the activity UP-43 would guess (UP-47). */
+export function guessWish(activities: Parameters<typeof guessActivity>[0], now: string | undefined) {
+  const id = guessActivity(activities, now);
+  return (activities as { id: string; dreamId?: string }[]).find((a) => a.id === id)?.dreamId;
+}
+
+/** The sheet's expense for a chosen wish: its title without a description, the category from the tiles (UP-47). */
+export const wishExpense = (w: WishChoice, f: { text: string; amount: string; category: string }, payer: string, sharedBy: string[]): ExpenseInput =>
+  ({ text: f.text.trim() || w.text, amount: f.amount, category: f.category, paidBy: payer, sharedBy, addedBy: payer, dreamId: w.id, ...(w.activityId ? { activityId: w.activityId } : {}) });
+
+/** Each traveler's total: the expenses they paid (MI-40). */
+export function paidTotals(people: Person[], expenses: { paidBy: string; amount: number }[]) {
+  const b: Record<string, number> = Object.fromEntries(people.map((p) => [p.id, 0]));
+  for (const e of expenses) b[e.paidBy] = (b[e.paidBy] ?? 0) + ore(e.amount);
+  return Object.fromEntries(Object.entries(b).map(([id, v]) => [id, v / 100]));
 }
 
 /** Summera's and Uppleva's short form without an activity: the category from the form (MI-13, UP-30). */

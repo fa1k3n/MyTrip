@@ -61,32 +61,27 @@ export function planSlices(p: BudgetPlan) {
   if (p.max !== undefined && p.left! > 0) slices.push({ label: sv.unused, value: p.left!, kind: "unused" });
   return { slices, total: Math.round(slices.reduce((a, x) => a + x.value * 100, 0)) / 100, sum: p.forecast, max: p.max };
 }
+type DayTrip = {
+  days: { id: string; date: string; activities: { id: string; dreamId?: string }[] }[]; dreams: { id: string; title: string }[];
+  expenses: { amount: number; activityId?: string; dreamId?: string; date?: string }[];
+};
+export type WishRow = { title: string; dreamId?: string; sum: number };
+export type DayGroup = { date?: string; sum: number; rows: WishRow[] };
 
-type ActivityTrip = { days: { id: string; date: string; activities: { id: string; text: string; hidden?: boolean }[] }[]; expenses: { amount: number; activityId?: string; date?: string }[] };
-export type ActivityRow = { title: string; hidden?: boolean; activityId?: string; sum: number };
-export type DayGroup = { date?: string; dayId?: string; sum: number; rows: ActivityRow[] };
-
-/** The expenses per day and activity, in date and day order, with the day's expenses without an activity last (BG-21). */
-export function byActivity(t: ActivityTrip): DayGroup[] {
+/** The expenses per day and wish: the wish chosen, else the activity's; the day of the activity, else the expense's date (BG-22). */
+export function byDay(t: DayTrip): DayGroup[] {
   const cents = (n: number) => Math.round(n * 100);
-  const dayOf = new Map(t.days.flatMap((d) => d.activities.map((a) => [a.id, { d, a }] as const)));
-  const groups = new Map<string, { date?: string; dayId?: string; acts: Map<string, number>; none: number }>();
-  const group = (date?: string) => {
-    const key = date ?? "";
-    if (!groups.has(key)) groups.set(key, { date, dayId: t.days.find((d) => d.date === date)?.id, acts: new Map(), none: 0 });
-    return groups.get(key)!;
-  };
+  const where = new Map(t.days.flatMap((d) => d.activities.map((a) => [a.id, { date: d.date, dreamId: a.dreamId }] as const)));
+  const groups = new Map<string, { date?: string; wishes: Map<string, number>; none: number }>();
   for (const e of t.expenses) {
-    const hit = e.activityId ? dayOf.get(e.activityId) : undefined;
-    if (hit) { const g = group(hit.d.date); g.acts.set(hit.a.id, (g.acts.get(hit.a.id) ?? 0) + cents(e.amount)); }
-    else group(e.date).none += cents(e.amount);
+    const at = e.activityId ? where.get(e.activityId) : undefined, date = at?.date ?? e.date, wish = e.dreamId ?? at?.dreamId;
+    const g = groups.get(date ?? "") ?? groups.set(date ?? "", { date, wishes: new Map(), none: 0 }).get(date ?? "")!;
+    if (wish && t.dreams.some((d) => d.id === wish)) g.wishes.set(wish, (g.wishes.get(wish) ?? 0) + cents(e.amount));
+    else g.none += cents(e.amount);
   }
   return [...groups.values()].sort((a, b) => (a.date ? (b.date ? a.date.localeCompare(b.date) : -1) : 1)).map((g) => {
-    const day = t.days.find((d) => d.id === g.dayId);
-    const rows: ActivityRow[] = (day?.activities ?? []).filter((a) => g.acts.has(a.id))
-      .map((a) => ({ title: a.text, ...(a.hidden ? { hidden: true } : {}), activityId: a.id, sum: g.acts.get(a.id)! / 100 }));
-    if (g.none) rows.push({ title: g.date ? sv.plan.none : sv.plan.noDate, sum: g.none / 100 });
-    const sum = (rows.reduce((s, r) => s + cents(r.sum), 0)) / 100;
-    return { ...(g.date ? { date: g.date } : {}), ...(g.dayId ? { dayId: g.dayId } : {}), sum, rows };
+    const rows: WishRow[] = t.dreams.filter((d) => g.wishes.has(d.id)).map((d) => ({ title: d.title, dreamId: d.id, sum: g.wishes.get(d.id)! / 100 }));
+    if (g.none) rows.push({ title: g.date ? sv.plan.noWish : sv.plan.noDate, sum: g.none / 100 });
+    return { ...(g.date ? { date: g.date } : {}), sum: rows.reduce((s, r) => s + cents(r.sum), 0) / 100, rows };
   });
 }

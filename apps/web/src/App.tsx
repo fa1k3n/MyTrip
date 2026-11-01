@@ -17,7 +17,7 @@ import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.t
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
-import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, type Transfer } from "./money.ts";
+import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, wishExpense, type Transfer } from "./money.ts";
 import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
 import { Gear, IconButton } from "./Icons.tsx";
 
@@ -36,7 +36,7 @@ import { newWish, toFill } from "./wishes.ts";
 
 const filling = new Set<string>(); // wishes already sent for an automatic image on this page (DB-07)
 
-type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string }; payer?: boolean; choices?: Choice[]; guess?: string } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | { kind: "wishImage"; id: string } | EditDlg;
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }; payer?: boolean; choices?: Choice[]; guess?: string } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | { kind: "wishImage"; id: string } | EditDlg;
 const dlgTitle = { wishImage: sv.wish.find, dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
 const ADDER_KEY = "mytrip.adder";
 const HINT_KEY = "mytrip.installHint";
@@ -287,9 +287,10 @@ export function App() {
       const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
       if (rate === null) return setErr(sv.up.noRate(cur));
       const foreign = rate && { currency: cur, rate: rate.rate, rateDate: rate.date };
-      const chosen = activity ?? short?.choices?.find((x) => x.id === str("activity")); // the card's activity, or the one chosen in the sheet (UP-43)
-      const input = { ...(chosen ? { ...activityExpense(chosen, { text: str("text"), amount: str("amount") }, payer, all), // UP-22, UP-23
-        ...(activity ? {} : { category: str("category") || activityCategory(chosen.category) }) } // the sheet's tiles can change the category
+      const wish = activity ? undefined : short?.choices?.find((x) => x.id === str("dream")); // the wish chosen in the sheet (UP-47)
+      const typed = { text: str("text"), amount: str("amount") };
+      const input = { ...(activity ? activityExpense(activity, typed, payer, all) // the card's activity and its wish (UP-22, UP-23, UP-47)
+        : wish ? wishExpense(wish, { ...typed, category: str("category") || activityCategory(wish.category) }, payer, all) // the tiles can change the category
         : plainExpense({ text: str("text"), amount: str("amount"), category: str("category") }, payer, all)), ...(foreign ? { foreign } : {}) }; // shared by all; split in Summera (MI-02)
       const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
@@ -300,7 +301,7 @@ export function App() {
         flushWaiting();
       } else change(r.ops, "add expense");
       { // after the dialog has closed, over the button that opened it (UP-35)
-        const at = origin.current, label = burstLabel(r.ops[0].value as Expense, t!.currency, chosen?.text); // UP-44
+        const at = origin.current, label = burstLabel(r.ops[0].value as Expense, t!.currency, (activity ?? wish)?.text); // UP-44
         setTimeout(() => burst(at, label), 80);
       }
     } else {

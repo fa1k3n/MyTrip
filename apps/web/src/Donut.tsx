@@ -1,9 +1,9 @@
-// The budget card of Nåla and Minnas (BG-17): the donut (BG-18) with its legend, the totals and the expenses per activity (BG-21);
-// Uppleva's donut (UP-45); and the maximum budget warning (BG-19).
+// The budget card of Nåla and Minnas (BG-17): the donut (BG-18) with its legend, the totals and the expenses per day and wish (BG-22);
+// Uppleva's donut with amounts (UP-48); and the maximum budget warning (BG-19).
 import type { ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { dayLabel, donutTotalSize, kr } from "./format.ts";
-import { budgetPlan, byActivity, money, planSlices, type BudgetPlan } from "./budget.ts";
+import { budgetPlan, byDay, money, planSlices, type BudgetPlan } from "./budget.ts";
 import { Icon } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
@@ -38,15 +38,14 @@ function Legend({ p, amounts }: { p: BudgetPlan; amounts?: boolean }) {
     <li key={x.label}><i className={x.kind} style={{ background: x.kind === "unused" ? UNUSED : colour(x.label) }}></i>{x.label}{amounts && <span>{whole(x.value)}</span>}</li>))}</ul>;
 }
 
-/** The expenses per day, each day opening to its activities (BG-21). */
-function PerActivity({ t }: { t: Trip }) {
-  const groups = byActivity(t);
+/** The expenses per day, each day opening to its wishes (BG-22). */
+function PerDay({ t }: { t: Trip }) {
+  const groups = byDay(t);
   if (!groups.length) return null;
   return <div className="bacts"><h4>{sv.plan.byActivity}</h4>{groups.map((g) => (
     <details className="bcat" key={g.date ?? ""}>
       <summary><span className="bline"><span>{g.date ? dayLabel(g.date) : sv.plan.noDate}</span><span>{kr(g.sum)}</span></span></summary>
-      {g.rows.map((r) => <div className="row" key={r.activityId ?? r.title}>
-        <span>{r.hidden ? <span className="hiddenact"><Icon name="eyeoff" />{sv.hiddenText}</span> : r.title}</span><span>{kr(r.sum)}</span></div>)}
+      {g.rows.map((r) => <div className="row" key={r.dreamId ?? r.title}><span>{r.title}</span><span>{kr(r.sum)}</span></div>)}
     </details>))}</div>;
 }
 
@@ -66,16 +65,16 @@ export function BudgetPlanView({ t, children }: { t: Trip; children?: ReactNode 
           {p.left! >= 0 ? total(sv.plan.left, whole(p.left!)) : total(sv.plan.over, whole(-p.left!))}
         </>}
       </dl>
-      <PerActivity t={t} />
+      <PerDay t={t} />
       {children}
     </div>
   );
 }
 
-/** Uppleva's budget: only the donut and which colour is which category, no amounts or lists (UP-45). */
+/** Uppleva's budget: the donut and its legend with the amounts, no totals or lists (UP-48). */
 export function BudgetDonut({ t }: { t: Trip }) {
   const p = budgetPlan(t, true);
-  return <div className="donutbox"><Donut p={p} /><Legend p={p} /></div>;
+  return <div className="bplan"><div className="donutbox"><Donut p={p} /><Legend p={p} amounts /></div></div>;
 }
 
 /** The card's tint: light yellow from 80 % of the maximum budget (caution), light red above it (warn) (BG-19). */

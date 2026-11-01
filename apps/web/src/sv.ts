@@ -31,7 +31,7 @@ export const sv = {
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",
   },
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
-    applies: "Aktivitet", noActivity: "Ingen", // UP-43, MI-32
+    applies: "Aktivitet", wishes: "Önskningar", noActivity: "Ingen", // UP-43, UP-47, MI-32
     sheetKicker: "Utlägg", what: "Beskrivning", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
     now: "Nu",
     place: "Visa platsen",
@@ -53,7 +53,7 @@ export const sv = {
   budgetCategories: ["Boende", "Transport", "Mat", "Upplevelse", "Shopping", "Övrigt"], // MI-30
   expandAll: "Visa alla dagar", collapseAll: "Fäll ihop alla", travelTime: "restid på dagen",
   bookings: "Bokningar", budget: "Budget", tripBudget: "Resans budget", // UP-45: the whole trip, not the day
-  plan: { planned: "Plan", actual: "Utfall", forecast: "Prognos", max: "Max", left: "Kvar", over: "Över max", byActivity: "Utlägg per dag", none: "Utan aktivitet", noDate: "Utan datum", items: "Budgetposter" }, // BG-17, BG-20, BG-21
+  plan: { planned: "Plan", actual: "Utfall", forecast: "Prognos", max: "Max", left: "Kvar", over: "Över max", byActivity: "Utlägg per dag", noWish: "Utan önskan", noDate: "Utan datum", items: "Budgetposter" }, // BG-17, BG-20, BG-21
   budgetChart: "Budget per kategori", total: "totalt",
   budgetMax: "Maxbudget", editBudgetMax: "Ändra maxbudget", noBudgetMax: "Ingen maxbudget",
   budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",

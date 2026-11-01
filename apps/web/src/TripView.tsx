@@ -1,5 +1,5 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, anyUnlocked, editModeLabel, isUnlocked, toggleAllUnlock, toggleUnlock, unlockLabel, type Unlock, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
 import { wxLabel, wxRows, type Forecast } from "./weather.ts";
@@ -22,7 +22,7 @@ import { anyWrite, type Perms } from "./access.ts";
 import { atLeast } from "@trip/schema/src/rules.ts";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { hasTickets, ticketFor } from "./tickets.ts";
-import { keepView, minnasView, storedView, type MinnasView } from "./memories.ts";
+import type { MinnasView } from "./memories.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
@@ -164,7 +164,7 @@ export type TripViewProps = {
   setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void;
   place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; back: () => void; admin: () => void;
   today: string; upDay: string | null; setUpDay: (id: string) => void;
-  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string }, pick?: { choices: { id: string; text: string; category?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
+  addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }, pick?: { choices: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
   edit: (d: EditDlg) => void; run: Run;
   unlock: Unlock; setUnlock: (u: Unlock) => void; // edit mode in Nåla, per part (ED-13, ED-18)
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
@@ -181,11 +181,12 @@ export type TripViewProps = {
 export function TripView(p: TripViewProps) {
   const { t, tab, perms } = p, writes = anyWrite(perms);
   const seesMemories = (perms.view.mi.memories ?? "hidden") !== "hidden";
-  const [miView, setMiView] = useState<MinnasView>(() => minnasView(storedView(), true)); // MI-15
+  const [miView, setMiView] = useState<MinnasView>("minnen"); // always Upplevt when Minnas opens, not remembered (MI-39)
+  useEffect(() => { if (tab !== "mi") setMiView("minnen"); }, [tab]);
   const shownMi = seesMemories ? miView : "budget";
-  const pickMi = (v: MinnasView) => { setMiView(v); keepView(v); };
-  const views = seesMemories && <span className="viewpick" role="group" aria-label={sv.minnas.views}>{/* Upplevt or Pengar, on the right under the tabs (MI-37) */}
-    <IconButton icon="ok" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
+  const pickMi = (v: MinnasView) => setMiView(v);
+  const views = seesMemories && <span className="viewpick" role="group" aria-label={sv.minnas.views}>{/* Upplevt or Pengar, on the right under the tabs (MI-39) */}
+    <IconButton icon="memories" label={sv.minnas.memories} pressed={shownMi === "minnen"} onClick={() => pickMi("minnen")} tip="left" />
     <IconButton icon="banknote" label={sv.minnas.budget} pressed={shownMi === "budget"} onClick={() => pickMi("budget")} tip="left" />
   </span>;
   const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise Nåla locks each part on its own (ED-18)

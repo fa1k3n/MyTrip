@@ -77,6 +77,7 @@ export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),
   paidBy: Id, sharedBy: z.array(Id).default([]), // empty: shared by every traveler (MI-02)
   date: Date_.optional(), activityId: Id.optional(), // the activity it was for, if any (UP-20)
+  dreamId: Id.optional(), // the wish it was for, if any (UP-47, BG-22)
   // paid in another currency: the amount as entered and the rate of its date; `amount` is converted to the trip's currency (UP-25)
   foreign: z.object({ amount: z.number().positive(), currency: z.string().regex(/^[A-Z]{3}$/), rate: z.number().positive(), rateDate: Date_ }).optional(),
   addedBy: Id.optional(), addedAt: z.string().datetime().optional(), // who added it, among the travelers, and when (UP-13)

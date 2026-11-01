@@ -5,7 +5,7 @@ import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.t
 import { clashes, durationText, nowAt, upDayTime, upTime } from "./upday.ts";
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
 import { geocodeUrl } from "./weather.ts";
-import { guessActivity } from "./money.ts";
+import { guessWish, wishChoices } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { BudgetDonut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
@@ -151,7 +151,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
             {place && <IconButton icon="map" look="bare" tip="left" label={`${sv.up.place}: ${t.places.find((x) => x.id === place)?.name ?? a.text}`} onClick={() => p.place(place)} />}
             {b && <TicketButton b={b} edit={p.edit} />}
             {add && !a.hidden && <IconButton icon="money" look="bare" tip="left" label={sv.up.expenseTitle(a.text)}
-              onClick={() => p.addShortExpense(currency, { id: a.id, text: a.text, category: a.category })} />}
+              onClick={() => p.addShortExpense(currency, { id: a.id, text: a.text, category: a.category, dreamId: a.dreamId } /* its wish too (UP-47) */)} />}
           </span>
         </span>
       </li>;
@@ -159,7 +159,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
     })}
     {at === day.activities.length && line}
   </ol>
-  {add && <div className="fabdock"><IconButton icon="money" look="fab" tip="up" label={sv.addExpense} onClick={() => p.addShortExpense(currency, undefined, { // the day's activities, the one going on now guessed (UP-43)
-    choices: day.activities.filter((a) => !a.hidden).map((a) => ({ id: a.id, text: a.text, category: a.category })), guess: guessActivity(day.activities, now) })} /></div> /* the phone's corner, else the day's column (UP-41) */}
+  {add && <div className="fabdock"><IconButton icon="money" look="fab" tip="up" label={sv.addExpense} onClick={() => p.addShortExpense(currency, undefined, { // the trip's wishes, the day's first, the one going on now guessed (UP-47)
+    choices: wishChoices(day, t.dreams), guess: guessWish(day.activities, now) })} /></div> /* the phone's corner, else the day's column (UP-41) */}
   </>;
 }

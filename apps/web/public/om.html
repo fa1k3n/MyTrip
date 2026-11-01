@@ -30,22 +30,27 @@ h1{font-size:clamp(1.6rem,4vw,2.3rem)}
 .stage{position:relative;background:var(--sky);border-radius:18px;overflow:hidden;aspect-ratio:16/9;max-width:100%;box-shadow:0 2px 14px rgba(44,42,41,.08)}
 .stage svg{position:absolute;inset:0;width:100%;height:100%}
 .scene[hidden]{display:none}
+/* UI-15: the player fills the screen, with the Fullscreen API where it exists, else (iPhone) the whole window */
+.player{display:grid;gap:18px;min-width:0}
+.player:fullscreen,.player.full{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.player:fullscreen>*,.player.full>*{width:min(100%,calc((100dvh - 150px) * 16 / 9));flex:none}
+.player:fullscreen .sub,.player.full .sub{max-width:none;min-height:3.9em;font-size:clamp(.85rem,1.8vw,1.2rem);line-height:1.3}
+.player:fullscreen .bar,.player.full .bar{justify-content:center;flex-wrap:nowrap}
+.player:fullscreen .chaps,.player.full .chaps{display:none}
+.player:fullscreen #full span,.player.full #full span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .sub{min-height:5.2em;margin:0;font-family:var(--display);font-weight:500;font-size:clamp(1.05rem,2.4vw,1.35rem);line-height:1.45;max-width:62ch}
 .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border-radius:22px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:600 .95rem var(--body);cursor:pointer;padding:0 14px;gap:6px}
 .btn:focus-visible,.chap:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
 .btn.main{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn[aria-pressed="true"]{background:var(--sage);border-color:var(--sage);color:#fff}
 .btn svg{width:18px;height:18px}
 .chaps{display:flex;gap:6px;flex-wrap:wrap}
 .chap{min-height:40px;padding:0 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:600 .9rem var(--body);cursor:pointer;position:relative;overflow:hidden}
 .chap[aria-current="true"]{background:var(--sage);border-color:var(--sage);color:#fff}
 .chap .fill{position:absolute;left:0;bottom:0;height:3px;background:var(--acc);width:0}
 .chap[aria-current="true"] .fill{background:#fff}
-.script{display:grid;gap:12px;margin:8px 0 0;padding:0;list-style:none;counter-reset:s}
-.script li{display:grid;grid-template-columns:2.2rem 1fr;gap:10px;align-items:start;counter-increment:s}
-.script li::before{content:counter(s);font-family:var(--display);font-weight:700;color:var(--acct);font-size:1.2rem;line-height:1.4}
-.script h3{font-size:1.05rem}
-.script p{margin:2px 0 0;color:var(--mute);max-width:65ch}
 .roles{display:flex;gap:14px;flex-wrap:wrap;margin:0;padding:0;list-style:none}
 .roles li{display:flex;align-items:center;gap:8px;font-size:.95rem}
 .mark{display:inline-flex;width:30px;height:30px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid var(--acc);color:var(--acct);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
@@ -109,6 +114,7 @@ section h2{font-size:1.3rem;margin-bottom:6px}
     <p class="kick">Från dröm till minne, tillsammans</p>
   </header>
 
+  <div class="player" id="player">
   <div class="stage" id="stage" role="img" aria-label="Animerad film om hur Basläger fungerar"></div>
   <p class="sub" id="sub" aria-live="polite"></p>
 
@@ -116,7 +122,10 @@ section h2{font-size:1.3rem;margin-bottom:6px}
     <button class="btn" id="prev" type="button" aria-label="Föregående scen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
     <button class="btn main" id="play" type="button"></button>
     <button class="btn" id="next" type="button" aria-label="Nästa scen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <button class="btn" id="voice" type="button" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>Berättarröst</button>
+    <button class="btn" id="full" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg><span>Helskärm</span></button>
     <div class="chaps" id="chaps" role="tablist" aria-label="Kapitel"></div>
+  </div>
   </div>
 
   <section>
@@ -127,11 +136,6 @@ section h2{font-size:1.3rem;margin-bottom:6px}
       <li><span class="mark s" id="m-r"></span>Resenär: tycker till, bockar av, lägger in utlägg</li>
       <li><span class="mark f" id="m-f"></span>Följare: får en länk och tittar</li>
     </ul>
-  </section>
-
-  <section>
-    <h2>Hela manuset</h2>
-    <ol class="script" id="script"></ol>
   </section>
 </div>
 
@@ -270,10 +274,31 @@ const stage = document.getElementById("stage"), sub = document.getElementById("s
 stage.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#2C2A29" flood-opacity=".12"/></filter></defs></svg>` + SCENES.map((s, i) => `<svg class="scene" viewBox="0 0 800 450" aria-hidden="true" ${i ? "hidden" : ""}>${s.svg()}</svg>`).join("");
 const scenes = [...stage.querySelectorAll(".scene")];
 chaps.innerHTML = SCENES.map((s, i) => `<button class="chap" type="button" role="tab" id="chap-${i}" aria-current="${!i}">${s.chap}<span class="fill"></span></button>`).join("");
-document.getElementById("script").innerHTML = SCENES.map((s) => `<li><div><h3>${s.title}</h3><p>${s.text}</p></div></li>`).join("");
 const fills = [...chaps.querySelectorAll(".fill")];
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let at = 0, playing = !reduce, started = performance.now(), elapsed = 0;
+let at = 0, playing = !reduce, started = performance.now(), elapsed = 0, ended = false;
+// The narration: the device's own Swedish voice reads each scene's text; nothing is sent anywhere (UI-14).
+const speech = "speechSynthesis" in window ? window.speechSynthesis : null, voiceBtn = document.getElementById("voice");
+let voice = null, voiceOn = false, spoken = false, turn = 0;
+function pickVoice() {
+  const all = speech ? speech.getVoices() : [];
+  voice = all.find((v) => /^sv([-_]|$)/i.test(v.lang) && v.localService) ?? all.find((v) => /^sv([-_]|$)/i.test(v.lang)) ?? null;
+  voiceBtn.hidden = !voice; // no Swedish voice: the subtitles remain
+}
+/** Reads the scene sentence by sentence (one long utterance is cut short in some browsers); spoken turns true at the end. */
+function speak(i) {
+  if (!speech || !voice) return;
+  speech.cancel();
+  spoken = false;
+  const mine = ++turn, parts = SCENES[i].text.match(/[^.!?]+[.!?]*/g) ?? [SCENES[i].text];
+  parts.forEach((t, n) => {
+    const u = new SpeechSynthesisUtterance(t.trim());
+    u.voice = voice; u.lang = voice.lang; u.rate = .95;
+    if (n === parts.length - 1) u.onend = () => { if (mine === turn) spoken = true; };
+    speech.speak(u);
+  });
+}
+const hush = () => { turn++; if (speech) speech.cancel(); };
 
 function show(i) {
   at = (i + SCENES.length) % SCENES.length;
@@ -285,19 +310,47 @@ function show(i) {
   [...chaps.children].forEach((b, n) => b.setAttribute("aria-current", String(n === at)));
   fills.forEach((f, n) => { f.style.width = n < at ? "100%" : "0"; });
   elapsed = 0; started = performance.now();
+  if (voiceOn && playing) speak(at); else hush();
 }
 const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>Spela', PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>Pausa';
 const playBtn = document.getElementById("play");
-const setPlaying = (p) => { playing = p; playBtn.innerHTML = p ? PAUSE : PLAY; if (p) started = performance.now() - elapsed; };
-playBtn.addEventListener("click", () => { if (!playing && at === SCENES.length - 1 && elapsed >= DUR) show(0); setPlaying(!playing); });
+const setPlaying = (p) => {
+  playing = p; playBtn.innerHTML = p ? PAUSE : PLAY;
+  if (p) started = performance.now() - elapsed;
+  if (p && voiceOn) speak(at); else if (!p) hush(); // a paused scene is read again from its start
+};
+playBtn.addEventListener("click", () => { if (!playing && ended) { ended = false; show(0); } setPlaying(!playing); });
+voiceBtn.addEventListener("click", () => { // started by a tap, which iPhone needs before it speaks
+  voiceOn = !voiceOn;
+  voiceBtn.setAttribute("aria-pressed", String(voiceOn));
+  if (!voiceOn) { hush(); started = performance.now() - Math.min(elapsed, DUR); return; }
+  if (ended) { ended = false; show(0); }
+  if (playing) speak(at); else setPlaying(true);
+});
+// UI-15: full screen, or the whole window where the browser cannot (iPhone); Esc or the button leaves it.
+const player = document.getElementById("player"), fullBtn = document.getElementById("full");
+const isFull = () => document.fullscreenElement === player || player.classList.contains("full");
+const showFull = () => { const on = isFull(); fullBtn.setAttribute("aria-pressed", String(on)); fullBtn.querySelector("span").textContent = on ? "Lämna helskärm" : "Helskärm"; document.body.style.overflow = player.classList.contains("full") ? "hidden" : ""; };
+fullBtn.addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (player.classList.contains("full")) player.classList.remove("full");
+  else if (player.requestFullscreen) player.requestFullscreen().catch(() => player.classList.add("full")).finally(showFull);
+  else player.classList.add("full");
+  showFull();
+});
+document.addEventListener("fullscreenchange", showFull);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && player.classList.contains("full")) { player.classList.remove("full"); showFull(); } });
+if (speech) { pickVoice(); speech.addEventListener?.("voiceschanged", pickVoice); }
 document.getElementById("prev").addEventListener("click", () => show(at - 1));
 document.getElementById("next").addEventListener("click", () => show(at + 1));
 chaps.addEventListener("click", (e) => { const b = e.target.closest(".chap"); if (b) show([...chaps.children].indexOf(b)); });
 function tick(now) {
   if (playing) {
     elapsed = now - started;
-    fills[at].style.width = `${Math.min(100, elapsed / DUR * 100)}%`;
-    if (elapsed >= DUR) { if (at < SCENES.length - 1) show(at + 1); else { elapsed = DUR; setPlaying(false); } }
+    const length = voiceOn ? SCENES[at].text.length * 70 : DUR; // with the voice, a scene lasts until its text is read
+    fills[at].style.width = `${Math.min(100, elapsed / length * 100)}%`;
+    const done = voiceOn ? spoken && elapsed > 2500 : elapsed >= DUR;
+    if (done) { if (at < SCENES.length - 1) show(at + 1); else { fills[at].style.width = "100%"; ended = true; setPlaying(false); } }
   }
   requestAnimationFrame(tick);
 }

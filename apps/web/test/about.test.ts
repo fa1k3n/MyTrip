@@ -40,3 +40,21 @@ test("UI-13 the film shows the day trip and the long trip, with soft figures", (
   assert.match(page, /Dagstur/);
   assert.match(page, /class="skin"/);
 });
+
+// REQ: UI-14 narration with the device's Swedish voice, started by a tap
+test("UI-14 the film can be narrated by the device's Swedish voice", () => {
+  assert.match(page, /id="voice"[^>]*aria-pressed="false"[^>]*hidden/);
+  assert.match(page, /Berättarröst/);
+  assert.match(page, /speechSynthesis/);
+  assert.match(page, /\^sv/, "a Swedish voice is picked");
+  assert.match(page, /SpeechSynthesisUtterance/);
+});
+
+// REQ: UI-15 the film fills the screen, also where the browser has no full screen
+test("UI-15 the film has a full screen button with a fallback for the iPhone", () => {
+  assert.match(page, /id="full"[^>]*aria-pressed="false"/);
+  assert.match(page, /requestFullscreen/);
+  assert.match(page, /\.player\.full\{position:fixed;inset:0/);
+  assert.match(page, /Lämna helskärm/);
+  assert.ok(!page.includes("Hela manuset"), "the script is gone");
+});

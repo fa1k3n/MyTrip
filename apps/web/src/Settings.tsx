@@ -1,7 +1,9 @@
-// Gear button (MT-10) and the instance-wide AI settings (AI-06..AI-09).
+// The app settings under the gear on Drömmar: AI for all trips (AI-06..AI-09), and the API key and image cache for the superuser (MT-13).
+import { useState } from "react";
 import type { AiArea, Settings } from "@trip/schema";
-import { IconButton } from "./Icons.tsx";
+import { api, maskedToken } from "./api.ts";
 import { sv } from "./sv.ts";
+import { ask } from "./Ask.tsx"; // UI-11
 
 /** On/off switch with an explanation shown on hover or keyboard focus, and read by screen readers. */
 export function Switch({ id, label, tip, checked, onChange }: { id: string; label: string; tip: string; checked: boolean; onChange: (on: boolean) => void }) {
@@ -44,4 +46,31 @@ export function AiSettings({ s, service, onChange }: { s: Settings; service: boo
       )}
     </div>
   );
+}
+
+/** Emptying the image cache of ended trips, for the superuser, with the count and size in the confirmation (DB-13). */
+function ImageCache() {
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const kb = (b: number) => Math.round(b / 1024);
+  const empty = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const s = await api.endedCache();
+      if (!s.images && !s.files) setMsg(sv.wish.cacheEmpty);
+      else if (await ask(sv.wish.cacheAsk(s.images, kb(s.bytes)))) { const r = await api.clearEndedCache(); setMsg(sv.wish.cacheDone(r.images, kb(r.bytes))); }
+    } catch { setMsg(sv.wish.failed); }
+    setBusy(false);
+  };
+  return <div className="card"><h3>{sv.wish.cache}</h3><p className="ro">{sv.wish.cacheText}</p>
+    <button className="btn ghost" type="button" disabled={busy} onClick={empty}>{sv.wish.cacheButton}</button>
+    {msg && <p className="ro note" role="status">{msg}</p>}</div>;
+}
+
+/** What only the superuser sees in the app settings: the masked API key and the image cache (MT-13). */
+export function AppAdmin() {
+  return <>
+    {maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
+    <ImageCache />
+  </>;
 }

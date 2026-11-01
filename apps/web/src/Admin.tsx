@@ -1,7 +1,7 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, installed, maskedToken, type PersonLinkInfo } from "./api.ts";
+import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
 import { linkFromText, missingLinks, personUrl, shareUrl } from "./access.ts";
 import { DEFAULT_ACCESS, levelsFor, PAGE_PARTS, PAGES, type Level, type Page } from "@trip/schema/src/rules.ts";
 import { tripRange } from "./edit.ts";
@@ -263,32 +263,13 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
   );
 }
 
-/** Emptying the image cache of ended trips, for the superuser, with the count and size in the confirmation (DB-13). */
-function ImageCache() {
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState(false);
-  const kb = (b: number) => Math.round(b / 1024);
-  const empty = async () => {
-    setBusy(true); setMsg("");
-    try {
-      const s = await api.endedCache();
-      if (!s.images && !s.files) setMsg(sv.wish.cacheEmpty);
-      else if (await ask(sv.wish.cacheAsk(s.images, kb(s.bytes)))) { const r = await api.clearEndedCache(); setMsg(sv.wish.cacheDone(r.images, kb(r.bytes))); }
-    } catch { setMsg(sv.wish.failed); }
-    setBusy(false);
-  };
-  return <div className="card"><h3>{sv.wish.cache}</h3><p className="ro">{sv.wish.cacheText}</p>
-    <button className="btn ghost" type="button" disabled={busy} onClick={empty}>{sv.wish.cacheButton}</button>
-    {msg && <p className="ro note" role="status">{msg}</p>}</div>;
-}
-
-/** The trip's settings. A Planerare sees the trip's own settings; the app settings, API key and deleting are for the superuser (AU-14). */
+/** The trip's settings: only what applies to this trip (MT-13). A Planerare sees them; the AI switch, permissions and deleting are for the superuser (AU-14). */
 export function AdminPage({ t, superuser, settings, back, edit, addPerson, change, run, removeTrip, openSettings }: {
   t: Trip; superuser: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
   change: (ops: Op[], reason: string) => void; removeTrip: () => void; openSettings: () => void;
 }) {
   return <>
-    <div className="top"><IconButton icon="back" label={sv.back} onClick={back} tip="right" /></div><h1>{sv.admin}</h1>
+    <div className="top"><IconButton icon="back" label={sv.back} onClick={back} tip="right" /></div><h1>{sv.tripSettings}</h1>
     <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{sv.name}: {t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
       <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
       <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div>
@@ -298,8 +279,6 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
     <Inbox t={t} />
-    {superuser && maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
-    {superuser && <ImageCache />}
     {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
     {superuser && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;

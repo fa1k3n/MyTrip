@@ -25,6 +25,7 @@ import { Gear, IconButton } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
 const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
+const AppAdmin = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AppAdmin })));
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 const Choose = lazy(() => import("./Choose.tsx"));
@@ -368,6 +369,7 @@ export function App() {
   else if (view === "settings") page = <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView(settingsBack)} tip="right" /></div><h1>{sv.settings}</h1>
     {aiCard}
+    {role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13 */}
   </>;
   else if (view === "portal" || !t) page = <>
     <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />

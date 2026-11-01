@@ -72,8 +72,8 @@ export function IconButton({ icon, label, onClick, mut, pressed, disabled, look 
 }
 
 /** The settings gear at the top right of the start page and the trip page (MT-10). */
-export const Gear = ({ onClick }: { onClick: () => void }) =>
-  <IconButton icon="settings" label={sv.settings} onClick={onClick} mut tip="left" />;
+export const Gear = ({ onClick, label = sv.settings }: { onClick: () => void; label?: string }) =>
+  <IconButton icon="settings" label={label} onClick={onClick} mut tip="left" />;
 
 /** The mark of a wish that is in the plan: an icon, no text, and not a pin since its time is an estimate (DB-19). */
 export const PlannedMark = () => <span className="planmark" role="img" aria-label={sv.wish.planned} title={sv.wish.planned}><Icon name="planned" /></span>;

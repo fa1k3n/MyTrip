@@ -244,7 +244,7 @@ export function TripView(p: TripViewProps) {
           ? <span className="who follower">{p.who.name}</span>
           : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
         {/* the person's own settings for notices (NT-03) */}<IconButton icon="bell" label={sv.notice.bell} onClick={p.notices} tip="left" />
-        {perms.settings && <Gear onClick={p.admin} />}
+        {perms.settings && <Gear onClick={p.admin} label={sv.tripSettings} />}
         {p.fullApp && <IconButton icon="external" label={sv.fullApp} onClick={p.fullApp} tip="left" />}
       </span>
     </div>

@@ -2,7 +2,7 @@
 export const sv = {
   hub: "Drömmar", family: "Familjen", newTrip: "+ Skapa ny resa", newTripTitle: "Ny resa",
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
-  allTrips: "Alla resor", back: "Tillbaka", admin: "Admin & Inställningar",
+  allTrips: "Alla resor", back: "Tillbaka", tripSettings: "Resans inställningar", // MT-13
   tabs: { dr: "Önska", nala: "Nåla", up: "Uppleva", mi: "Minnas" },
   proposal: { // MC-15..MC-18
     title: "Förslag", waiting: (n: number) => (n === 1 ? "1 förslag väntar" : `${n} förslag väntar`), made: (at: string) => `Gjort ${at}`,

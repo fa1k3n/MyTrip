@@ -37,6 +37,8 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .blegend i{width:10px;height:10px;border-radius:50%;display:inline-block}.blegend i.unused{box-shadow:inset 0 0 0 1px var(--mute)}
 .blegend.sums{flex:1;min-width:0;max-width:280px}.blegend.sums span{margin-left:auto;padding-left:16px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .asklist{margin:0 0 12px;padding-left:20px}
+.sharegrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px 6px;margin-top:10px} /* MI-38: six to a row */
+.sharer{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}.sharer>span:last-child{font-size:.85rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .manifest{font-family:Fraunces,Georgia,serif;font-size:1.1rem;line-height:1.7;padding:22px;border-left:5px solid var(--acc)}
 .tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;background:var(--bg);padding:8px 0;margin-bottom:8px}
 .tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px;font-weight:600}

@@ -205,12 +205,12 @@ function Sharing({ t, run }: { t: Trip; run: Run }) {
     <div className="card">
       <h3>{svAdmin.shares.title}</h3>
       <p className="ro note">{svAdmin.shares.hint}</p>
-      {t.travelers.map((x) => (
-        <div className="row mid" key={x.id}><span>{x.name}</span>
-          <span className="verdict">{/* a toggle in the style of the verdict buttons in Minnas: pressed means shares */}
-            <IconButton icon="users" tip="left" pressed={x.shares !== false} label={svAdmin.shares.toggle(x.name)}
-              onClick={() => run((y) => sharesOps(y, x.id, x.shares === false), "shares")} /></span></div>
-      ))}
+      <div className="sharegrid">{t.travelers.map((x) => ( // six to a row, the name under the button
+        <div className="sharer" key={x.id}><span className="verdict">{/* a toggle in the style of the verdict buttons in Minnas: pressed means shares */}
+          <IconButton icon="users" tip="up" pressed={x.shares !== false} label={svAdmin.shares.toggle(x.name)}
+            onClick={() => run((y) => sharesOps(y, x.id, x.shares === false), "shares")} /></span>
+          <span aria-hidden="true">{x.name}</span></div>
+      ))}</div>
     </div>
   );
 }

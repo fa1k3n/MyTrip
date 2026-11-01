@@ -1,7 +1,7 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, sendError, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, timeoutSignal, triedAt, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
 
@@ -96,28 +96,32 @@ export const queue = {
   load: (): Waiting[] => { try { return link ? loadQueue(localStorage, link) : []; } catch { return []; } },
   save: (q: Waiting[]) => { try { if (link) saveQueue(localStorage, link, q); } catch { /* blocked */ } },
 };
-/** One expense to the server. No network, a conflict or a server error: try later and say why; otherwise the reason (PW-07, PW-09, PW-18). */
+/** One expense to the server. No network, a conflict or a server error: try later and say why, with when; otherwise the reason
+ * (PW-07, PW-09, PW-18, PW-19). A request without an answer is given up after 20 seconds, in every browser (PW-19). */
 async function sendExpense(tripId: string, e: Expense): Promise<Sent> {
   try {
-    await call(`${trip(tripId)}/changes`, { method: "POST", signal: AbortSignal.timeout(20_000), // a hanging request must not hold up the queue
+    await call(`${trip(tripId)}/changes`, { method: "POST", signal: timeoutSignal(20_000), // a hanging request must not hold up the queue
       body: JSON.stringify({ baseRevision: 0, ops: [{ op: "add", path: "expenses/-", value: e }], reason: "add expense" }) });
     return { ok: true };
   } catch (x) {
-    return sendError(x); // PW-09, PW-18
+    const r = sendError(x);
+    return "offline" in r && r.why ? { offline: true, why: triedAt(r.why, new Date()) } : r;
   }
 }
-let flushing = false;
-/** Sends the waiting expenses; ones added meanwhile stay. True when the server got at least one (PW-07). */
-export async function sendWaiting(tripId: string): Promise<boolean> {
+let sendingTo = "";
+/** Sends the waiting expenses; ones added meanwhile stay. True when the server got at least one (PW-07). One send at a time: a
+ * call during a send waits for it and sends again, so "Skicka nu" always tries (PW-19). */
+const sendQueue = serial(async () => {
   const before = queue.load();
-  if (flushing || !before.some((x) => x.state === "waiting")) return false;
-  flushing = true;
-  try {
-    const after = await flush(before, (e) => sendExpense(tripId, e));
-    const sent = before.filter((x) => !after.some((a) => a.expense.id === x.expense.id)).map((x) => x.expense.id);
-    queue.save(queue.load().filter((x) => !sent.includes(x.expense.id)).map((x) => after.find((a) => a.expense.id === x.expense.id) ?? x));
-    return sent.length > 0;
-  } finally { flushing = false; }
+  if (!before.some((x) => x.state === "waiting")) return false;
+  const after = await flush(before, (e) => sendExpense(sendingTo, e));
+  const sent = before.filter((x) => !after.some((a) => a.expense.id === x.expense.id)).map((x) => x.expense.id);
+  queue.save(queue.load().filter((x) => !sent.includes(x.expense.id)).map((x) => after.find((a) => a.expense.id === x.expense.id) ?? x));
+  return sent.length > 0;
+});
+export function sendWaiting(tripId: string): Promise<boolean> {
+  sendingTo = tripId;
+  return sendQueue();
 }
 
 /** A read that falls back on the phone's copy when the server cannot be reached; only links keep one (PW-03, PW-05). */

@@ -32,8 +32,21 @@ export function Uppleva(p: TripViewProps) {
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   return <>
     {/* no timeline of stops: the day changes with the arrows (UP-31) */}
-    <div className={`cols ${side ? "" : "one"}`}>
+    <div className={`cols uppage ${side ? "" : "one"}`}>
       <div>
+        {p.waiting.length > 0 && <section className="card waitcard">{/* first, not in the budget, so nothing hides it (UP-46) */}
+          <h3>{sv.queue.title}</h3>
+          {p.waiting.map((x) => { // marked until the server has them, with why, when and Skicka nu (PW-06, PW-09, PW-18, PW-19)
+            const text = String(x.expense.text ?? ""), busy = p.sending && x.state === "waiting";
+            return <div className="row mid waiting" key={x.expense.id}>
+              <span>{text}<br /><small className={x.state === "failed" ? "over" : "ro"} role="status">
+                {x.state === "failed" ? sv.queue.failed(x.reason ?? "") : busy ? sv.queue.sending : [sv.queue.waiting, x.reason].filter(Boolean).join(". ")}</small></span>
+              <span className="end">{expenseAmountText(x.expense, t.currency)}
+                <IconButton icon="refresh" look="bare" tip="left" label={`${x.state === "failed" ? sv.queue.retry : sv.queue.sendNow}: ${text}`} onClick={() => p.retryWaiting(x.expense.id)} disabled={busy} />
+                <IconButton icon="trash" look="bare" tip="left" label={`${sv.queue.remove}: ${text}`} onClick={async () => { if (await ask(sv.queue.removeAsk)) p.removeWaiting(x.expense.id); }} /></span>
+            </div>;
+          })}
+        </section>}
         <section className="card uphead">
           <div className="dayhead">
             <div className="daytitle">
@@ -61,14 +74,6 @@ export function Uppleva(p: TripViewProps) {
         {parts.budget !== "hidden" && <section className={`card ${limitClass(t)}`}>
           <div className="sechead"><h3>{sv.tripBudget}</h3><LimitIcon t={t} big /></div>
           <BudgetDonut t={t} />{/* UP-45 */}
-          {p.waiting.map((x) => ( // marked until the server has them, with why and Skicka nu (PW-06, PW-09, PW-18)
-            <div className="row mid waiting" key={x.expense.id}>
-              <span>{String(x.expense.text ?? "")}<br /><small className={x.state === "failed" ? "over" : "ro"}>{x.state === "failed" ? sv.queue.failed(x.reason ?? "") : [sv.queue.waiting, x.reason].filter(Boolean).join(". ") /* PW-18 */}</small></span>
-              <span className="end">{expenseAmountText(x.expense, t.currency)}
-                <IconButton icon="refresh" look="bare" tip="left" label={`${x.state === "failed" ? sv.queue.retry : sv.queue.sendNow}: ${String(x.expense.text ?? "")}`} onClick={() => p.retryWaiting(x.expense.id)} />
-                <IconButton icon="trash" look="bare" tip="left" label={`${sv.queue.remove}: ${String(x.expense.text ?? "")}`} onClick={async () => { if (await ask(sv.queue.removeAsk)) p.removeWaiting(x.expense.id); }} /></span>
-            </div>
-          ))}
           {/* expenses are added from the day, not here (UP-30) */}
         </section>}
         {parts.bookings !== "hidden" && <section className="card">

@@ -133,9 +133,11 @@ export function App() {
   const pagePerms = (x: Parameters<typeof permsFor>[1]) => (installed ? forInstalled(permsFor(role, x)) : permsFor(role, x));
   const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
+  const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
   const flushWaiting = useCallback(async () => {
     if (!me || !("tripId" in me)) return;
-    if (await sendWaiting(me.tripId)) load(); // PW-07
+    setSending((n) => n + 1);
+    try { if (await sendWaiting(me.tripId)) load(); } finally { setSending((n) => n - 1); } // PW-07
     setWaiting(queue.load());
   }, [me, load]);
   const changeWaiting = (next: Waiting[]) => { queue.save(next); setWaiting(next); flushWaiting(); }; // PW-09: try again, remove
@@ -354,7 +356,7 @@ export function App() {
   );
   else page = (
     <TripView
-      t={withWaiting(t, waiting) as Trip} waiting={waiting} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
+      t={withWaiting(t, waiting) as Trip} waiting={waiting} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
       cover={covers[t.id]} tab={tab} open={open} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }}

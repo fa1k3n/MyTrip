@@ -175,7 +175,7 @@ export type TripViewProps = {
   notices: () => void; // the bell: notices on this phone (NT-03)
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
   memoryBy?: string; setMemoryBy?: (id: string) => void; // whose hearts and sentences in Minnen (MI-17)
-  waiting: Waiting[]; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
+  waiting: Waiting[]; sending: boolean; retryWaiting: (id: string) => void; removeWaiting: (id: string) => void; // expenses not sent yet (PW-06, PW-09)
 };
 
 export function TripView(p: TripViewProps) {

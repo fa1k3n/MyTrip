@@ -80,6 +80,7 @@ export const sv = {
   },
   queue: { // PW-06, PW-09
     waiting: "Ej skickat", noContact: "Ingen kontakt med servern.", server: (n: number) => `Servern svarade ${n}.`, sendNow: "Skicka nu", // PW-18
+    sending: "Skickar…", tried: (why: string, hhmm: string) => `${why} Försökte ${hhmm}.`, title: "Ej skickade utlägg", // PW-19, UP-46
     failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
     removeAsk: "Ta bort utlägget? Det har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot det (${status}).`,
   },

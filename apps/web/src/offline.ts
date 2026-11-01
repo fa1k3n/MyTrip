@@ -85,3 +85,24 @@ export async function flush(q: Waiting[], send: (e: Expense) => Promise<Sent>): 
   }
   return out;
 }
+
+/** Runs `fn` one at a time: a call while it runs waits and runs it once more after, however many calls came meanwhile (PW-19). */
+export function serial(fn: () => Promise<boolean>) {
+  let running: Promise<boolean> | null = null, again: Promise<boolean> | null = null;
+  const start = (): Promise<boolean> => (running = fn().finally(() => { running = null; }));
+  return (): Promise<boolean> => {
+    if (!running) return start();
+    return (again ??= running.catch(() => false).then(() => { again = null; return start(); }));
+  };
+}
+
+/** A signal that aborts after `ms`, built by hand: older Safari has no AbortSignal.timeout (PW-19). */
+export function timeoutSignal(ms: number, later: (f: () => void, ms: number) => unknown = setTimeout) {
+  const c = new AbortController();
+  later(() => c.abort(), ms);
+  return c.signal;
+}
+
+/** The reason with the time it was tried, as the row shows it (PW-19). */
+export const triedAt = (why: string, at: Date) =>
+  sv.queue.tried(why, `${String(at.getHours()).padStart(2, "0")}.${String(at.getMinutes()).padStart(2, "0")}`);

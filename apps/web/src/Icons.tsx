@@ -52,16 +52,17 @@ export const Icon = ({ name }: { name: IconName }) => (
 );
 
 /** A 44 × 44 px icon button with an accessible name and a tooltip on hover and keyboard focus (AC-05, UI-07). */
-export function IconButton({ icon, label, onClick, mut, pressed, look = "", tip = "" }: {
+export function IconButton({ icon, label, onClick, mut, pressed, disabled, look = "", tip = "" }: {
   icon: IconName; label: string; onClick: () => void;
   pressed?: boolean; // a toggle button (aria-pressed)
+  disabled?: boolean; // e.g. "Skicka nu" while a send is going on (PW-19)
   mut?: boolean; // an editing control, hidden in read-only views (UP-07)
   look?: "" | "bare" | "red" | "primary" | "fab";
   tip?: "" | "left" | "right" | "up"; // tooltip placement near page edges: grows to the left, to the right, or upwards
 }) {
   const base = look === "red" ? "btn red" : look === "primary" ? "btn" : look === "fab" ? "btn fab" : "btn ghost";
   return (
-    <button type="button" className={`${base} icon ${look} ${tip && `tip-${tip}`}`} onClick={onClick} aria-label={label} data-tip={label} aria-pressed={pressed} {...(mut ? { "data-mut": "" } : {})}>
+    <button type="button" className={`${base} icon ${look} ${tip && `tip-${tip}`}`} onClick={onClick} aria-label={label} data-tip={label} aria-pressed={pressed} disabled={disabled} {...(mut ? { "data-mut": "" } : {})}>
       <Icon name={icon} />
     </button>
   );

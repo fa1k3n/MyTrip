@@ -28,6 +28,16 @@ const mail = (to: string, subject = "Tropiska Badparadiset", images: Uint8Array[
   "--xx--", "",
 ].join("\r\n"));
 
+/** A fictional mail with only the given subject and text. */
+const bare = (to: string, subject: string, text: string) => new TextEncoder().encode([
+  "From: Anna Exempel <anna@example.org>", `To: ${to}`, `Subject: ${subject}`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "", text, "",
+].join("\r\n"));
+/** A fetch that answers every page with this HTML, and records what it was asked for. */
+const pages = (html: string | null, asked: string[] = []) => (async (url: string | URL | Request) => {
+  asked.push(String(url));
+  return html === null ? new Response("gone", { status: 404 }) : new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}) as typeof fetch;
+
 async function setup(store: Store = memoryStore([trip()])) {
   const app = createApp(store, tokens, { inboxDomain: "resa.example.org" });
   const { address } = await json(call(app, "/api/trips/berlin/wish-inbox", "a", "POST"));
@@ -76,7 +86,7 @@ test("DB-23 a mail becomes a wish", async () => {
   assert.equal((await store.proposals("berlin")).length, 0, "no proposal");
   const inbox = (await json(call(app, "/api/trips/berlin/inbox", "a", "POST"))).address;
   assert.ok("proposalId" in (await receiveMail(store, mail(inbox), inbox)), "a booking mail is still a proposal");
-  assert.deepEqual(await receiveMail(store, mail(address, "Fwd:"), address), { error: "no title" });
+  assert.deepEqual(await receiveMail(store, bare(address, "Fwd:", ""), address), { error: "no title" }, "neither a title nor a link");
   assert.deepEqual(await receiveMail(store, mail("nagon@resa.example.org"), "nagon@resa.example.org"), { error: "unknown address" });
 });
 
@@ -118,4 +128,30 @@ test("DB-23 the source", () => {
   assert.equal(wishSource('  "Bo"  '), "Mejl från Bo");
   assert.equal(wishSource(""), "Mejl");
   assert.equal(wishSource(undefined), "Mejl");
+});
+
+// REQ: DB-26 a mail with only a link gets the title of the link's page, og:title first
+test("DB-26 the title from the linked page", async () => {
+  const { store, address } = await setup();
+  const asked: string[] = [];
+  const html = '<html><head><title>Startsida | Liseberg</title><meta property="og:title" content="Liseberg &amp; Kaninlandet"></head></html>';
+  const r = await receiveMail(store, bare(address, "", "https://www.example.org/park"), address, pages(html, asked));
+  assert.ok("wishId" in r, JSON.stringify(r));
+  assert.deepEqual(asked, ["https://www.example.org/park"]);
+  const w = (await store.load("berlin"))!.dreams[0]!;
+  assert.deepEqual([w.title, w.url], ["Liseberg & Kaninlandet", "https://www.example.org/park"]);
+  await receiveMail(store, bare(address, "", "https://example.org/b"), address, pages("<title>  Glass &#228;r gott </title>"));
+  assert.equal((await store.load("berlin"))!.dreams[1]!.title, "Glass är gott", "<title> when there is no og:title");
+});
+
+// REQ: DB-26 without a page title the link's host is the title; addresses on the own network are not fetched
+test("DB-26 the host when the page has no title", async () => {
+  const { store, address } = await setup();
+  await receiveMail(store, bare(address, "", "https://www.example.org/x"), address, pages(null));
+  await receiveMail(store, bare(address, "", "https://example.org/y"), address, pages("<p>ingen titel</p>"));
+  const asked: string[] = [];
+  for (const u of ["http://localhost:8787/api", "http://127.0.0.1/", "http://192.168.1.1/admin"])
+    await receiveMail(store, bare(address, "", u), address, pages("<title>Inne</title>", asked));
+  assert.deepEqual(asked, [], "nothing on the own network is fetched");
+  assert.deepEqual((await store.load("berlin"))!.dreams.map((w) => w.title), ["example.org", "example.org", "localhost", "127.0.0.1", "192.168.1.1"]);
 });

@@ -13,13 +13,14 @@ type Result = { proposalId: string } | { error: "unknown address" | "too many" }
 export type WishResult = { wishId: string } | { error: "unknown address" | "too many" | "no title" | "invalid" };
 
 /** A mail for the trip with this inbox or wish address; an unknown address is rejected (BK-14, BK-15, DB-21). */
-export async function receiveMail(store: Store, raw: Uint8Array | ArrayBuffer, to: string): Promise<Result | WishResult> {
+/** `f` fetches a linked page for a wish without a title (DB-26). */
+export async function receiveMail(store: Store, raw: Uint8Array | ArrayBuffer, to: string, f: typeof fetch = fetch): Promise<Result | WishResult> {
   const address = (/<([^>]+)>/.exec(to)?.[1] ?? to).trim().toLowerCase();
   const trips = address ? await store.list() : [];
   const t = trips.find((x) => x.inbox?.toLowerCase() === address);
   if (t) return importMail(store, t, raw);
   const w = trips.find((x) => x.wishInbox?.toLowerCase() === address);
-  return w ? importWish(store, w, raw) : { error: "unknown address" };
+  return w ? importWish(store, w, raw, f) : { error: "unknown address" };
 }
 
 /** Reads the mail into a pending proposal for the trip, with at most five PDF, PNG or JPEG attachments of at most 2 MB. */
@@ -45,15 +46,46 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   return { proposalId: p.id };
 }
 
+const PAGE_MAX = 64 * 1024, PAGE_MS = 5000;
+const UA = "Baslager/0.1 (https://github.com/fa1k3n/MyTrip; wish titles)";
+/** An address on the own machine or network: an IP address or localhost, never fetched (DB-26). */
+const local = (host: string) => host === "localhost" || host.endsWith(".localhost") || host.startsWith("[") || /^\d+(\.\d+){3}$/.test(host);
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const decode = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e: string) =>
+  e[0] === "#" ? String.fromCodePoint(e[1]!.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENTITIES[e.toLowerCase()] ?? all);
+
+/** The title of a linked page, og:title first, from its first 64 KB; the link's host when there is none (DB-26). */
+export async function pageTitle(url: string, f: typeof fetch = fetch): Promise<string> {
+  const u = new URL(url), host = u.hostname.replace(/^www\./, "");
+  if (local(u.hostname)) return host;
+  try {
+    const res = await f(url, { headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(PAGE_MS) });
+    if (!res.ok || !res.body) return host;
+    const reader = res.body.getReader(), parts: Uint8Array[] = [];
+    for (let n = 0; n < PAGE_MAX;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value); n += value.length;
+    }
+    await reader.cancel().catch(() => {});
+    const html = new TextDecoder().decode(new Uint8Array(parts.flatMap((p) => [...p])).slice(0, PAGE_MAX));
+    const og = /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']*)["']/i.exec(html)?.[1]
+      ?? /<meta[^>]+content=["']([^"']*)["'][^>]*property=["']og:title["']/i.exec(html)?.[1];
+    const title = decode((og ?? /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1] ?? "").replace(/\s+/g, " ").trim()).slice(0, 120);
+    return title || host;
+  } catch { return host; }
+}
+
 /** "Mejl", or "Mejl från" and the first word of the sender's display name; only a hint, since a sender can be forged (DB-23). */
 export const wishSource = (name: string | undefined) => sv.wish.fromMail(name?.replace(/["']/g, "").trim().split(/\s+/)[0]?.slice(0, 40) || undefined);
 
 /** Adds the wish the mail describes, with the largest attached photo of 8 KB to the DB-08 size as its own photo (DB-23, DB-24). */
-export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayBuffer): Promise<WishResult> {
+export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayBuffer, f: typeof fetch = fetch): Promise<WishResult> {
   const now = Date.now();
   if (t.dreams.filter((w) => w.mailedAt && now - Date.parse(w.mailedAt) < DAY_MS).length >= MAX_WISHES) return { error: "too many" }; // DB-25
   const m = await PostalMime.parse(raw);
   const r = readWish({ subject: m.subject, text: m.text, html: m.html });
+  if (!r.title && r.url) r.title = await pageTitle(r.url, f); // DB-26
   if (!r.title) return { error: "no title" };
   const photo = m.attachments
     .map((a) => (typeof a.content === "string" ? new TextEncoder().encode(a.content) : new Uint8Array(a.content)))

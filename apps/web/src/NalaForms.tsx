@@ -19,7 +19,7 @@ import { readBooking } from "@trip/schema/src/mailbooking.ts";
 import { api, type MailProposal } from "./api.ts";
 import { checkPick } from "./tickets.ts";
 import { MAX_NOTE, memoryOps, mineOf, saveAlbum } from "./memories.ts";
-import { defaultSharers, linkChoices, relinkOps, splitOps } from "./money.ts";
+import { defaultSharers, rewishOps, splitOps, wishOf } from "./money.ts";
 import { ActivityAndCategory } from "./ExpenseFields.tsx";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
@@ -143,15 +143,17 @@ function SplitForm(p: Props & { id: string }) {
   );
 }
 
-/** Which activity an expense applies to, and its category, confirmed together (MI-32). */
+/** Which wish an expense belongs to, among all the trip's wishes, and its category, confirmed together (MI-41). */
 function RelinkForm(p: Props & { id: string }) {
   const s = useSave(p);
   const e = p.t.expenses.find((x) => x.id === p.id);
-  const [v, setV] = useState({ activity: e?.activityId ?? "", category: e?.category ?? "" });
+  const [v, setV] = useState({ activity: e ? wishOf(p.t, e) ?? "" : "", category: e?.category ?? "" });
   if (!e) return null;
   return (
-    <Form title={sv.minnas.relink(e.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(relinkOps(p.t, p.id, v.activity, v.category), "relink expense")}>
-      <ActivityAndCategory choices={linkChoices(p.t, e).map((a) => ({ id: a.id, text: a.text, category: a.category }))} activity={v.activity} category={v.category} onChange={setV} />
+    <Form title={sv.minnas.relink(e.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(rewishOps(p.t, p.id, v.activity, v.category), "rewish expense")}>
+      <ActivityAndCategory choices={p.t.dreams.filter((d) => !d.hidden || d.id === v.activity).map((d) => ({ id: d.id, text: d.hidden ? sv.hiddenText : d.title, category: d.category }))}
+        activity={v.activity} category={v.category}
+        label={sv.up.wishes} name="dream" onChange={setV} />
     </Form>
   );
 }

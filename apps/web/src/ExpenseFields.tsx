@@ -1,4 +1,4 @@
-// The activity an expense applies to and its category tiles, which follow each other (UP-42, UP-43, MI-32).
+// The activity an expense applies to and its category tiles, which follow each other (UP-42, UP-47, MI-41).
 import { useState, type ReactNode } from "react";
 import { activityCategory, expenseTiles } from "./money.ts";
 import { ShapeIcon } from "./CatIcon.tsx";

@@ -22,12 +22,15 @@ const person = async (app: App, id: string, role: string) => `person.berlin.${id
 const change = async (app: App, auth: string, ops: unknown[]) =>
   call(app, "/api/trips/berlin/changes", auth, "POST", { baseRevision: (await json(call(app, "/api/trips/berlin", "a"))).revision, ops, reason: "test" });
 
-// REQ: MI-32 a traveler changes the activity and category of their own expenses only; a Planerare every expense
-test("MI-32 who may change an expense's activity", async () => {
+// REQ: MI-41 a traveler changes the wish, activity and category of their own expenses only; a Planerare every expense
+test("MI-41 who may change an expense's wish", async () => {
   const app = createApp(memoryStore([trip()]), tokens);
   const bo = await person(app, "bo", "traveler"), anna = await person(app, "anna", "planner");
   assert.equal((await change(app, bo, [{ op: "set", path: "expenses/0/activityId", value: "glass" }, { op: "set", path: "expenses/0/category", value: "Mat" }])).status, 200);
   assert.equal((await change(app, bo, [{ op: "remove", path: "expenses/0/activityId" }])).status, 200, "or to none");
+  assert.equal((await change(app, bo, [{ op: "set", path: "expenses/0/dreamId", value: "w" }])).status, 200, "its wish");
+  assert.equal((await change(app, bo, [{ op: "remove", path: "expenses/0/dreamId" }])).status, 200, "or none");
+  assert.equal((await change(app, bo, [{ op: "set", path: "expenses/1/dreamId", value: "w" }])).status, 403, "not someone else's wish");
   assert.equal((await change(app, bo, [{ op: "set", path: "expenses/1/activityId", value: "glass" }])).status, 403, "not someone else's");
   assert.equal((await change(app, bo, [{ op: "set", path: "expenses/0/amount", value: 1 }])).status, 403, "only the activity and category");
   assert.equal((await change(app, bo, [{ op: "set", path: "expenses/0/activityId", value: "glass" }, { op: "set", path: "expenses/0/amount", value: 1 }])).status, 403);

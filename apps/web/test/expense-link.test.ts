@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, Trip } from "@trip/schema";
-import { activityCategory, guessActivity, linkChoices, mayRelink, mayRemove, relinkOps, removeExpense, removePayment } from "../src/money.ts";
+import { activityCategory, guessActivity, mayRelink, mayRemove, removeExpense, removePayment, rewishOps, wishOf } from "../src/money.ts";
 import { burstLabel } from "../src/celebrate.ts";
 import { sv } from "../src/sv.ts";
 
@@ -46,31 +46,40 @@ const trip = () => Trip.parse({ id: "t", revision: 1, title: "t", timezone: "UTC
     { id: "e3", text: "Bensin", category: "Transport", amount: 500, paidBy: "anna", sharedBy: [] },
   ] });
 
-// REQ: MI-32 the choices: the activities of the expense's day that are not hidden, and its current one
-test("MI-32 the activities to choose among", () => {
+const dream = (id: string, title: string, category: string) => ({ id, title, category, source: "", icon: "x", votes: 0 });
+const wishTrip = () => {
   const t = trip();
-  assert.deepEqual(linkChoices(t, t.expenses[0]).map((x) => x.id), ["museum", "glass"]);
-  assert.deepEqual(linkChoices(t, t.expenses[1]).map((x) => x.id), ["museum", "glass", "zoo"], "its current one from another day too");
-  assert.deepEqual(linkChoices(t, t.expenses[2]).map((x) => x.id), [], "no date: no day");
-});
+  t.dreams = [dream("w-zoo", "Zoo", "Aktivitet"), dream("w-museum", "Museum", "Museum"), dream("w-glass", "Glass", "Mat")];
+  t.days[0].activities[0].dreamId = "w-museum"; // planned on the first day
+  t.days[1].activities[0].dreamId = "w-zoo"; // planned on another day
+  return t;
+};
 
-// REQ: MI-32 changing the activity and category, saved together; nothing when nothing changes
-test("MI-32 changing an expense's activity", () => {
-  const t = trip();
-  const to = relinkOps(t, "e1", "glass", "Mat");
-  assert.ok(to.ok);
-  assert.deepEqual(Trip.parse(applyOps(t, to.ops)).expenses[0], { ...t.expenses[0], activityId: "glass", category: "Mat" });
-  const none = relinkOps(t, "e1", "", "Mat");
+// REQ: MI-41 changing the wish and category, saved together: the wish's activity on the expense's day, else none; "Ingen" removes both
+test("MI-41 changing an expense's wish", () => {
+  const t = wishTrip();
+  const museum = rewishOps(t, "e1", "w-museum", "Upplevelse");
+  assert.deepEqual(museum, { ok: true, ops: [{ op: "set", path: "expenses/0/dreamId", value: "w-museum" }] }, "planned that day: its activity stays");
+  const zoo = rewishOps(t, "e1", "w-zoo", "Upplevelse");
+  assert.ok(zoo.ok);
+  const z = Trip.parse(applyOps(t, zoo.ops)).expenses[0];
+  assert.deepEqual([z.dreamId, z.activityId], ["w-zoo", undefined], "planned on another day: no activity");
+  const glass = rewishOps(t, "e1", "w-glass", "Mat");
+  assert.ok(glass.ok);
+  assert.deepEqual(Trip.parse(applyOps(t, glass.ops)).expenses[0].category, "Mat");
+  const none = rewishOps(Trip.parse(applyOps(t, museum.ok ? museum.ops : [])), "e1", "", "Upplevelse");
   assert.ok(none.ok);
-  assert.equal(Trip.parse(applyOps(t, none.ops)).expenses[0].activityId, undefined);
-  assert.deepEqual(relinkOps(t, "e1", "museum", "Upplevelse"), { ok: true, ops: [] });
-  assert.equal(relinkOps(t, "e1", "nope", "Mat").ok, false);
-  assert.equal(relinkOps(t, "nope", "", "Mat").ok, false);
-  assert.equal(sv.minnas.relink("Glass"), "Ändra vilken aktivitet Glass gäller");
+  const n = Trip.parse(applyOps(Trip.parse(applyOps(t, museum.ok ? museum.ops : [])), none.ops)).expenses[0];
+  assert.deepEqual([n.dreamId, n.activityId], [undefined, undefined]);
+  assert.equal(rewishOps(t, "e1", "nope", "Mat").ok, false);
+  assert.equal(rewishOps(t, "nope", "", "Mat").ok, false);
+  assert.deepEqual(wishOf(t, t.expenses[0]), "w-museum", "the dialog starts on the activity's wish");
+  assert.equal(sv.minnas.relink("Glass"), "Ändra vilken önskning Glass gäller");
+  assert.equal(sv.minnas.relinkTitle, "Önskning");
 });
 
-// REQ: MI-32 who may change it: a Planerare and the superuser every expense, a traveler their own
-test("MI-32 who may change an expense's activity", () => {
+// REQ: MI-41 who may change it: a Planerare and the superuser every expense, a traveler their own
+test("MI-41 who may change an expense's wish", () => {
   const e = trip().expenses[0];
   assert.equal(mayRelink(e, { manager: true }), true);
   assert.equal(mayRelink(e, { manager: false, self: "bo" }), true);

@@ -25,7 +25,7 @@ export const sv = {
     noteHint: "Bara planerarna ser kommentarerna, utan namn.", dream: "Önskan", noDream: "Ingen önskan",
     tooLong: (n: number) => `Högst ${n} tecken.`,
     albumLabel: "Länk till delat album", noAlbum: "Ingen", editAlbum: "Ändra länken till albumet", albumHint: "En https-adress till ett album ni delar. Lämna tomt för att ta bort den.", badAlbum: "Ange en adress som börjar med https://.",
-    relink: (text: string) => `Ändra vilken aktivitet ${text} gäller`, relinkTitle: "Gäller", relinkGone: "Utlägget eller aktiviteten finns inte längre.", // MI-32
+    relink: (text: string) => `Ändra vilken önskning ${text} gäller`, relinkTitle: "Önskning", relinkGone: "Utlägget eller önskningen finns inte längre.", // MI-41
     remove: (text: string) => `Ta bort utlägget ${text}`, removeAsk: (text: string) => `Ta bort utlägget ”${text}”? Det går inte att ångra.`, // MI-34
     removePayment: (s: string) => `Ta bort inbetalningen ${s}`, removePaymentAsk: (s: string) => `Ta bort inbetalningen ${s}? Det går inte att ångra.`, // MI-35
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",

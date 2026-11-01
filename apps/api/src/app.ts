@@ -128,7 +128,7 @@ const accessRole = (role: Role): AccessRole | undefined => (role === "link" ? "f
 function linkMayChange(t: Trip, ar: AccessRole, ops: Op[], travelerId?: string) {
   const rules = accessFor(t, ar);
   const ok = ops.length > 0 && ops.every((o) => {
-    if (relinksOwn(t, o, travelerId)) return true; // MI-32
+    if (relinksOwn(t, o, travelerId)) return true; // MI-41
     const n = opNeeds(o);
     return n.part === "access" ? false : n.part === "trip" ? ar === "planner"
       : n.part === "memories" ? atLeast(rules.view.mi.memories ?? "hidden", n.level) : atLeast(rules.parts[n.part], n.level); // MI-21
@@ -136,10 +136,10 @@ function linkMayChange(t: Trip, ar: AccessRole, ops: Op[], travelerId?: string) 
   const adds = ops.some((o) => o.op === "add" && o.path === "expenses/-");
   return ok && (!adds || rules.parts.expenses === "write" || ops.length === 1);
 }
-/** A traveler moves an expense they added to another activity or none, and confirms its category; nothing else of it (MI-32). */
+/** A traveler moves an expense they added to another wish or none, with its activity, and confirms its category; nothing else of it (MI-41). */
 function relinksOwn(t: Trip, o: Op, travelerId?: string) {
-  const m = /^expenses\/(\d+)\/(activityId|category)$/.exec(o.path);
-  return !!m && !!travelerId && (o.op === "set" || (o.op === "remove" && m[2] === "activityId")) && t.expenses[Number(m[1])]?.addedBy === travelerId;
+  const m = /^expenses\/(\d+)\/(activityId|dreamId|category)$/.exec(o.path);
+  return !!m && !!travelerId && (o.op === "set" || (o.op === "remove" && m[2] !== "category")) && t.expenses[Number(m[1])]?.addedBy === travelerId;
 }
 type Activity = Trip["days"][number]["activities"][number];
 /** Activities hidden from the viewer, without title, note, places or category, and without places only they use (AU-18).

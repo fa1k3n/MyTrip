@@ -209,24 +209,26 @@ export function guessActivity(list: Planned[], now: string | undefined) {
   return last(going)?.id ?? (recent && at - toMin(recent.start!) < 60 ? recent.id : undefined);
 }
 
-type Day = { date: string; activities: (Planned & { text: string; category?: string })[] };
-/** The activities an expense can be moved to: those of its day that are not hidden, and its current one (MI-32). */
-export function linkChoices(t: { days: Day[] }, e: { date?: string; activityId?: string }) {
-  const own = t.days.find((d) => d.date === e.date)?.activities.filter((a) => !a.hidden) ?? [];
-  const current = own.some((a) => a.id === e.activityId) ? undefined : t.days.flatMap((d) => d.activities).find((a) => a.id === e.activityId);
-  return current ? [...own, current] : own;
-}
+type Day = { date: string; activities: (Planned & { text: string; category?: string; dreamId?: string })[] };
+/** The wish an expense belongs to: the one chosen, else its activity's (MI-41, BG-22). */
+export const wishOf = (t: { days: Day[] }, e: { dreamId?: string; activityId?: string }) =>
+  e.dreamId ?? t.days.flatMap((d) => d.activities).find((a) => a.id === e.activityId)?.dreamId;
 
-/** A Planerare and the superuser change every expense's activity, a traveler only their own (MI-32). */
-export const mayRelink = (e: { addedBy?: string }, who: { manager: boolean; self?: string }) => who.manager || (!!who.self && e.addedBy === who.self);
-export const mayRemove = (who: { manager: boolean }) => who.manager; // MI-34: travelers may not remove expenses (AU-13)
-
-/** Moving an expense to another activity, or none, with the category confirmed in the same step (MI-32). */
-export function relinkOps(t: { days: Day[]; expenses: { id: string; activityId?: string; category: string }[] }, id: string, activityId: string, category: string): { ok: true; ops: Op[] } | { ok: false; error: string } {
+/** Moving an expense to another wish, or none, with the category confirmed in the same step: the wish's first activity on the
+ * expense's day that the viewer sees, else no activity (MI-41). */
+export function rewishOps(t: { days: Day[]; dreams: { id: string }[]; expenses: { id: string; date?: string; activityId?: string; dreamId?: string; category: string }[] },
+  id: string, dreamId: string, category: string): { ok: true; ops: Op[] } | { ok: false; error: string } {
   const i = t.expenses.findIndex((e) => e.id === id), e = t.expenses[i];
-  if (!e || (activityId && !t.days.some((d) => d.activities.some((a) => a.id === activityId)))) return { ok: false, error: sv.minnas.relinkGone };
-  const ops: Op[] = [];
-  if ((e.activityId ?? "") !== activityId) ops.push(activityId ? { op: "set", path: `expenses/${i}/activityId`, value: activityId } : { op: "remove", path: `expenses/${i}/activityId` });
+  if (!e || (dreamId && !t.dreams.some((d) => d.id === dreamId))) return { ok: false, error: sv.minnas.relinkGone };
+  const activityId = dreamId ? t.days.find((d) => d.date === e.date)?.activities.find((a) => a.dreamId === dreamId && !a.hidden)?.id ?? "" : "";
+  const field = (k: "dreamId" | "activityId", v: string): Op[] => ((e[k] ?? "") === v ? []
+    : [v ? { op: "set", path: `expenses/${i}/${k}`, value: v } : { op: "remove", path: `expenses/${i}/${k}` }]);
+  const ops = [...field("dreamId", dreamId), ...field("activityId", activityId)];
   if (e.category !== category) ops.push({ op: "set", path: `expenses/${i}/category`, value: category });
   return { ok: true, ops };
 }
+
+/** A Planerare and the superuser change every expense's wish, a traveler only their own (MI-41). */
+export const mayRelink = (e: { addedBy?: string }, who: { manager: boolean; self?: string }) => who.manager || (!!who.self && e.addedBy === who.self);
+export const mayRemove = (who: { manager: boolean }) => who.manager; // MI-34: travelers may not remove expenses (AU-13)
+

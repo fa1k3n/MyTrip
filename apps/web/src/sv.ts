@@ -25,13 +25,13 @@ export const sv = {
     noteHint: "Bara planerarna ser kommentarerna, utan namn.", dream: "Önskan", noDream: "Ingen önskan",
     tooLong: (n: number) => `Högst ${n} tecken.`,
     albumLabel: "Länk till delat album", noAlbum: "Ingen", editAlbum: "Ändra länken till albumet", albumHint: "En https-adress till ett album ni delar. Lämna tomt för att ta bort den.", badAlbum: "Ange en adress som börjar med https://.",
-    relink: (text: string) => `Ändra vilken önskning ${text} gäller`, relinkTitle: "Önskning", relinkGone: "Utlägget eller önskningen finns inte längre.", // MI-41
+    relink: (text: string) => `Ändra vilken önskan ${text} gäller`, relinkTitle: "Önskan", relinkGone: "Utlägget eller önskan finns inte längre.", // MI-41
     remove: (text: string) => `Ta bort utlägget ${text}`, removeAsk: (text: string) => `Ta bort utlägget ”${text}”? Det går inte att ångra.`, // MI-34
     removePayment: (s: string) => `Ta bort inbetalningen ${s}`, removePaymentAsk: (s: string) => `Ta bort inbetalningen ${s}? Det går inte att ångra.`, // MI-35
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",
   },
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
-    applies: "Aktivitet", wishes: "Önskningar", noActivity: "Ingen", // UP-43, UP-47, MI-32
+    applies: "Aktivitet", wish: "Önskan", noActivity: "Ingen", // UP-43, UP-47, MI-41: one wish, so the singular
     sheetKicker: "Utlägg", what: "Beskrivning", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
     now: "Nu",
     place: "Visa platsen",

@@ -35,7 +35,7 @@ export function ExpenseSheet({ choices = [], guess, currency, payer }: { choices
   const [activity, setActivity] = useState(guess ?? "");
   const chosen = choices.find((c) => c.id === activity);
   return <>
-    <ActivityAndCategory choices={choices} activity={guess} label={sv.up.wishes} name="dream" onChange={(v) => setActivity(v.activity)} />
+    <ActivityAndCategory choices={choices} activity={guess} label={sv.up.wish} name="dream" onChange={(v) => setActivity(v.activity)} />
     <label>{chosen ? sv.up.shortText : sv.up.what}<input name="text" maxLength={60} placeholder={chosen ? chosen.text : sv.up.whatExample} /></label>
     <div className="two">
       <label>{sv.amount.replace(" (kr)", "")}<input name="amount" inputMode="decimal" /></label>

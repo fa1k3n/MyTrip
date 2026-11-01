@@ -153,7 +153,7 @@ function RelinkForm(p: Props & { id: string }) {
     <Form title={sv.minnas.relink(e.text || sv.hiddenText)} {...s} close={p.close} onSubmit={() => s.submit(rewishOps(p.t, p.id, v.activity, v.category), "rewish expense")}>
       <ActivityAndCategory choices={p.t.dreams.filter((d) => !d.hidden || d.id === v.activity).map((d) => ({ id: d.id, text: d.hidden ? sv.hiddenText : d.title, category: d.category }))}
         activity={v.activity} category={v.category}
-        label={sv.up.wishes} name="dream" onChange={setV} />
+        label={sv.up.wish} name="dream" onChange={setV} />
     </Form>
   );
 }

@@ -74,8 +74,8 @@ test("MI-41 changing an expense's wish", () => {
   assert.equal(rewishOps(t, "e1", "nope", "Mat").ok, false);
   assert.equal(rewishOps(t, "nope", "", "Mat").ok, false);
   assert.deepEqual(wishOf(t, t.expenses[0]), "w-museum", "the dialog starts on the activity's wish");
-  assert.equal(sv.minnas.relink("Glass"), "Ändra vilken önskning Glass gäller");
-  assert.equal(sv.minnas.relinkTitle, "Önskning");
+  assert.equal(sv.minnas.relink("Glass"), "Ändra vilken önskan Glass gäller");
+  assert.equal(sv.minnas.relinkTitle, "Önskan");
 });
 
 // REQ: MI-41 who may change it: a Planerare and the superuser every expense, a traveler their own

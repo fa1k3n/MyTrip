@@ -4,6 +4,7 @@ import type { AiArea, Settings } from "@trip/schema";
 import { api, maskedToken } from "./api.ts";
 import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
+import { Users } from "./Users.tsx";
 
 /** On/off switch with an explanation shown on hover or keyboard focus, and read by screen readers. */
 export function Switch({ id, label, tip, checked, onChange }: { id: string; label: string; tip: string; checked: boolean; onChange: (on: boolean) => void }) {
@@ -67,9 +68,10 @@ function ImageCache() {
     {msg && <p className="ro note" role="status">{msg}</p>}</div>;
 }
 
-/** What only the superuser sees in the app settings: the masked API key and the image cache (MT-13). */
+/** What only the superuser sees in the app settings: the accounts (US-02), the masked API key and the image cache (MT-13). */
 export function AppAdmin() {
   return <>
+    <Users />
     {maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
     <ImageCache />
   </>;

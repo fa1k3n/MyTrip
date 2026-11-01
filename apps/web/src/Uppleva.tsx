@@ -26,7 +26,7 @@ export function Uppleva(p: TripViewProps) {
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
   const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && t.info.length > 0; // practical information as in Nåla (UP-15)
   const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info; // Uppleva's components (AU-20)
-  const canAdd = atLeast(parts.expenses, "add") && (p.perms.superuser || !!p.self); // the superuser and personal links (UP-12, AU-22)
+  const canAdd = atLeast(parts.expenses, "add") && (p.perms.manager || !!p.self); // the superuser, the owner and personal links (UP-12, AU-22, US-14)
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))]; // UP-14
   const titleWho = titleHiddenFrom(day, t); // AU-29, AU-30
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);

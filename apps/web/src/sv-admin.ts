@@ -16,6 +16,9 @@ export const svAdmin = {
     hint: "Varje resenär har en egen länk. Resenär: läsa, bocka av och lägga till egna utlägg. Planerare: dessutom ändra allt för resan.",
     copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Byt länk för ${n}`,
     copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Inga resenärer än. Lägg till dem med plusknappen.",
+    account: (n: string) => `Konto för ${n} (mejladress)`, accountPlaceholder: "Konto (mejladress)", // US-21
+    accountHint: "Skriv in mejladressen till en resenärs konto, så ser hen resan när hen loggar in. Saknar adressen konto kopplas det när kontot skapas.",
+    accountTaken: "Adressen används redan av en annan resenär i resan.", accountBad: "Det där är ingen mejladress.",
   },
   inbox: { // BK-14
     title: "Mejlimport", none: "Ingen adress än.", create: "Skapa adress", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
@@ -27,6 +30,16 @@ export const svAdmin = {
     title: "Mejla in önskningar",
     hint: "Planerare och resenärer kan mejla eller dela sidor hit. Varje mejl blir en önskan direkt i Önska. Den som har adressen kan skicka, så byt den om den har spridits.",
     confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram, och alla behöver den nya.",
+  },
+  users: { // US-02..US-04, US-12, US-16
+    title: "Användare", name: "Namn", email: "Mejladress", add: "Lägg till användare",
+    hint: "Bara du ser listan. En ny användare får en lösenordslänk som gäller i 7 dagar: ge den till personen, kopiera den eller visa QR-koden. Har personen ett Google-konto med samma adress kan hen också logga in med Google.",
+    how: { both: "Lösenord och Google", password: "Lösenord", google: "Google", none: "Inte inloggad än" },
+    last: (d: string) => `senast ${d}`, superuser: (n: string) => `${n} är superanvändare`, ai: (n: string) => `${n} får använda AI`,
+    disabled: (n: string) => `${n} är avstängd`, newLink: (n: string) => `Ny lösenordslänk för ${n}`, remove: (n: string) => `Ta bort ${n}`,
+    confirmRemove: (n: string) => `Ta bort ${n}? Resor som ${n} har skapat blir dina.`, confirmLink: "Göra en ny lösenordslänk? Den förra slutar fungera.",
+    link: (n: string) => `Lösenordslänk för ${n}`, expires: (d: string) => `Gäller till ${d}.`, copy: (n: string) => `Kopiera lösenordslänken för ${n}`, copied: "Kopierad.",
+    taken: "Adressen har redan ett konto.", bad: "Skriv ett namn och en giltig mejladress.", self: "Du kan inte stänga av, ta bort eller ta superflaggan från dig själv.",
   },
   qr: { // AU-31
     show: (n: string) => `Visa QR-kod för ${n}`, title: (n: string) => `Länk för ${n}`, label: (n: string) => `QR-kod med länken för ${n}`,

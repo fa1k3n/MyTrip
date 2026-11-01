@@ -7,6 +7,8 @@ import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
 import { importMail, importWish } from "./mail.ts";
+import { checkPassword, firstSuper, googleAuthUrl, googleIdentity, hashPassword, memberships, normEmail, PASSWORD_MIN, pkce, publicUser, SETUP_DAYS, sha256, validEmail, type Google, type User } from "./users.ts";
+export type { User } from "./users.ts";
 
 export type Proposal = {
   id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
@@ -17,7 +19,7 @@ export type Proposal = {
 export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] | "image/webp" }; // webp: wish images (DB-08); tripId "_commons": the shared cache (DB-11)
 export type LogEntry = { at: string; tripId: string; actor: string; reason: string; ops: Op[] };
 /** A traveler's personal link to one trip, with the permission Resenär (traveler) or Planerare (planner) (AU-11). */
-export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner" };
+export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner"; account?: string }; // account: the tied address (US-21)
 /** A phone that wants notices for a trip (NT-03): who is a traveler id, "follower" for the common link, or "admin". */
 export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
 
@@ -52,6 +54,12 @@ export interface Store {
   imageCache(): Promise<CacheEntry[]>;
   saveImageCache(e: CacheEntry): Promise<void>;
   removeImageCache(keys: string[]): Promise<void>;
+  /** Accounts (US-01) and the owner of each trip that has one (US-13). */
+  users(): Promise<User[]>;
+  saveUser(u: User): Promise<void>;
+  removeUser(id: string): Promise<void>;
+  owners(): Promise<Record<string, string>>;
+  saveOwner(tripId: string, userId: string | null): Promise<void>;
 }
 /** A Commons lookup: the stored file with its credit and size, or nothing found (DB-11). */
 export type CacheEntry = { key: string; at: string; found?: { file: string; page: string; author?: string; licence: string; licenceUrl?: string; size: number } };
@@ -59,9 +67,10 @@ export type CacheEntry = { key: string; at: string; found?: { file: string; page
 export const isFileId = (id: string) => /^[a-z0-9]{16,40}$/.test(id);
 export type Tokens = { read: string; propose: string; admin: string };
 /** Admin login (AU-04): off when no password is set. The session key signs the cookie. */
-export type Auth = { adminPassword?: string; sessionKey?: string };
-type Role = "read" | "propose" | "admin" | "link" | "traveler" | "planner";
-const rank: Record<Role, number> = { link: 1, read: 1, traveler: 1, propose: 2, planner: 2, admin: 3 };
+export type Auth = { adminPassword?: string; sessionKey?: string; google?: Google };
+/** owner: a user on a trip they own (US-14); account: a user without the superuser flag, before a trip is chosen. */
+type Role = "read" | "propose" | "admin" | "link" | "traveler" | "planner" | "owner" | "account";
+const rank: Record<Role, number> = { link: 1, read: 1, traveler: 1, account: 1, propose: 2, planner: 2, owner: 2, admin: 3 };
 const mime: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 /** In-memory store for tests and demos. */
@@ -74,7 +83,13 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   let subs: PushSub[] = [];
   const files = new Map<string, FileMeta & { bytes: Uint8Array<ArrayBuffer> }>();
   const cache = new Map<string, CacheEntry>();
+  let users: User[] = [], owners: Record<string, string> = {};
   return {
+    users: async () => structuredClone(users).sort((a, b) => a.id.localeCompare(b.id)),
+    saveUser: async (u) => { users = [...users.filter((x) => x.id !== u.id), structuredClone(u)]; },
+    removeUser: async (id) => { users = users.filter((x) => x.id !== id); },
+    owners: async () => ({ ...owners }),
+    saveOwner: async (tripId, userId) => { const { [tripId]: _old, ...rest } = owners; owners = userId ? { ...rest, [tripId]: userId } : rest; },
     file: async (id) => { const f = files.get(id); return f && { ...f, bytes: f.bytes.slice() }; },
     saveFile: async (m, bytes) => void files.set(m.id, { ...m, bytes: Uint8Array.from(bytes) }),
     removeFiles: async (ids) => ids.forEach((id) => files.delete(id)),
@@ -247,7 +262,7 @@ export async function storeTicket(store: Store, tripId: string, name: string, ty
   return { id, name: name.trim().slice(0, 200) || "biljett", type, size: bytes.length };
 }
 
-type Env = { Variables: { role: Role; tripId?: string; travelerId?: string } };
+type Env = { Variables: { role: Role; tripId?: string; travelerId?: string; user?: User } };
 /** True when a subscription matches every given field. */
 /** The order every store lists subscriptions in. */
 export const bySubscriber = (a: PushSub, b: PushSub) => a.who.localeCompare(b.who) || a.endpoint.localeCompare(b.endpoint);
@@ -255,35 +270,109 @@ export const pushMatch = (x: PushSub, m: { endpoint?: string; who?: string }) =>
 
 export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth; vapidKey?: string; inboxDomain?: string } & TrafficOpts = {}) {
   const app = new Hono<Env>();
-  const { adminPassword, sessionKey } = opts.auth ?? {};
-  const fails = new Map<string, { n: number; since: number }>(); // per address, in memory (AU-05)
+  const { adminPassword, sessionKey, google } = opts.auth ?? {};
+  const fails = new Map<string, { n: number; since: number }>(); // per address and per account, in memory (AU-05, US-08)
+  const clock = () => opts.now?.() ?? new Date();
+  const ipOf = (c: Context<Env>) => c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "local";
+  const blocked = (key: string) => {
+    const f = fails.get(key), now = Date.now();
+    if (f && now - f.since > FAIL_WINDOW_MS) fails.delete(key);
+    return (fails.get(key)?.n ?? 0) >= MAX_FAILS;
+  };
+  const failed = (key: string) => { const g = fails.get(key) ?? { n: 0, since: Date.now() }; fails.set(key, { ...g, n: g.n + 1 }); };
+  /** The session cookie: `admin.<exp>` for the admin password, `user.<id>.<exp>` for an account (AU-04, US-11). */
+  const startSession = async (c: Context<Env>, who: string, strict = true) => {
+    const exp = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
+    await setSignedCookie(c, "session", `${who}.${exp}`, sessionKey!, { httpOnly: true, secure: true, sameSite: strict ? "Strict" : "Lax", path: "/api", maxAge: SESSION_DAYS * 86400 });
+  };
+  const loggedIn = (u: User) => store.saveUser({ ...u, lastLogin: clock().toISOString() });
 
-  // AU-04, AU-05: admin login with a password, answered with a signed session cookie.
+  // AU-04, AU-05: admin login with a password; US-07, US-08: an account logs in with its address and password.
   app.post("/api/login", async (c) => {
+    const b = await c.req.json<{ email?: unknown; password?: unknown }>().catch(() => ({} as { email?: unknown; password?: unknown }));
+    const ip = ipOf(c);
+    if (typeof b.email === "string" && b.email.trim()) {
+      if (!sessionKey) return c.json({ error: "login is off" }, 404);
+      const email = normEmail(b.email), acct = `account:${email}`;
+      if (blocked(ip) || blocked(acct)) return c.json({ error: "too many attempts" }, 429);
+      const u = (await store.users()).find((x) => x.email === email && !x.disabled);
+      const ok = !!u?.passwordHash && typeof b.password === "string" && await checkPassword(b.password, u.passwordHash);
+      if (!ok) { failed(ip); failed(acct); return c.json({ error: "wrong address or password" }, 401); } // the same answer either way (US-07)
+      fails.delete(ip); fails.delete(acct);
+      await loggedIn(u!);
+      await startSession(c, `user.${u!.id}`);
+      return c.body(null, 204);
+    }
     if (!adminPassword || !sessionKey) return c.json({ error: "login is off" }, 404);
-    const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "local", now = Date.now();
-    const f = fails.get(ip);
-    if (f && now - f.since > FAIL_WINDOW_MS) fails.delete(ip);
-    if ((fails.get(ip)?.n ?? 0) >= MAX_FAILS) return c.json({ error: "too many attempts" }, 429);
-    const b = await c.req.json<{ password?: string }>().catch(() => ({ password: undefined }));
+    if (blocked(ip)) return c.json({ error: "too many attempts" }, 429);
     if (typeof b.password !== "string" || !same(b.password, adminPassword)) {
-      const g = fails.get(ip) ?? { n: 0, since: now };
-      fails.set(ip, { ...g, n: g.n + 1 });
+      failed(ip);
       return c.json({ error: "wrong password" }, 401);
     }
     fails.delete(ip);
-    const exp = Math.floor(now / 1000) + SESSION_DAYS * 86400;
-    await setSignedCookie(c, "session", `admin.${exp}`, sessionKey, { httpOnly: true, secure: true, sameSite: "Strict", path: "/api", maxAge: SESSION_DAYS * 86400 });
+    await startSession(c, "admin");
     return c.body(null, 204);
   });
   app.post("/api/logout", (c) => { deleteCookie(c, "session", { path: "/api", secure: true }); return c.body(null, 204); });
 
-  // Who is calling: an admin session, an MCP token, the common share link or a personal link (AU-01, AU-04, AU-09, AU-11).
+  // US-04, US-05: the password link shows whose account it is, and sets the password once.
+  const setupUser = async (c: Context<Env>) => {
+    const b = await c.req.json<{ user?: unknown; secret?: unknown; password?: unknown }>().catch(() => ({} as { user?: unknown; secret?: unknown; password?: unknown }));
+    const u = (await store.users()).find((x) => x.id === b.user);
+    const valid = !!u?.setup && !u.disabled && typeof b.secret === "string" && same(await sha256(b.secret), u.setup.hash) && Date.parse(u.setup.expires) > clock().getTime();
+    return { u: valid ? u : undefined, password: b.password };
+  };
+  app.post("/api/setup/info", async (c) => {
+    const { u } = await setupUser(c);
+    return u ? c.json({ name: u.name, email: u.email }) : c.json({ error: "gone" }, 410);
+  });
+  app.post("/api/setup", async (c) => {
+    if (!sessionKey) return c.json({ error: "login is off" }, 404);
+    const { u, password } = await setupUser(c);
+    if (!u) return c.json({ error: "gone" }, 410);
+    if (typeof password !== "string" || [...password].length < PASSWORD_MIN) return c.json({ error: "too short" }, 400);
+    const { setup: _used, ...rest } = u;
+    await store.saveUser({ ...rest, passwordHash: await hashPassword(password), lastLogin: clock().toISOString() });
+    await startSession(c, `user.${u.id}`);
+    return c.body(null, 204);
+  });
+
+  // US-09, US-10: Google login, only for an existing account with Google's verified address.
+  app.get("/api/auth/config", (c) => c.json({ google: !!google && !!sessionKey }));
+  const redirectUri = (c: Context<Env>) => `${new URL(c.req.url).origin}/api/auth/google/callback`;
+  app.get("/api/auth/google", async (c) => {
+    if (!google || !sessionKey) return c.json({ error: "off" }, 404);
+    const state = newSecret(), { verifier, challenge } = await pkce();
+    await setSignedCookie(c, "google", `${state}.${verifier}`, sessionKey, { httpOnly: true, secure: true, sameSite: "Lax", path: "/api/auth", maxAge: 600 });
+    return c.redirect(googleAuthUrl(google, redirectUri(c), state, challenge), 302);
+  });
+  app.get("/api/auth/google/callback", async (c) => {
+    if (!google || !sessionKey) return c.json({ error: "off" }, 404);
+    const kept = await getSignedCookie(c, sessionKey, "google");
+    deleteCookie(c, "google", { path: "/api/auth", secure: true });
+    const [state, verifier] = (kept || "").split(".");
+    const code = c.req.query("code");
+    if (!state || !verifier || !code || !same(state, c.req.query("state") ?? "")) return c.redirect("/#login=fel", 302);
+    const id = await googleIdentity(google, code, verifier, redirectUri(c), opts.fetch, clock().getTime());
+    if (!id?.verified) return c.redirect("/#login=fel", 302);
+    const users = await store.users();
+    const u = users.find((x) => x.googleId === id.sub) ?? users.find((x) => x.email === id.email && !x.googleId);
+    if (!u || u.disabled) return c.redirect("/#login=nokonto", 302);
+    await loggedIn({ ...u, googleId: id.sub });
+    await startSession(c, `user.${u.id}`);
+    return c.redirect("/", 302);
+  });
+
+  // Who is calling: an admin or account session, an MCP token, the common share link or a personal link (AU-01, AU-04, AU-09, AU-11, US-11).
   app.use("/api/*", async (c, next) => {
     if (sessionKey) {
       const v = await getSignedCookie(c, sessionKey, "session");
-      const exp = v ? Number(v.split(".")[1]) : 0;
-      if (v && v.startsWith("admin.") && exp * 1000 > Date.now()) { c.set("role", "admin"); return next(); }
+      const [kind, a, b] = v ? v.split(".") : [];
+      if (kind === "admin" && Number(a) * 1000 > Date.now()) { c.set("role", "admin"); return next(); }
+      if (kind === "user" && Number(b) * 1000 > Date.now()) {
+        const u = (await store.users()).find((x) => x.id === a); // checked on every request, so a disabled account is out at once
+        if (u && !u.disabled) { c.set("user", u); c.set("role", u.superuser ? "admin" : "account"); return next(); }
+      }
     }
     const t = (c.req.header("authorization") ?? "").replace(/^Bearer /, "");
     const role = (Object.keys(tokens) as (keyof Tokens)[]).find((r) => tokens[r] && same(tokens[r], t));
@@ -299,11 +388,29 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     }
     return c.json({ error: "unauthorized" }, 401);
   });
+  /** A user's roles in every trip they reach (US-13, US-14, US-22). */
+  const membersOf = async (u: User, trips?: Trip[]) =>
+    memberships(u, await store.users(), trips ?? await store.list(), await store.owners(), await store.personLinks());
+  // US-14, US-22: on a trip, a user gets the role they have there; a trip they do not reach does not exist for them.
+  const tripRole = async (c: Context<Env>, next: () => Promise<void>) => {
+    const u = c.get("user"), id = c.req.param("id");
+    if (!u || !id || c.get("tripId")) return next();
+    const t = await store.load(id);
+    const m = t && (await membersOf(u, [t]))[id];
+    if (!m) return c.json({ error: "not found" }, 404);
+    c.set("role", m.role); c.set("tripId", id);
+    if (m.role === "traveler" || m.role === "planner") c.set("travelerId", m.travelerId);
+    return next();
+  };
+  app.use("/api/trips/:id/*", tripRole);
+  app.use("/api/trips/:id", tripRole);
   const need = (c: { get(k: "role"): Role }, min: Role) => rank[c.get("role")] >= rank[min];
   /** Links see one trip only (AU-03, AU-12, AU-14). */
   const scoped = (c: Context<Env>) => ["link", "traveler", "planner"].includes(c.get("role"));
-  /** The superuser, or a Planerare for its own trip (AU-14). */
-  const manager = (c: Context<Env>) => c.get("role") === "admin" || c.get("role") === "planner";
+  /** The superuser or the trip's owner: everything on the trip (US-14). */
+  const full = (c: Context<Env>) => c.get("role") === "admin" || c.get("role") === "owner";
+  /** The superuser, the owner, or a Planerare for its own trip (AU-14, US-14). */
+  const manager = (c: Context<Env>) => full(c) || c.get("role") === "planner";
   /** What a role on a link may see: components hidden by the trip's permissions are left out (AU-17, AU-19, AU-21), booking
    * references never reach a Följare (AU-22), activities hidden from the viewer are masked (AU-18), and the link gets only its
    * own role's rules (AU-20). Read-only tokens get no booking references (MC-11). */
@@ -332,8 +439,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return masked(out, (a) => hides(who.get(a.id) ?? []), hides);
   };
 
-  app.get("/api/me", (c) => c.json(!scoped(c) ? { role: c.get("role") }
-    : { role: c.get("role"), tripId: c.get("tripId"), ...(c.get("travelerId") ? { travelerId: c.get("travelerId") } : {}) }));
+  app.get("/api/me", async (c) => {
+    const u = c.get("user");
+    if (u) return c.json({ role: c.get("role"), user: { id: u.id, name: u.name, superuser: u.superuser }, trips: await membersOf(u) }); // US-22, US-23
+    return c.json(!scoped(c) ? { role: c.get("role") }
+      : { role: c.get("role"), tripId: c.get("tripId"), ...(c.get("travelerId") ? { travelerId: c.get("travelerId") } : {}) });
+  });
   // A link sees one trip only; other trips do not exist for it (AU-03, AU-12, AU-14).
   app.use("/api/trips/:id/*", async (c, next) => (scoped(c) && c.req.param("id") !== c.get("tripId") ? c.json({ error: "not found" }, 404) : next()));
   app.use("/api/trips/:id", async (c, next) => (scoped(c) && c.req.param("id") !== c.get("tripId") ? c.json({ error: "not found" }, 404) : next()));
@@ -344,7 +455,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   /** Who made a change, as notices compare it with each subscription (NT-01). */
   const whoOf = (c: Context<Env>) => c.get("travelerId") ?? (c.get("role") === "link" ? "follower" : "admin");
   /** The name a change is logged with: the traveler of a personal link, or "user" for the superuser (AU-15). */
-  const actorName = (c: Context<Env>, t: Trip) => { const id = c.get("travelerId"); return id ? t.travelers.find((x) => x.id === id)?.name ?? id : "user"; };
+  const actorName = (c: Context<Env>, t: Trip) => { const id = c.get("travelerId"); return id ? t.travelers.find((x) => x.id === id)?.name ?? id : c.get("user")?.name ?? "user"; }; // US-17
   /** A notice to every other phone with notices on, each described from its own view of the trip (NT-01, NT-02, NT-05). */
   async function notify(before: Trip, after: Trip, who: string, name: string, origin: string) {
     if (!opts.vapidKey) return;
@@ -371,13 +482,20 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const kept = new Set([...fileIdsOf(next.bookings), ...wishFiles(next.dreams, true), ...proposalFiles(await store.proposals(base.id))]);
     const gone = [...fileIdsOf(base.bookings), ...wishFiles(base.dreams, true)].filter((id) => !kept.has(id));
     if (gone.length) await store.removeFiles(gone); // BK-13, DB-08
-    if (notice) later(notice.c, notify(base, next, notice.who, notice.who === "admin" ? sv.notice.admin : actor, new URL(notice.c.req.url).origin));
+    if (notice) later(notice.c, notify(base, next, notice.who, notice.who === "admin" && !notice.c.get("user") ? sv.notice.admin : actor, new URL(notice.c.req.url).origin)); // US-17
     return { revision: base.revision + 1 };
   }
 
-  app.get("/api/trips", async (c) => c.json((await store.list()).filter((t) => !scoped(c) || t.id === c.get("tripId")).map((t) => view(t, c.get("role"), c.get("travelerId")))));
+  app.get("/api/trips", async (c) => {
+    const all = await store.list(), u = c.get("user");
+    if (u) { // US-14, US-15, US-22: a user's own trips and the ones they travel on, each seen with the role they have there
+      const m = await membersOf(u, all);
+      return c.json(all.filter((t) => m[t.id]).map((t) => view(t, m[t.id]!.role, m[t.id]!.role === "traveler" || m[t.id]!.role === "planner" ? m[t.id]!.travelerId : undefined)));
+    }
+    return c.json(all.filter((t) => !scoped(c) || t.id === c.get("tripId")).map((t) => view(t, c.get("role"), c.get("travelerId"))));
+  });
   app.post("/api/trips", async (c) => {
-    if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403);
+    if (!need(c, "admin") && c.get("role") !== "account") return c.json({ error: "forbidden" }, 403); // US-14: every user creates trips
     const b = await c.req.json<{ title?: string; purpose?: string }>().catch(() => ({ title: undefined, purpose: undefined }));
     const title = b.title?.trim();
     if (!title) return c.json({ error: "title required" }, 400);
@@ -386,10 +504,15 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       stops: [], days: [], places: [], bookings: [], tasks: [], travelers: [],
     });
     await store.save(trip);
-    await store.appendLog({ at: new Date().toISOString(), tripId: trip.id, actor: "user", reason: "create", ops: [] });
+    const owner = c.get("user")?.id ?? (c.get("role") === "admin" ? firstSuper(await store.users())?.id : undefined); // US-13, US-18
+    if (owner) await store.saveOwner(trip.id, owner);
+    await store.appendLog({ at: new Date().toISOString(), tripId: trip.id, actor: c.get("user")?.name ?? "user", reason: "create", ops: [] });
     return c.json(trip, 201);
   });
-  app.get("/api/settings", async (c) => c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService })); // AI-08
+  app.get("/api/settings", async (c) => { // AI-08; US-16: the AI service only for users allowed it
+    const u = c.get("user");
+    return c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService && (!u || u.superuser || u.ai) });
+  });
   app.put("/api/settings", async (c) => {
     if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403); // AI-09
     const parsed = Settings.safeParse(await c.req.json().catch(() => undefined));
@@ -408,12 +531,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return t ? c.json(view(t, c.get("role"), c.get("travelerId"))) : c.json({ error: "not found" }, 404);
   });
   app.delete("/api/trips/:id", async (c) => {
-    if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403); // MC-07
+    if (!full(c)) return c.json({ error: "forbidden" }, 403); // MC-07; US-14: the owner deletes their own trip
     if (!(await store.remove(c.req.param("id")))) return c.json({ error: "not found" }, 404);
+    await store.saveOwner(c.req.param("id"), null);
     const { [c.req.param("id")]: _gone, ...links } = await store.links();
     await store.saveLinks(links); // a deleted trip's links must not come back with a new trip of the same id
     await store.savePersonLinks((await store.personLinks()).filter((l) => l.tripId !== c.req.param("id")));
-    await store.appendLog({ at: new Date().toISOString(), tripId: c.req.param("id"), actor: "user", reason: "delete", ops: [] });
+    await store.appendLog({ at: new Date().toISOString(), tripId: c.req.param("id"), actor: c.get("user")?.name ?? "user", reason: "delete", ops: [] });
     return c.body(null, 204);
   });
   app.get("/api/trips/:id/image", async (c) => {
@@ -451,16 +575,20 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
 
   // AU-11: personal links per traveler, managed by the superuser or a Planerare of the trip.
   const people = async (tripId: string) => (await store.personLinks()).filter((l) => l.tripId === tripId);
-  const shown = (l: PersonLink) => ({ travelerId: l.travelerId, role: l.role, secret: l.secret });
+  const shown = (l: PersonLink) => ({ travelerId: l.travelerId, role: l.role, secret: l.secret, ...(l.account ? { account: l.account } : {}) });
   app.get("/api/trips/:id/people", async (c) => (manager(c) ? c.json((await people(c.req.param("id"))).map(shown)) : c.json({ error: "forbidden" }, 403)));
   app.put("/api/trips/:id/people/:tid", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const tripId = c.req.param("id"), travelerId = c.req.param("tid");
-    const { role } = await c.req.json<{ role?: string }>().catch(() => ({ role: undefined }));
+    const { role, account } = await c.req.json<{ role?: string; account?: unknown }>().catch(() => ({ role: undefined, account: undefined }));
     if (role !== "traveler" && role !== "planner") return c.json({ error: "role must be traveler or planner" }, 400);
     if (!(await load(tripId)).travelers.some((x) => x.id === travelerId)) return c.json({ error: "not found" }, 404);
     const all = await store.personLinks(), old = all.find((l) => l.tripId === tripId && l.travelerId === travelerId);
-    const next: PersonLink = { tripId, travelerId, role, secret: old?.secret ?? newSecret() }; // a new permission keeps the link
+    // US-21: the traveler's account address; left out keeps it, null or empty clears it. Nothing tells whether an account has it.
+    const address = account === undefined ? old?.account : typeof account === "string" && account.trim() ? normEmail(account) : account === null || account === "" ? undefined : false;
+    if (address === false || (address && !validEmail(address))) return c.json({ error: "bad address" }, 400);
+    if (address && all.some((l) => l.tripId === tripId && l.travelerId !== travelerId && l.account === address)) return c.json({ error: "address in use" }, 409);
+    const next: PersonLink = { tripId, travelerId, role, secret: old?.secret ?? newSecret(), ...(address ? { account: address } : {}) }; // a new permission keeps the link
     await store.savePersonLinks([...all.filter((l) => l !== old), next]);
     return c.json(shown(next), old ? 200 : 201);
   });
@@ -521,10 +649,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   /** Whether the caller may change wishes: the superuser, or a link whose role has Ändra on them (DB-10). */
   const changesWishes = (c: Context<Env>, t: Trip) => {
     const ar = accessRole(c.get("role"));
-    return ar ? accessFor(t, ar).parts.dreams === "write" : c.get("role") === "admin";
+    return ar ? accessFor(t, ar).parts.dreams === "write" : full(c);
   };
   const now = () => opts.now?.() ?? new Date();
-  const actorOf = (c: Context<Env>, t: Trip) => (c.get("travelerId") ? t.travelers.find((x) => x.id === c.get("travelerId"))?.name ?? "link" : "user");
+  const actorOf = (c: Context<Env>, t: Trip) => (c.get("travelerId") ? t.travelers.find((x) => x.id === c.get("travelerId"))?.name ?? "link" : c.get("user")?.name ?? "user");
   /** A Commons image for a title: from the cache, else looked up, copied and cached; "nothing found" is kept 30 days (DB-06, DB-11). */
   async function lookup(title: string): Promise<{ found?: NonNullable<CacheEntry["found"]>; failed?: true }> {
     const key = cacheKey(title);
@@ -665,6 +793,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const role = c.get("role"), travelerId = c.get("travelerId"), ar = accessRole(role);
     const t = await load(c.req.param("id"));
     if (!(ar ? linkMayChange(t, ar, b.ops, travelerId) : need(c, "propose"))) return c.json({ error: "forbidden" }, 403); // MC-10, AU-21
+    if (role === "owner" && b.ops.some((o) => opNeeds(o).part === "access")) return c.json({ error: "forbidden" }, 403); // AU-22: the permissions are the superuser's
     if (travelerId) { // AU-13: a personal link adds expenses only in its own name
       const own = ownExpenses(b.ops, travelerId);
       if (!own) return c.json({ error: "forbidden" }, 403);
@@ -681,7 +810,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     try {
       next = Trip.parse(applyOps(t, b.ops));
       problems = checkTrip(next);
-      if (!ar && c.get("role") !== "admin") problems.push(...pinBreaks(t, next).map(sv.proposal.pin)); // MC-20: an LLM client leaves pins alone, also in a dry run
+      if (!ar && !full(c)) problems.push(...pinBreaks(t, next).map(sv.proposal.pin)); // MC-20: an LLM client leaves pins alone, also in a dry run
     } catch (e) {
       return c.json({ ok: false, problems: describeError(e) }, 422); // MC-03
     }
@@ -696,12 +825,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const done = (r: Awaited<ReturnType<typeof apply>>) => ("conflict" in r ? c.json({ error: "conflict" }, 409) : c.json(r));
     // Personal links apply at once, logged with the traveler's name (AU-12, AU-14, AU-15).
     if (ar) return done(await apply(t, b.ops, travelerId ? t.travelers.find((x) => x.id === travelerId)?.name ?? travelerId : "link", b.reason ?? "", { c, who: whoOf(c) }));
-    if (c.get("role") !== "admin") {
+    if (!full(c)) {
       const p: Proposal = { id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: b.ops, reason: b.reason ?? "", status: "pending", at: new Date().toISOString() };
       await store.saveProposal(p); // MC-06, MC-07: only an admin applies or approves
       return c.json({ proposalId: p.id, status: p.status }, 202);
     }
-    return done(await apply(t, b.ops, "user", b.reason ?? "", { c, who: whoOf(c) }));
+    return done(await apply(t, b.ops, actorName(c, t), b.reason ?? "", { c, who: whoOf(c) }));
   });
 
   app.post("/api/trips/:id/proposals/:pid/:action", async (c) => {
@@ -737,6 +866,59 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if ("conflict" in r) return c.json({ error: "conflict" }, 409);
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
+  });
+
+  // US-02, US-03, US-04, US-12: the superuser manages the accounts; the admin password acts as the first superuser (US-18).
+  const superOnly = async (c: Context<Env>, next: () => Promise<void>) => (c.get("role") === "admin" && !scoped(c) ? next() : c.json({ error: "forbidden" }, 403));
+  app.use("/api/users", superOnly);
+  app.use("/api/users/*", superOnly);
+  const selfOf = async (c: Context<Env>) => c.get("user")?.id ?? firstSuper(await store.users())?.id;
+  /** A new password link: the secret goes to the superuser once, only its hash is kept (US-04). */
+  const newSetup = async (u: User) => {
+    const secret = newSecret(), expires = new Date(clock().getTime() + SETUP_DAYS * 86_400_000).toISOString();
+    await store.saveUser({ ...u, setup: { hash: await sha256(secret), expires } });
+    return { secret, expires };
+  };
+  app.get("/api/users", async (c) => c.json((await store.users()).map(publicUser)));
+  app.post("/api/users", async (c) => {
+    const b = await c.req.json<{ name?: unknown; email?: unknown }>().catch(() => ({} as { name?: unknown; email?: unknown }));
+    const name = typeof b.name === "string" ? b.name.trim().slice(0, 80) : "", email = typeof b.email === "string" ? normEmail(b.email) : "";
+    if (!name || !validEmail(email)) return c.json({ error: "name and a valid address needed" }, 400);
+    const users = await store.users();
+    if (users.some((u) => u.email === email)) return c.json({ error: "address in use" }, 409);
+    let id = slug(name);
+    for (let n = 2; users.some((u) => u.id === id); n++) id = `${slug(name)}-${n}`;
+    const u: User = { id, name, email, superuser: users.length === 0, disabled: false, ai: false, createdAt: clock().toISOString() }; // the first account is the superuser
+    if (users.length === 0) for (const t of await store.list()) if (!(await store.owners())[t.id]) await store.saveOwner(t.id, id); // US-13: the trips so far
+    return c.json({ user: publicUser(u), setup: await newSetup(u) }, 201);
+  });
+  /** The account in the path, and whether a change would leave no superuser who can log in (US-12). */
+  const target = async (c: Context<Env>) => {
+    const users = await store.users(), u = users.find((x) => x.id === c.req.param("uid"));
+    const lastSuper = (next?: User) => !users.map((x) => (x.id === next?.id ? next : x)).some((x) => x.superuser && !x.disabled);
+    return { u, self: u?.id === await selfOf(c), lastSuper };
+  };
+  app.patch("/api/users/:uid", async (c) => {
+    const { u, self, lastSuper } = await target(c);
+    if (!u) return c.json({ error: "not found" }, 404);
+    const b = await c.req.json<{ disabled?: unknown; superuser?: unknown; ai?: unknown }>().catch(() => ({} as Record<string, unknown>));
+    const next: User = { ...u, ...(typeof b.disabled === "boolean" ? { disabled: b.disabled } : {}), ...(typeof b.superuser === "boolean" ? { superuser: b.superuser } : {}), ...(typeof b.ai === "boolean" ? { ai: b.ai } : {}) };
+    if ((self && (next.disabled || !next.superuser)) || lastSuper(next)) return c.json({ error: "forbidden" }, 403); // never oneself, never the last one
+    await store.saveUser(next);
+    return c.json(publicUser(next));
+  });
+  app.post("/api/users/:uid/setup", async (c) => {
+    const { u } = await target(c);
+    return u ? c.json(await newSetup(u)) : c.json({ error: "not found" }, 404);
+  });
+  app.delete("/api/users/:uid", async (c) => {
+    const { u, self, lastSuper } = await target(c);
+    if (!u) return c.json({ error: "not found" }, 404);
+    if (self || lastSuper({ ...u, disabled: true })) return c.json({ error: "forbidden" }, 403);
+    const heir = await selfOf(c);
+    for (const [tripId, owner] of Object.entries(await store.owners())) if (owner === u.id) await store.saveOwner(tripId, heir ?? null); // US-13
+    await store.removeUser(u.id);
+    return c.body(null, 204);
   });
   return app;
 }

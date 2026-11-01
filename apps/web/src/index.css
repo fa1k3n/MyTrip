@@ -470,3 +470,13 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .act.pinned .grip-gap,.act .grip-gap{display:inline-block;width:34px;flex:none}
 .day.dropday{outline:3px dashed var(--sage);outline-offset:-3px}
 .act .miss{color:var(--mute)}
+/* US-23: the user's roles on a trip card; US-02, US-21: accounts and the account of a traveler */
+.trip .roles{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px}.trip .roles .ro{font-size:.85rem}
+.rolemark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1.5px solid}.rolemark svg{width:16px;height:16px}
+.rolemark.owner,.rolemark.planner{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
+.rolemark.traveler{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 18%,var(--card))}
+.people .row{flex-wrap:wrap}label.account{flex-basis:100%;margin:0 0 4px}label.account input{margin:0}
+.setuplink{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}.setuplink p{margin:0}
+.users .row{flex-wrap:wrap}.users .row .end{margin-left:auto}
+.adduser{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:12px}.adduser label{flex:1 1 180px}
+a.btn.google{display:flex;justify-content:center;margin-top:8px;text-decoration:none}

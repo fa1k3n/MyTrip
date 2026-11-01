@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { forInstalled, permsFor, safariUrl, showInstallHint } from "./access.ts";
+import { forInstalled, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -21,13 +21,14 @@ import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
 import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, wishExpense, type Transfer } from "./money.ts";
 import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
-import { Gear, IconButton } from "./Icons.tsx";
+import { Gear, IconButton, TripRoles } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
 const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
 const AppAdmin = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AppAdmin })));
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
+const SetupPassword = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.SetupPassword }))); // US-05
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
 const WishImage = lazy(() => import("./WishImage.tsx")); // DB-05..DB-08
@@ -89,6 +90,7 @@ function useForecast(trip: Trip | undefined): [Record<string, Forecast>, string 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined: asking, null: no access (AU-07)
   const [expired, setExpired] = useState(false);
+  const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -131,10 +133,13 @@ export function App() {
     load();
     if (!permsFor(me.role, {}).scoped) api.settings().then(setSettings, () => {}); // links see no app settings (AU-03, AU-12, AU-14)
   }, [me, load]);
-  const role = me?.role ?? "link";
+  /** The role on a trip: a user's differs per trip (US-14, US-22); without a trip, the start page's. */
+  const roleOf = (id?: string) => (me ? roleIn(me, id) : { role: "link" as const });
+  const account = !!me && "user" in me;
+  const perms = (x: { id?: string; access?: Trip["access"] }) => permsFor(roleOf(x.id).role, x, account);
+  const { role, travelerId: self } = roleOf(tripId || undefined); // self: the traveler of a personal link or a tied user (AU-13, US-22)
   /** The pages shown: only Uppleva in the app on the home screen (PW-15). */
-  const pagePerms = (x: Parameters<typeof permsFor>[1]) => (installed ? forInstalled(permsFor(role, x)) : permsFor(role, x));
-  const self = me && "travelerId" in me ? me.travelerId : undefined; // the traveler of a personal link (AU-13)
+  const pagePerms = (x: { id?: string; access?: Trip["access"] }) => (installed ? forInstalled(perms(x)) : perms(x));
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
   const flushWaiting = useCallback(async () => {
@@ -224,7 +229,7 @@ export function App() {
     setDlg(null);
   };
   useEffect(() => { // DB-07: wishes without an image get one once, one at a time, when someone who changes wishes opens Önska
-    if (!t || view !== "trip" || tab !== "dr" || permsFor(role, t).view.dr.dreams !== "write") return;
+    if (!t || view !== "trip" || tab !== "dr" || perms(t).view.dr.dreams !== "write") return;
     const todo = toFill(t).filter((id) => !filling.has(id));
     if (!todo.length) return;
     todo.forEach((id) => filling.add(id));
@@ -358,27 +363,30 @@ export function App() {
   const adder = () => {
     let stored: string | null = null;
     try { stored = localStorage.getItem(`${ADDER_KEY}.${t?.id}`); } catch { /* storage blocked */ }
-    return pickAdder(t?.travelers ?? [], stored);
+    return pickAdder(t?.travelers ?? [], stored ?? (me && "user" in me && t ? me.trips[t.id]?.travelerId ?? null : null)); // US-22: an owner who travels pays first
   };
 
   let page;
-  if (choosing) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Choose onPick={pick} /></Suspense>;
+  if (setupLink) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><SetupPassword user={setupLink.user} secret={setupLink.secret}
+    onDone={() => { history.replaceState(null, "", location.pathname + location.search); setSetupLink(null); setMe(undefined); start(); }} /></Suspense>;
+  else if (choosing) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Choose onPick={pick} /></Suspense>;
   else if (failed) page = <p className="ro">{sv.error}</p>;
   else if (me === null) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Login expired={expired} onDone={() => { setExpired(false); start(); }} /></Suspense>;
   else if (!trips) page = <p className="ro">{sv.loading}</p>;
   else if (view === "settings") page = <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView(settingsBack)} tip="right" /></div><h1>{sv.settings}</h1>
     {aiCard}
-    {role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13 */}
+    {me && roleIn(me, undefined).role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13, US-02 */}
   </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr"><span className="chip">{me && "user" in me ? me.user.name : sv.family}</span><Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
       <IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div></div>
     <div className="grid">
       {trips.map((x) => (
         <button className="card trip" key={x.id} onClick={() => openTrip(x.id)}>
           {covers[x.id] && <img className="cover" src={covers[x.id]} alt="" />}
           <h3>{x.title}</h3><div className="ro">{tripDates(x)}</div><p className="sum">{excerpt(x.purpose)}</p>
+          {me && <TripRoles me={me} id={x.id} />}
         </button>
       ))}
       <button className="card new" onClick={newTrip}>{sv.newTrip}</button>
@@ -386,7 +394,7 @@ export function App() {
   </>;
   else if (view === "admin") page = (
     <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      <AdminPage t={t} superuser={permsFor(role, t).superuser} settings={settings} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} run={run} removeTrip={removeTrip}
+      <AdminPage t={t} superuser={perms(t).superuser} manager={perms(t).manager} settings={settings} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} run={run} removeTrip={removeTrip}
         openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
     </Suspense>
   );
@@ -398,12 +406,12 @@ export function App() {
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
-      addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={permsFor(role, t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
+      addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={perms(t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
       today={today} upDay={upDay} setUpDay={setUpDay}
       addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} perms={pagePerms(t)} self={self}
-      memoryBy={self ?? (permsFor(role, t).superuser ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && permsFor(role, t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
-      who={me && "travelerId" in me ? { name: t.travelers.find((x) => x.id === me.travelerId)?.name ?? me.travelerId, role: me.role }
+      memoryBy={self ?? (perms(t).manager ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && perms(t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
+      who={self && (role === "traveler" || role === "planner") ? { name: t.travelers.find((x) => x.id === self)?.name ?? self, role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
       review={{ approve: approveProposal, reject: rejectMail }} // MC-18
@@ -429,7 +437,7 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && permsFor(role, t).view.nala.plan === "write" && view === "trip" && tab === "nala" ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && perms(t).view.nala.plan === "write" && view === "trip" && tab === "nala" ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}

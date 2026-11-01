@@ -75,6 +75,7 @@ export const sv = {
   budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  roles: { owner: "Skapare", planner: "Planerare", traveler: "Resenär", by: (n: string) => `Skapad av ${n}` }, // US-23, US-24
   fullApp: "Öppna hela appen i Safari", // PW-15
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
   notice: { // NT-01..NT-05: the texts of notices, also used by the server
@@ -145,10 +146,15 @@ export const sv = {
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
   login: {
     title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut",
-    noLink: "Öppna resan med länken du fått, eller logga in som administratör.",
-    expired: "Länken gäller inte längre. Be om en ny länk, eller logga in som administratör.",
+    noLink: "Logga in med ditt konto, eller öppna resan med länken du fått.",
+    expired: "Länken gäller inte längre. Be om en ny länk, eller logga in med ditt konto.",
+    email: "Mejladress", google: "Logga in med Google", // US-07, US-09
+    googleInstalled: "Google-inloggning fungerar inte i appen på hemskärmen. Logga in med mejladress och lösenord här, eller med Google i Safari.", // US-19
+    noAccount: "Det finns inget konto för den här adressen.", googleFailed: "Inloggningen med Google gick inte. Försök igen.",
+    setTitle: "Välj lösenord", setFor: (name: string, email: string) => `Kontot för ${name}, ${email}.`, min: "Minst 10 tecken.", // US-05
+    setSave: "Spara och logga in", setGone: "Länken gäller inte längre. Be den som skapade kontot om en ny.", setShort: "Lösenordet behöver minst 10 tecken.",
     pasteLink: "Klistra in länken du fått", openLink: "Öppna resan", badLink: "Det där är ingen länk till en resa.", // PW-02
-    wrong: "Fel lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
+    wrong: "Fel mejladress eller lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
   },
   prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",

@@ -1,5 +1,5 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
 import { linkFromText, missingLinks, personUrl, shareUrl } from "./access.ts";
@@ -9,7 +9,7 @@ import { tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { IconButton } from "./Icons.tsx";
-import { qr, qrSvgPath } from "./qr.ts";
+import { QrDialog } from "./QrDialog.tsx";
 import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
@@ -17,14 +17,25 @@ import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { svAdmin } from "./sv-admin.ts";
 
-/** AU-04, AU-05, AU-07: the admin login, also shown when a link is missing or no longer valid. */
+/** Google's answer comes back in the fragment: no account, or the login failed (US-09). Read once and cleared. */
+const googleAnswer = (() => {
+  const h = location.hash;
+  if (h !== "#login=nokonto" && h !== "#login=fel") return "";
+  history.replaceState(null, "", location.pathname + location.search);
+  return h === "#login=nokonto" ? sv.login.noAccount : sv.login.googleFailed;
+})();
+
+/** AU-04, AU-07, US-07..US-10, US-19: the login with address and password or Google, also shown when a link is missing or no longer
+ * valid. Without an address, the password is the admin password (US-18). */
 export function Login({ expired, onDone }: { expired: boolean; onDone: () => void }) {
-  const [pw, setPw] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(googleAnswer), [busy, setBusy] = useState(false);
+  const [google, setGoogle] = useState(false);
+  useEffect(() => { api.authConfig().then((c) => setGoogle(c.google), () => {}); }, []);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.login(pw);
+      await api.login(pw, email);
       onDone();
     } catch (x) {
       const s = x instanceof ApiError ? x.status : 0;
@@ -37,11 +48,42 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
     <h1>{sv.login.title}</h1>
     <p className="ro">{expired ? sv.login.expired : sv.login.noLink}</p>
     <form className="card" onSubmit={submit}>
-      <label>{sv.login.password}<input type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus /></label>
+      <label>{sv.login.email}<input type="email" inputMode="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></label>
+      <label>{sv.login.password}<input type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
       {err && <p className="err" role="alert">{err}</p>}
       <button className="btn" type="submit" disabled={busy || !pw}>{sv.login.submit}</button>
+      {google && !installed && <a className="btn ghost google" href="/api/auth/google">{sv.login.google}</a>}
+      {google && installed && <p className="ro note">{sv.login.googleInstalled}</p>}
     </form>
     {installed && <PasteLink />}
+  </>;
+}
+
+/** US-04, US-05: the password link opens this form; the password is chosen once, then the user is logged in. */
+export function SetupPassword({ user, secret, onDone }: { user: string; secret: string; onDone: () => void }) {
+  const [who, setWho] = useState<{ name: string; email: string } | null | undefined>(undefined);
+  const [pw, setPw] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  useEffect(() => { api.setupInfo(user, secret).then(setWho, () => setWho(null)); }, [user, secret]);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if ([...pw].length < 10) { setErr(sv.login.setShort); return; }
+    setBusy(true);
+    try { await api.setup(user, secret, pw); onDone(); } catch (x) { setErr(x instanceof ApiError && x.status === 410 ? sv.login.setGone : sv.error); }
+    setBusy(false);
+  };
+  return <>
+    <div className="top"><div className="logo">{sv.hub}</div></div>
+    <h1>{sv.login.setTitle}</h1>
+    {who === undefined && <p className="ro">{sv.loading}</p>}
+    {who === null && <p className="ro">{sv.login.setGone}</p>}
+    {who && <form className="card" onSubmit={submit}>
+      <p className="ro">{sv.login.setFor(who.name, who.email)}</p>
+      <input type="email" autoComplete="username" value={who.email} readOnly hidden />
+      <label>{sv.login.password}<input type="password" autoComplete="new-password" minLength={10} value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} autoFocus /></label>
+      <p className="ro note">{sv.login.min}</p>
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn" type="submit" disabled={busy || !pw}>{sv.login.setSave}</button>
+    </form>}
   </>;
 }
 
@@ -59,32 +101,6 @@ function PasteLink() {
     {err && <p className="err" role="alert">{err}</p>}
     <button className="btn" type="submit" disabled={!text.trim()}>{sv.login.openLink}</button>
   </form>;
-}
-
-/** AU-31: a link as a QR code, to show on this screen to the one who is invited. Drawn here, so the link stays on the device. */
-function QrDialog({ url, name, close }: { url: string; name: string; close: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const d = ref.current!, opener = document.activeElement as HTMLElement | null;
-    d.showModal();
-    document.body.style.overflow = "hidden"; // PL-14
-    return () => { document.body.style.overflow = ""; opener?.focus(); };
-  }, []);
-  const { path, box } = qrSvgPath(qr(url));
-  return (
-    <dialog ref={ref} aria-label={svAdmin.qr.title(name)} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
-      <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
-      <h3>{svAdmin.qr.title(name)}</h3>
-      <svg className="qr" viewBox={`0 0 ${box} ${box}`} role="img" aria-label={svAdmin.qr.label(name)} shapeRendering="crispEdges">
-        <rect width={box} height={box} className="qrbg" /><path d={path} />
-      </svg>
-      <p className="ro note">{svAdmin.qr.hint}</p>
-    </dialog>
-  );
 }
 
 /** AU-06: the trip's share link, to copy or replace. Replacing it stops the old link at once. */
@@ -166,13 +182,20 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
     }, () => setLinks([]));
   }, [t.id, t.travelers.map((x) => x.id).join()]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when travelers change
   const put = (l: PersonLinkInfo) => { setLinks((ls) => [...(ls ?? []).filter((x) => x.travelerId !== l.travelerId), l]); setCopied(""); };
+  const [accountErr, setAccountErr] = useState<{ id: string; text: string } | null>(null);
+  /** US-21: the address of the traveler's account, saved when the field is left. */
+  const saveAccount = async (l: PersonLinkInfo, value: string) => {
+    if (value.trim().toLowerCase() === (l.account ?? "")) return;
+    try { put(await api.setPerson(t.id, l.travelerId, l.role, value.trim() || null)); setAccountErr(null); }
+    catch (x) { setAccountErr({ id: l.travelerId, text: x instanceof ApiError && x.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad }); }
+  };
   const copy = async (l: PersonLinkInfo, name: string) => {
     try { await navigator.clipboard.writeText(personUrl(location.origin, t.id, l.travelerId, l.secret)); setCopied(name); } catch { /* no clipboard */ }
   };
   return (
-    <div className="card">
+    <div className="card people">
       <h3>{svAdmin.people.title}</h3>
-      <p className="ro note">{svAdmin.people.hint}</p>
+      <p className="ro note">{svAdmin.people.hint} {svAdmin.people.accountHint}</p>
       {!t.travelers.length && <p className="ro">{svAdmin.people.noTravelers}</p>}
       {links && t.travelers.map((x) => {
         const l = links.find((y) => y.travelerId === x.id);
@@ -194,6 +217,11 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
                   onClick={async () => { if (await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace })) put(await api.renewPerson(t.id, x.id)); }} />
               </>}
             </span>
+            {l && <label className="account"><span className="sr">{svAdmin.people.account(x.name)}</span>
+              <input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} defaultValue={l.account ?? ""} key={l.account ?? ""}
+                aria-invalid={accountErr?.id === x.id || undefined} onBlur={(e) => saveAccount(l, e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }} /></label>}
+            {accountErr?.id === x.id && <p className="err" role="alert">{accountErr.text}</p>}
           </div>
         );
       })}
@@ -267,9 +295,10 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
   );
 }
 
-/** The trip's settings: only what applies to this trip (MT-13). A Planerare sees them; the AI switch, permissions and deleting are for the superuser (AU-14). */
-export function AdminPage({ t, superuser, settings, back, edit, addPerson, change, run, removeTrip, openSettings }: {
-  t: Trip; superuser: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
+/** The trip's settings: only what applies to this trip (MT-13). A Planerare sees them; the AI switch and permissions are for the superuser
+ * (AU-14), deleting also for the trip's owner (US-14). */
+export function AdminPage({ t, superuser, manager, settings, back, edit, addPerson, change, run, removeTrip, openSettings }: {
+  t: Trip; superuser: boolean; manager: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
   change: (ops: Op[], reason: string) => void; removeTrip: () => void; openSettings: () => void;
 }) {
   return <>
@@ -285,6 +314,6 @@ export function AdminPage({ t, superuser, settings, back, edit, addPerson, chang
     <Inbox t={t} kind="bookings" />
     <Inbox t={t} kind="wishes" />
     {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
-    {superuser && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
+    {manager && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;
 }

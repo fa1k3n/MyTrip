@@ -1,7 +1,7 @@
-// The store on Cloudflare: trips, settings, links, personal links, push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
+// The store on Cloudflare: trips, settings, links, personal links, accounts and trip owners (US-01, US-13), push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store } from "./app.ts";
+import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -100,13 +100,31 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
       await db.batch([db.prepare("DELETE FROM links"), ...Object.entries(l).map(([id, s]) => db.prepare("INSERT INTO links (trip_id, secret) VALUES (?, ?)").bind(id, s))]);
     },
     async personLinks() {
-      const { results } = await db.prepare("SELECT trip_id, traveler_id, secret, role FROM person_links ORDER BY trip_id, traveler_id")
-        .all<{ trip_id: string; traveler_id: string; secret: string; role: PersonLink["role"] }>();
-      return results.map((r) => ({ tripId: r.trip_id, travelerId: r.traveler_id, secret: r.secret, role: r.role }));
+      const { results } = await db.prepare("SELECT trip_id, traveler_id, secret, role, account FROM person_links ORDER BY trip_id, traveler_id")
+        .all<{ trip_id: string; traveler_id: string; secret: string; role: PersonLink["role"]; account: string | null }>();
+      return results.map((r) => ({ tripId: r.trip_id, travelerId: r.traveler_id, secret: r.secret, role: r.role, ...(r.account ? { account: r.account } : {}) }));
     },
     async savePersonLinks(l) {
       await db.batch([db.prepare("DELETE FROM person_links"),
-        ...l.map((x) => db.prepare("INSERT INTO person_links (trip_id, traveler_id, secret, role) VALUES (?, ?, ?, ?)").bind(x.tripId, x.travelerId, x.secret, x.role))]);
+        ...l.map((x) => db.prepare("INSERT INTO person_links (trip_id, traveler_id, secret, role, account) VALUES (?, ?, ?, ?, ?)").bind(x.tripId, x.travelerId, x.secret, x.role, x.account ?? null))]);
+    },
+    async users() { // US-01
+      const { results } = await db.prepare("SELECT json FROM users ORDER BY id").all<{ json: string }>();
+      return results.map((r) => JSON.parse(r.json) as User);
+    },
+    async saveUser(u) {
+      await db.prepare("INSERT INTO users (id, email, json) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET email = excluded.email, json = excluded.json").bind(u.id, u.email, JSON.stringify(u)).run();
+    },
+    async removeUser(id) {
+      await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+    },
+    async owners() { // US-13
+      const { results } = await db.prepare("SELECT trip_id, user_id FROM trip_owners").all<{ trip_id: string; user_id: string }>();
+      return Object.fromEntries(results.map((r) => [r.trip_id, r.user_id]));
+    },
+    async saveOwner(tripId, userId) {
+      if (userId) await db.prepare("INSERT INTO trip_owners (trip_id, user_id) VALUES (?, ?) ON CONFLICT (trip_id) DO UPDATE SET user_id = excluded.user_id").bind(tripId, userId).run();
+      else await db.prepare("DELETE FROM trip_owners WHERE trip_id = ?").bind(tripId).run();
     },
     async proposals(tripId) {
       const { results } = await db.prepare("SELECT json FROM proposals WHERE trip_id = ? ORDER BY at, id").bind(tripId).all<{ json: string }>();

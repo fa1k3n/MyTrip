@@ -3,7 +3,8 @@ import type { Traffic } from "./transport.ts";
 
 import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, timeoutSignal, triedAt, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
-import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, removeLink } from "./access.ts";
+import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, parseSetupHash, removeLink, type Me } from "./access.ts";
+export type { Me } from "./access.ts";
 
 // The development token is used only by the local dev server; a build never contains it (AU-08).
 const TOKEN = import.meta.env.DEV ? (import.meta.env.VITE_TRIP_TOKEN ?? "") : "";
@@ -35,7 +36,7 @@ if (fromUrl?.kind === "link") {
 }
 if (fromUrl?.kind === "admin") { links = []; keep(); try { dropAllCopies(localStorage); } catch { /* nothing stored */ } } // PW-17
 // A link or #admin typed into a tab that is already open only changes the fragment, so load the page again to use it (AU-23).
-addEventListener("hashchange", () => { if (parseLinkHash(location.hash)) location.reload(); });
+addEventListener("hashchange", () => { if (parseLinkHash(location.hash) || parseSetupHash(location.hash)) location.reload(); }); // US-04: a password link too
 /** A tapped notice opens the app with ?trip=, which picks the phone's link for that trip (NT-04). */
 const askedTrip = new URLSearchParams(location.search).get("trip");
 if (askedTrip !== null) history.replaceState(null, "", location.pathname + location.hash);
@@ -146,21 +147,31 @@ async function call<T>(path: string, init: RequestInit = {}, key = link): Promis
 }
 const trip = (id: string) => `/api/trips/${encodeURIComponent(id)}`;
 
-export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string } | { role: "traveler" | "planner"; tripId: string; travelerId: string };
 /** A mail to the trip's inbox, read into a proposed booking that waits for review (BK-15, BK-17). */
 export type MailProposal = { id: string; status: "pending" | "approved" | "rejected"; source?: { kind: "mail"; from: string; subject: string; at: string }; booking?: BookingReading & { files?: TicketFile[] } };
 /** A traveler's personal link as the settings show it (AU-11). */
-export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string };
+export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string; account?: string }; // account: US-21
+/** An account as the superuser's list shows it (US-02). */
+export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
+export type SetupLink = { secret: string; expires: string }; // US-04
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
-  login: (password: string) => call<void>("/api/login", { method: "POST", body: JSON.stringify({ password }) }),
+  login: (password: string, email = "") => call<void>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
+  authConfig: () => call<{ google: boolean }>("/api/auth/config"), // US-10
+  setupInfo: (user: string, secret: string) => call<{ name: string; email: string }>("/api/setup/info", { method: "POST", body: JSON.stringify({ user, secret }) }), // US-05
+  setup: (user: string, secret: string, password: string) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password }) }),
+  users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12
+  addUser: (name: string, email: string) => call<{ user: UserInfo; setup: SetupLink }>("/api/users", { method: "POST", body: JSON.stringify({ name, email }) }),
+  changeUser: (id: string, patch: Partial<Pick<UserInfo, "disabled" | "superuser" | "ai">>) => call<UserInfo>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  newSetup: (id: string) => call<SetupLink>(`/api/users/${encodeURIComponent(id)}/setup`, { method: "POST" }),
+  removeUser: (id: string) => call<void>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
   logout: () => call<void>("/api/logout", { method: "POST" }),
   link: (id: string) => call<{ secret: string }>(`${trip(id)}/link`),
   newLink: (id: string) => call<{ secret: string }>(`${trip(id)}/link`, { method: "POST" }),
   people: (id: string) => call<PersonLinkInfo[]>(`${trip(id)}/people`),
-  setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"]) =>
-    call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify({ role }) }),
+  setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"], account?: string | null) => // account left out: kept (US-21)
+    call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify(account === undefined ? { role } : { role, account }) }),
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => kept<Trip[]>("trips", "/api/trips"),

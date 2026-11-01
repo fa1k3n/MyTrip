@@ -1,6 +1,7 @@
-// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC: sparkle, grip, qr, ticket, bed, mail, paste, file, attach, calendar-check, calendar-plus, pin), inline so no image files are loaded (CP-05).
+// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC: sparkle, grip, qr, ticket, bed, mail, paste, file, attach, calendar-check, calendar-plus, pin, crown, compass, luggage, user-x), inline so no image files are loaded (CP-05).
 import type { ReactNode } from "react";
 import { sv } from "./sv.ts";
+import { roleIcons, type Me } from "./access.ts";
 
 const paths: Record<string, ReactNode> = {
   plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
@@ -46,6 +47,10 @@ const paths: Record<string, ReactNode> = {
   users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>, // MI-25
   image: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>, // MI-20
   alert:<><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
+  crown: <><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></>, // Lucide crown (US-23)
+  compass: <><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /><circle cx="12" cy="12" r="10" /></>, // Lucide compass (US-23)
+  luggage: <><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2" /><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14" /><path d="M10 20h4" /><circle cx="16" cy="20" r="2" /><circle cx="8" cy="20" r="2" /></>, // Lucide luggage (US-23)
+  userx: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" x2="22" y1="8" y2="13" /><line x1="22" x2="17" y1="8" y2="13" /></>, // Lucide user-x (US-12)
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
 };
 export type IconName = keyof typeof paths;
@@ -76,4 +81,14 @@ export const Gear = ({ onClick, label = sv.settings }: { onClick: () => void; la
   <IconButton icon="settings" label={label} onClick={onClick} mut tip="left" />;
 
 /** The mark of a wish that is in the plan: an icon, no text, and not a pin since its time is an estimate (DB-19). */
+const ROLE_ICON = { owner: "crown", planner: "compass", traveler: "luggage" } as const;
+/** The user's roles on a trip card on Drömmar, and for the superuser the owner of someone else's trip (US-23, US-24). */
+export function TripRoles({ me, id }: { me: Me; id: string }) {
+  const roles = roleIcons(me, id), owner = "user" in me ? me.trips[id]?.owner : undefined;
+  if (!roles.length && !owner) return null;
+  return <span className="roles">
+    {roles.map((r) => <span key={r} className={`rolemark ${r}`} role="img" aria-label={sv.roles[r]} title={sv.roles[r]}><Icon name={ROLE_ICON[r]} /></span>)}
+    {owner && <span className="ro">{sv.roles.by(owner)}</span>}
+  </span>;
+}
 export const PlannedMark = () => <span className="planmark" role="img" aria-label={sv.wish.planned} title={sv.wish.planned}><Icon name="planned" /></span>;

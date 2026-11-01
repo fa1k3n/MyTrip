@@ -25,14 +25,38 @@ export const authHeader = (devToken: string, link: string | null) =>
 export const missingLinks = (travelers: { id: string }[], links: { travelerId: string }[]) =>
   travelers.filter((x) => !links.some((l) => l.travelerId === x.id)).map((x) => x.id);
 
-export type Role = "admin" | "read" | "propose" | "link" | "traveler" | "planner";
-export type Perms = Rules & { scoped: boolean; superuser: boolean; settings: boolean };
+/** owner: a user on a trip they own; account: a user on the start page (US-14). */
+export type Role = "admin" | "read" | "propose" | "link" | "traveler" | "planner" | "owner" | "account";
+export type Perms = Rules & { scoped: boolean; superuser: boolean; manager: boolean; settings: boolean };
 /** What a role may see and do in the app on a trip. Links follow the trip's permissions; the superuser may do everything (AU-20, AU-21).
- * scoped: one trip, no start page; settings: the trip's settings and links (AU-22). */
-export function permsFor(role: Role, t: { access?: AccessConfig }): Perms {
+ * scoped: one trip, no start page; manager: everything on the trip, as the superuser or the owner (US-14); settings: the trip's
+ * settings and links (AU-22). A user tied to a traveler has that traveler's permission, without the scope of a link (US-22). */
+export function permsFor(role: Role, t: { access?: AccessConfig }, account = false): Perms {
   if (role !== "link" && role !== "traveler" && role !== "planner")
-    return { ...resolve(ALL_ACCESS), scoped: false, superuser: role === "admin", settings: true };
-  return { ...accessFor(t, role === "link" ? "follower" : role), scoped: true, superuser: false, settings: role === "planner" };
+    return { ...resolve(ALL_ACCESS), scoped: false, superuser: role === "admin", manager: role === "admin" || role === "owner", settings: true };
+  return { ...accessFor(t, role === "link" ? "follower" : role), scoped: !account, superuser: false, manager: false, settings: role === "planner" };
+}
+
+/** What /api/me answers: a token, a link, or a user with their roles per trip (US-22). */
+export type Membership = { role: "admin" | "owner" | "traveler" | "planner"; roles: ("owner" | "traveler" | "planner")[]; travelerId?: string; owner?: string };
+export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string } | { role: "traveler" | "planner"; tripId: string; travelerId: string }
+  | { role: "admin" | "account"; user: { id: string; name: string; superuser: boolean }; trips: Record<string, Membership> };
+/** The role on one trip, and the traveler a personal link or a tied user acts as (US-14, US-22). Without a trip: the start page. */
+export function roleIn(me: Me, tripId: string | undefined): { role: Role; travelerId?: string } {
+  if ("user" in me) {
+    const m = tripId ? me.trips[tripId] : undefined;
+    if (!m) return { role: me.role };
+    return m.role === "traveler" || m.role === "planner" ? { role: m.role, travelerId: m.travelerId! } : { role: m.role };
+  }
+  return "travelerId" in me ? { role: me.role, travelerId: me.travelerId } : { role: me.role };
+}
+/** The user's roles on a trip, as icons on its card on Drömmar (US-23). */
+export const roleIcons = (me: Me, tripId: string) => ("user" in me ? me.trips[tripId]?.roles ?? [] : []);
+/** The password link of an account (US-04): the secret after #, as for the share links. */
+export const setupUrl = (origin: string, user: string, secret: string) => `${origin}/#u=${user}.${secret}`;
+export function parseSetupHash(hash: string): { user: string; secret: string } | null {
+  const m = /^#u=([a-z0-9][a-z0-9-]*)\.([A-Za-z0-9_-]+)$/.exec(hash);
+  return m ? { user: m[1]!, secret: m[2]! } : null;
 }
 /** True when the role may change some component, so Nåla offers edit mode. */
 /** Whether the role edits the trip; writing one's own memories is not editing it (MI-21). */

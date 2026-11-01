@@ -4,12 +4,14 @@
 import { createApp } from "./app.ts";
 import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
 import { receiveMail } from "./mail.ts";
+import { googleOf } from "./users.ts";
 
 export type WorkerEnv = {
   DB: D1Like; IMAGES?: R2Like; ASSETS?: { fetch(r: Request): Promise<Response> };
   // Secrets (wrangler secret put …), never in the configuration or a repository (DP-07).
   TRIP_READ_TOKEN?: string; TRIP_PROPOSE_TOKEN?: string; TRIP_ADMIN_TOKEN?: string;
   ADMIN_PASSWORD?: string; SESSION_KEY?: string; ROUTES_API_KEY?: string; AI_API_KEY?: string;
+  GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; // Google login (US-10)
   VAPID_KEY?: string; // the private VAPID key as a JWK, for notices (NT-05)
   TRAFFIC_DELAY_MIN?: string;
   INBOX_DOMAIN?: string; // the domain whose mail Cloudflare Email Routing sends to this Worker (BK-14)
@@ -31,7 +33,7 @@ const appFor = (env: WorkerEnv) => {
     const tokens = { read: env.TRIP_READ_TOKEN ?? "", propose: env.TRIP_PROPOSE_TOKEN ?? "", admin: env.TRIP_ADMIN_TOKEN ?? "" };
     app = createApp(d1Store(env.DB, env.IMAGES), tokens, {
       aiService: !!env.AI_API_KEY, routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
-      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN,
+      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY, google: googleOf(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET) }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN,
     });
     apps.set(env, app);
   }

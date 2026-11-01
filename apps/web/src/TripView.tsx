@@ -208,7 +208,7 @@ export function TripView(p: TripViewProps) {
   const lock = tab === "up" || !writes; // ED-11, AU-21; otherwise each part of Nåla follows the role's level, with no locks (ED-21)
   const [preview, setPreview] = useState<Preview | null>(null); // a proposal shown in the plan (MC-17)
   useEffect(() => { setPreview(null); }, [tab, t.revision]);
-  const reviews = !!p.review && (perms.superuser || p.who?.role === "planner"); // MC-19
+  const reviews = !!p.review && (perms.manager || p.who?.role === "planner"); // MC-19, US-14
   const days = [...(preview?.next ?? t).days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
   let main;
@@ -234,8 +234,8 @@ export function TripView(p: TripViewProps) {
   </>;
   else if (tab === "up") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Uppleva {...p} /></Suspense>;
   else main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Minnas t={t} addExpense={p.addExpense} addPayment={p.addPayment}
-    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.superuser || !!p.self)}
-    approver={perms.superuser || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} views={views || undefined} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} self={p.self} /></Suspense>;
+    expenses={perms.view.mi.expenses} budget={perms.view.mi.budget} memories={perms.view.mi.memories ?? "hidden"} canAdd={atLeast(perms.view.mi.expenses, "add") && (perms.manager || !!p.self)}
+    approver={perms.manager || p.who?.role === "planner"} run={p.run} today={p.today} view={shownMi} views={views || undefined} edit={p.edit} by={p.memoryBy} setBy={p.self ? undefined : p.setMemoryBy} self={p.self} /></Suspense>;
   return <>
     <div className="top">
       {perms.scoped && !p.toChooser ? <span /> : <IconButton icon="back" label={sv.allTrips} onClick={p.toChooser ?? p.back} tip="right" />}

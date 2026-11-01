@@ -37,7 +37,7 @@ export function tripDates(t: { days: { date: string }[]; dateLabel?: string }) {
   return `${dayMonth(ds[0])} – ${dayMonth(last)} ${parts(last).y}`;
 }
 
-export const excerpt = (purpose: string) => (purpose || sv.noPurpose).slice(0, 70) + "…";
+export const excerpt = (purpose: string) => { const s = purpose || sv.noPurpose; return s.length > 70 ? s.slice(0, 70) + "…" : s; };
 
 export function bookingDates(b: { from: string; to: string }) {
   if (b.from === b.to) return dayMonth(b.from);

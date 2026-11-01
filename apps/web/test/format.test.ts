@@ -44,9 +44,10 @@ test("MT-04 tripDates", () => {
 
 // REQ: MT-01 the hub card shows the first 70 characters of the purpose
 test("MT-01 excerpt", () => {
-  assert.equal(excerpt("Strand, glass och cykling."), "Strand, glass och cykling.…");
+  assert.equal(excerpt("Strand, glass och cykling."), "Strand, glass och cykling."); // the mark only when cut
+  assert.equal(excerpt("x".repeat(70)), "x".repeat(70));
   assert.equal(excerpt("x".repeat(80)), "x".repeat(70) + "…");
-  assert.equal(excerpt(""), "Skriv syftet med resan här.…");
+  assert.equal(excerpt(""), "Skriv syftet med resan här.");
 });
 
 // REQ: BK-01 booking dates as a compact range

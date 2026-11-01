@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, Trip } from "@trip/schema";
-import { canUndo, undoOps, UNDOABLE } from "../src/undo.ts";
+import { canUndo, removeAsk, undoOps, UNDOABLE } from "../src/undo.ts";
+import { sv } from "../src/sv.ts";
 import { moveActivity } from "../src/schedule.ts";
 
 const act = (id: string, start: string) => ({ id, text: id, placeIds: [], start, durationMin: 60, estimated: false, category: "Mat" });
@@ -33,4 +34,11 @@ test("ED-22 Ångra is not offered when a change removed ticket files", () => {
   const noHotel = Trip.parse(applyOps(before, [{ op: "remove", path: "bookings/1" }]));
   assert.equal(canUndo(before, noTix), false);
   assert.equal(canUndo(before, noHotel), true);
+});
+
+test("ED-26 the removal question says it cannot be undone only when ticket files go", () => {
+  const before = trip();
+  assert.equal(removeAsk(before, [{ op: "remove", path: "bookings/1" }]), sv.confirmRemove);
+  assert.equal(removeAsk(before, [{ op: "remove", path: "bookings/0" }]), sv.confirmRemoveFiles);
+  assert.doesNotMatch(sv.confirmRemove, /ångra/i);
 });

@@ -22,7 +22,7 @@ test("NT-01 describeChange", () => {
   assert.deepEqual(describeChange(base, withs({ days: [day([])] }), "Anna"), ["Anna tog bort Zoo, lör 24 okt"]);
   assert.deepEqual(describeChange(base, withs({ bookings: [{ id: "b", name: "Hotell" }], tasks: [...base.tasks, { id: "k2", text: "Packa", done: false }],
     info: [{ id: "i", title: "Parkering" }], dreams: [{ id: "w", title: "Glass" }], payments: [{ id: "p", amount: 10 }] }), "Bo"),
-    ["Bo lade till bokningen Hotell", "Bo lade till uppgiften Packa", "Bo lade till Parkering under Praktiskt", "Bo lade till önskan Glass", "Bo registrerade en betalning på 10 kr"]);
+    ["Bo lade till bokningen Hotell", "Bo lade till uppgiften Packa", "Bo lade till Parkering under Praktiskt", "Bo lade till önskan Glass", "Bo registrerade en inbetalning på 10 kr"]);
   assert.deepEqual(describeChange(base, withs({ tasks: [{ ...base.tasks[0], done: true }] }), "Bo"), [], "ticks give no notice");
 });
 

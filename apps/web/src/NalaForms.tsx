@@ -25,6 +25,7 @@ import { ActivityAndCategory } from "./ExpenseFields.tsx";
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600];
 import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
+import { removeAsk } from "./undo.ts";
 
 import type { EditDlg } from "./editKinds.ts";
 export type { EditDlg };
@@ -44,7 +45,7 @@ function useFields<T extends Record<string, string | boolean>>(init: T) {
   return { f, text, check, set: setValue };
 }
 
-function useSave({ save, close }: Props) {
+function useSave({ t, save, close }: Props) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const submit = async (r: Result, reason: string, send: (ops: Op[], reason: string) => Promise<string | null> = save) => {
@@ -54,7 +55,7 @@ function useSave({ save, close }: Props) {
     setBusy(false);
     if (e) setErr(e); else close(); // ED-10: a rejected change keeps the form open
   };
-  const remove = async (ops: Op[], reason: string) => { if (await ask(sv.confirmRemove)) submit({ ok: true, ops }, reason); }; // ED-09
+  const remove = async (ops: Op[], reason: string) => { if (await ask(removeAsk(t, ops))) submit({ ok: true, ops }, reason); }; // ED-09, ED-26
   return { err, busy, submit, remove, setErr };
 }
 

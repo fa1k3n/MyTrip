@@ -386,8 +386,8 @@ const SCENES = [
       <g class="rise" style="animation-delay:1s"><rect x="170" y="194" width="460" height="34" rx="10" style="fill:none;stroke:var(--sage);stroke-dasharray:6 6;stroke-width:1.5"/><text class="tm" x="204" y="216" style="fill:var(--sageT)">Lucka 45 min</text></g>
       <g class="slideup">${act(170, 238, 460, "15.30", "map", "Hamnrundtur", { col: "var(--sage)", stroke: "var(--acc)" })}</g>
       <g class="rise" style="animation-delay:2.4s"><rect x="170" y="290" width="460" height="30" rx="10" style="fill:#B3382C;opacity:.12"/>${li("alert", 180, 293, .9, "#B3382C")}<text class="tm" x="210" y="310" style="fill:#B3382C">Krock 15 min</text></g>
-      <g class="pop" style="animation-delay:3.6s"><rect x="300" y="346" width="260" height="40" rx="12" style="fill:var(--ink)"/><text class="t" x="320" y="371" style="fill:#fff">Aktiviteten flyttad</text>
-        <rect x="484" y="352" width="64" height="28" rx="8" style="fill:none;stroke:#fff;stroke-width:1.5;opacity:.7"/><text class="t" x="496" y="371" style="fill:#fff">Ångra</text></g>` },
+      <g class="pop" style="animation-delay:3.6s"><rect x="300" y="346" width="260" height="40" rx="12" style="fill:var(--ink)"/><text class="t" x="320" y="371" style="fill:var(--bg)">Aktiviteten flyttad</text>
+        <rect x="484" y="352" width="64" height="28" rx="8" style="fill:none;stroke:var(--bg);stroke-width:1.5;opacity:.7"/><text class="t" x="496" y="371" style="fill:var(--bg)">Ångra</text></g>` },
   { chap: "Nåla fast", title: "Det som inte får flytta sig",
     text: "En del ligger fast, som bordet på restaurangen klockan sju. Då nålar Anna fast aktiviteten med nålen. Den kan inte dras och tiden ligger kvar, så resten av dagen får rätta sig efter den.",
     svg: () => `${ground}${fig(80, 392, { name: "Anna", act: "point" })}
@@ -451,7 +451,7 @@ const SCENES = [
       ${card(150, 50, 300, 190)}<text class="tm" x="170" y="80">Så ser Anna det</text>
       ${act(166, 96, 268, "11.00", "map", "Lekland Rabatz", { col: "var(--sage)", grip: false, h: 52 })}
       <g transform="translate(398 158)"><g class="pop" style="animation-delay:1.2s">${li("eyeoff", 0, 0, 1, "var(--acc)")}</g></g>
-      <g class="rise" style="animation-delay:1.8s"><rect x="166" y="190" width="268" height="32" rx="10" style="fill:var(--ink)"/><text class="tm" x="180" y="211" style="fill:#fff">Dold för: Olle, Mia</text></g>
+      <g class="rise" style="animation-delay:1.8s"><rect x="166" y="190" width="268" height="32" rx="10" style="fill:var(--ink)"/><text class="tm" x="180" y="211" style="fill:var(--bg)">Dold för: Olle, Mia</text></g>
       <g class="rise" style="animation-delay:2.6s">${card(490, 50, 280, 190)}<text class="tm" x="510" y="80">Så ser Olle och Mia det</text>
         <rect x="506" y="96" width="248" height="52" rx="10" style="fill:var(--bg)"/>${li("eyeoff", 520, 110, 1, "var(--mute)")}<text class="t" x="554" y="128" style="fill:var(--mute)">Dold aktivitet</text></g>
       ${fig(600, 392, { name: "Olle", s: .72, c: "--acct" })}${fig(660, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },

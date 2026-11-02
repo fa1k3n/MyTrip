@@ -48,3 +48,12 @@ test("UI-17 a paused scene is complete", () => {
     assert.match(s, /if \(p && !scenes\[at\]\.classList\.contains\("on"\)\) \{ void scenes\[at\]\.getBoundingClientRect\(\); scenes\[at\]\.classList\.add\("on"\); \}/, f);
   }
 });
+
+// REQ: UI-13 UI-23 UI-30 text on a box in the ink colour follows the theme, so it can be read also in dark mode, where the box turns light
+test("UI-13 no white text on an ink box", () => {
+  for (const f of ["om.html", "ai.html", "nala.html"]) {
+    const s = read(f);
+    assert.ok(!/fill:var\(--ink\)"\/>\s*<text[^>]*fill:#fff/.test(s), `${f}: white text on an ink box`);
+    assert.ok(!/fill:var\(--ink\)"\/>[\s\S]{0,200}stroke:#fff/.test(s), `${f}: a white outline on an ink box`);
+  }
+});

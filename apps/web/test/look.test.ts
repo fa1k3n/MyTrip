@@ -90,3 +90,10 @@ test("RS-11 the activity text keeps clear of the buttons", () => {
   assert.match(css, /@media \(max-width:599px\)\{\.actbtns\{flex-direction:column\}\}/);
   assert.match(src("Plan.tsx"), /<span className="actbtns"><IconButton icon="pin"/);
 });
+
+// REQ: TR-22 the way between two activities is joined by a dotted line, as in the films, instead of a dashed rule under it
+test("TR-22 a dotted line between activities", () => {
+  assert.match(css, /\.travel\{display:flex;align-items:center;gap:8px;padding:4px 0 4px 74px;color:var\(--mute\);font-size:\.85rem;position:relative\}/);
+  assert.match(css, /\.travel::before\{content:"";position:absolute;left:58px;top:-2px;bottom:-2px;border-left:2px dotted var\(--mute\)\}/);
+  assert.match(css, /\.upday>\.travel::before\{left:/);
+});

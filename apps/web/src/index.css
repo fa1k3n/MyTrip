@@ -56,13 +56,14 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .sum{color:var(--mute);font-size:.92rem}.time{font-size:.85rem;color:var(--sageT);font-weight:600}
 .body{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}.day.open .body{display:block}
 .act{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}.act time{min-width:64px;font-weight:600}
-.travel{display:flex;align-items:center;gap:8px;padding:4px 0 4px 74px;color:var(--mute);font-size:.85rem;border-bottom:1px dashed var(--line)}.travel .cat{transform:scale(.8)} /* TR-20 */
+.travel{display:flex;align-items:center;gap:8px;padding:4px 0 4px 74px;color:var(--mute);font-size:.85rem;position:relative}.travel .cat{transform:scale(.8)} /* TR-20 */
+.travel::before{content:"";position:absolute;left:58px;top:-2px;bottom:-2px;border-left:2px dotted var(--mute)} /* the activities before and after joined, as in the films (TR-22) */
 .ainew{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0 0 14px;padding:10px 12px;border-radius:14px;border:1.5px solid var(--sage);background:color-mix(in srgb,var(--sage) 10%,var(--card))} /* AI-84: calm, not a warning */
 .ainew-h{display:inline-flex;align-items:center;font-weight:700;margin-right:4px}
 .aicount{min-height:44px;padding:0 14px;border-radius:22px;border:1.5px solid var(--sage);background:var(--card);color:var(--sageT);font:inherit;font-weight:600;cursor:pointer}.aicount:hover{background:color-mix(in srgb,var(--sage) 18%,var(--card))}.aicount:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
 .aikeepall{margin-left:auto;display:inline-flex;align-items:center;gap:6px}.aikeepall svg{width:18px;height:18px}
 .aikeep{display:inline-flex;align-items:center;flex:none}.act .aikeep{margin-left:auto}.act .aikeep+.icon{margin-left:0} /* AI-83 */
-.upday>.travel{list-style:none;padding:2px 0 2px 18px;border:0}
+.upday>.travel{list-style:none;padding:2px 0 2px 52px;border:0}.upday>.travel::before{left:28px} /* under the cards' category icons (TR-22) */
 .step.wait{opacity:.5}.step.wait .mark{border:2px dashed var(--line)} /* AI-76: not started yet */
 .place{background:none;border:0;border-bottom:2px solid var(--acc);color:var(--acct);padding:0;font-weight:600;position:relative}.place::before{content:"";position:absolute;inset:-10px -4px} /* a 44 px tall touch area, the look unchanged (AC-05) */
 .tels{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 12px;font-size:.88rem;font-weight:400;color:var(--ink);text-decoration:none}.tel svg{width:16px;height:16px;color:var(--acct)}.tel b{font-variant-numeric:tabular-nums} /* PI-06, AC-05 */

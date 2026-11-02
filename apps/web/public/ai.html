@@ -331,8 +331,8 @@ const SCENES = [
       ${[["Mån 25 okt", "Malmö–Hamburg · bil 4 h"], ["Tis 26 okt", "Hamburg"], ["Ons 27 okt", "Hamburg–Malmö · bil 4 h"]].map(([d, w], i) => `
         <g class="drop" style="animation-delay:${1.6 + i * .35}s">${card(450, 50 + i * 74, 310, 62)}<text class="t" x="470" y="${76 + i * 74}">${d}</text><text class="tm" x="470" y="${98 + i * 74}">${w}</text></g>`).join("")}
       <g class="pop" style="animation-delay:3.4s"><rect x="300" y="300" width="300" height="52" rx="14" style="fill:var(--ink)"/>
-        <text class="t" x="322" y="332" style="fill:#fff">Utkastet är inlagt</text>
-        <rect x="502" y="310" width="82" height="32" rx="10" style="fill:none;stroke:#fff;stroke-width:1.5;opacity:.7"/><text class="t" x="520" y="331" style="fill:#fff">Ångra</text></g>` },
+        <text class="t" x="322" y="332" style="fill:var(--bg)">Utkastet är inlagt</text>
+        <rect x="502" y="310" width="82" height="32" rx="10" style="fill:none;stroke:var(--bg);stroke-width:1.5;opacity:.7"/><text class="t" x="520" y="331" style="fill:var(--bg)">Ångra</text></g>` },
   { chap: "Bra att veta", title: "Det som är lätt att missa",
     text: "Samtidigt letar AI:n på webben upp det som är lätt att missa längs vägen: miljödekalen till bilen i Tyskland och EU-kortet. Hotellet med pool hamnar under Bokningar, som att boka, och under Praktiskt står var ni kan parkera och hur man köper bussbiljett i Hamburg. Allt har en källa att kolla.",
     svg: () => `${ground}

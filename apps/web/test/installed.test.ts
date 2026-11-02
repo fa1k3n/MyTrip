@@ -1,19 +1,36 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cookieLink, forInstalled, linkCookie, linkFromText, linkHash, parseLinkHash, permsFor, safariUrl } from "../src/access.ts";
+import { cookieLink, forInstalled, freshAgain, installedTab, needsFullApp, linkCookie, linkFromText, linkHash, parseLinkHash, permsFor, safariUrl } from "../src/access.ts";
 
-// REQ: PW-15 the installed app shows only Uppleva, for every role
-test("PW-15 the installed app shows only Uppleva", () => {
-  for (const role of ["admin", "planner", "traveler", "link"] as const) {
+// REQ: PW-24 the app on the phone shows Uppleva, Önska and Minnas of what the role may see, in that order, and no settings
+test("PW-24 the installed app's pages", () => {
+  for (const role of ["admin", "planner", "traveler"] as const) {
     const p = forInstalled(permsFor(role, {}));
-    assert.deepEqual([p.pages, p.settings], [["up"], false], role); // no tabs, and the settings stay in the full app
+    assert.deepEqual([p.pages, p.settings], [["up", "dr", "mi"], false], role);
   }
-  const noUp = { ...permsFor("admin", {}), pages: ["nala" as const] }; // a role without Uppleva keeps what it has
+  const some = { ...permsFor("admin", {}), pages: ["mi" as const, "nala" as const, "up" as const] };
+  assert.deepEqual(forInstalled(some).pages, ["up", "mi"], "only what the role may see; Nåla stays in the full app");
+  const noUp = { ...permsFor("admin", {}), pages: ["nala" as const] }; // a role with none of them keeps what it has
   assert.deepEqual(forInstalled(noUp).pages, ["nala"]);
 });
 
-// REQ: PW-15 the link to the full app opens the same link in Safari
-test("PW-15 the full app opens in Safari with the same link", () => {
+// REQ: PW-24 a role that may see Nåla gets the link to the full app
+test("PW-24 needsFullApp", () => {
+  assert.equal(needsFullApp(permsFor("admin", {})), true);
+  assert.equal(needsFullApp({ ...permsFor("admin", {}), pages: ["up", "dr", "mi"] }), false);
+});
+
+// REQ: PW-25 the app opens a trip on Uppleva, and again after an hour or more in the background
+test("PW-25 installedTab and freshAgain", () => {
+  assert.equal(installedTab(["up", "dr", "mi"]), "up");
+  assert.equal(installedTab(["dr", "mi"]), "dr", "a role without Uppleva gets its first page");
+  assert.equal(freshAgain(0, 59 * 60_000), false);
+  assert.equal(freshAgain(0, 60 * 60_000), true);
+  assert.equal(freshAgain(undefined, 60 * 60_000), false, "never hidden");
+});
+
+// REQ: PW-24 the link to the full app opens the same link in Safari
+test("PW-24 the full app opens in Safari with the same link", () => {
   for (const hash of ["#p=berlin.anna.AbC_-1", "#l=berlin.XyZ"]) {
     const key = (parseLinkHash(hash) as { key: string }).key;
     assert.equal(linkHash(key), hash);

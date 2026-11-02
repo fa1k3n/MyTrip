@@ -27,6 +27,12 @@ export function hasEnded<A extends Timed>(list: A[], i: number, now: string | un
   return !!end && toMin(end) <= toMin(now);
 }
 
+/** A swipe on the day: 1 for the next day (to the left), -1 for the previous, 0 for a short or mostly vertical movement (UP-52). */
+export function swipeStep(dx: number, dy: number) {
+  if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return 0;
+  return dx < 0 ? 1 : -1;
+}
+
 /** What the floating add button in Uppleva adds: an activity for a role that may change the plan, an expense for one that may add
  * expenses; with both it offers a choice (UP-41, UP-51). */
 export const addChoices = (expense: boolean, plan: boolean) => [...(plan ? ["activity" as const] : []), ...(expense ? ["expense" as const] : [])];

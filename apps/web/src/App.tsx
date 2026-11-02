@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type AiAdded, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { ABOUT_PAGE, forInstalled, landsOnAbout, needsConsent, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
+import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -148,7 +148,7 @@ export function App() {
   const account = !!me && "user" in me;
   const perms = (x: { id?: string; access?: Trip["access"] }) => permsFor(roleOf(x.id).role, x, account);
   const { role, travelerId: self } = roleOf(tripId || undefined); // self: the traveler of a personal link or a tied user (AU-13, US-22)
-  /** The pages shown: only Uppleva in the app on the home screen (PW-15). */
+  /** The pages shown: Uppleva, Önska and Minnas in the app on the home screen (PW-24). */
   const pagePerms = (x: { id?: string; access?: Trip["access"] }) => (installed ? forInstalled(perms(x)) : perms(x));
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
@@ -168,6 +168,19 @@ export function App() {
     addEventListener("online", back);
     return () => removeEventListener("online", back);
   }, [load, me, flushWaiting]);
+  const hiddenAt = useRef<number>();
+  useEffect(() => { // PW-25: back after an hour or more in the background, the phone app starts over on Uppleva and today
+    if (!installed) return;
+    const seen = () => {
+      if (document.visibilityState === "hidden") { hiddenAt.current = Date.now(); return; }
+      if (!freshAgain(hiddenAt.current, Date.now())) return;
+      hiddenAt.current = undefined;
+      const x = trips?.find((y) => y.id === tripId);
+      if (view === "trip" && x) { setTab(installedTab(pagePerms(x).pages) ?? "up"); setUpDay(null); window.scrollTo(0, 0); }
+    };
+    document.addEventListener("visibilitychange", seen);
+    return () => document.removeEventListener("visibilitychange", seen);
+  }); // eslint-disable-line react-hooks/exhaustive-deps -- reads the current trip and view each time
   useEffect(() => { // TK-10: changes from other devices show up within 30 seconds
     const id = setInterval(() => { if (me && document.visibilityState === "visible" && !dialog.current?.open) { load(); flushWaiting(); } }, 30_000);
     return () => clearInterval(id);
@@ -210,8 +223,8 @@ export function App() {
   const openTrip = (id: string, nextTab?: Tab) => {
     const x = trips?.find((y) => y.id === id);
     setTripId(id); setView("trip"); setOpen({}); setUpDay(null);
-    const tab = nextTab ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala"); // MT-09
     const allowed = pagePerms(x ?? {}).pages;
+    const tab = nextTab ?? (installed ? installedTab(allowed) : undefined) ?? (x ? defaultTab(x.days, todayIn(x.timezone)) : "nala"); // MT-09; the phone app: Uppleva (PW-25)
     setTab(allowed.includes(tab) ? tab : allowed[0] ?? "up"); // only the pages the role may see (AU-20)
     window.scrollTo(0, 0);
   };
@@ -461,10 +474,10 @@ export function App() {
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={perms(t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}
-      today={today} upDay={upDay} setUpDay={setUpDay}
+      today={today} upDay={upDay} setUpDay={setUpDay} bar={installed}
       addExpense={() => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency: t.currency, payer: true } }); }} addShortExpense={(currency, activity, pick) => { origin.current = document.activeElement; setDlg({ kind: "expense", short: { currency, activity, ...pick } }); }} notices={() => setDlg({ kind: "notices" })}
       edit={setDlg} perms={pagePerms(t)} self={self}
-      memoryBy={self ?? (perms(t).manager ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && perms(t).pages.length > 1 ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
+      memoryBy={self ?? (perms(t).manager ? adder() || undefined : undefined)} setMemoryBy={setAdder} fullApp={installed && needsFullApp(perms(t)) ? () => { location.href = safariUrl(location.origin, linkKey()); } : undefined}
       who={self && (role === "traveler" || role === "planner") ? { name: t.travelers.find((x) => x.id === self)?.name ?? self, role }
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal

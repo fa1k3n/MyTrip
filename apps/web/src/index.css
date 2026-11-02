@@ -46,6 +46,13 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;background:var(--bg);padding:8px 0;margin-bottom:8px}
 .tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px;font-weight:600}
 .tab[aria-selected=true]{background:var(--sage);color:#1b2a20;border-color:var(--sage)}
+/* The phone app's pages as a tab bar at the bottom, above the home indicator; floating buttons and the page end sit above it (PW-24). */
+:root:has(.tabbar){--barh:64px}:root:has(.tabbar) .wrap{padding-bottom:calc(var(--barh) + 16px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;gap:6px;background:var(--card);border-top:1px solid var(--line);box-shadow:var(--sh);
+  padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:4px;border:0;background:none;
+  border-radius:12px;font-size:.75rem;color:var(--mute)}
+.tabbar .tab svg{width:24px;height:24px}.tabbar .tab[aria-selected=true]{background:color-mix(in srgb,var(--sage) 24%,var(--card));color:var(--ink)}
 .tl{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
 .stop{flex:0 0 auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 12px;text-align:left}
 .stop small{display:block;color:var(--mute)}
@@ -79,7 +86,7 @@ dialog{border:0;border-radius:16px;background:var(--card);color:var(--ink);max-w
 .img{height:110px;display:flex;align-items:center;justify-content:center;font-size:2.4rem}
 .dream .in{padding:12px}.src{font-size:.78rem;color:var(--mute)}
 .heart{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:44px;min-height:44px;background:var(--card);color:var(--ink);border:0;border-radius:99px;padding:4px 12px;font-weight:700;box-shadow:var(--sh)}.heart svg{width:15px;height:15px;fill:currentColor} /* DB-02, UI-28 */
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));box-shadow:var(--sh);padding:12px 18px}
+.fab{position:fixed;right:16px;bottom:calc(16px + var(--barh,0px) + env(safe-area-inset-bottom,0px));box-shadow:var(--sh);padding:12px 18px}
 .lock [data-mut]{display:none!important}
 .lock .heart{pointer-events:none}
 .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
@@ -425,12 +432,12 @@ dialog[open]::backdrop{transition:background-color .2s}
 @starting-style{dialog[open]::backdrop{background-color:rgba(0,0,0,0)}}
 /* An expense without an activity: its own sheet with category tiles (UP-42), opened from the floating button (UP-41). */
 .upday.withfab{padding-bottom:72px} /* the last card's buttons never under the floating button */
-.fabmenu{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:16px;
+.fabmenu{position:fixed;right:16px;bottom:calc(84px + var(--barh,0px) + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:16px;
   background:var(--card);box-shadow:var(--sh)} /* Aktivitet or Utlägg (UP-51) */
 .fabmenu .btn{display:flex;align-items:center;gap:10px;justify-content:flex-start;min-height:44px;text-align:left;white-space:nowrap}.fabmenu .btn svg{width:20px;height:20px;flex:none}.fabmenu small{color:var(--mute);margin-left:auto}
 @media (min-width:600px){ /* on a wide screen in the day's column, following the scroll, not far out in the window's corner (UP-41) */
   .upday.withfab{padding-bottom:0}
-  .fabdock{position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:flex-end;margin-top:12px;pointer-events:none;z-index:3}
+  .fabdock{position:sticky;bottom:calc(16px + var(--barh,0px) + env(safe-area-inset-bottom,0px));display:flex;justify-content:flex-end;margin-top:12px;pointer-events:none;z-index:3}
   .fabdock .btn.fab.icon,.fabdock .btn.fab.icon[data-tip]{position:relative;right:auto;bottom:auto;pointer-events:auto}
   .fabdock .fabmenu{position:absolute;right:0;bottom:68px;pointer-events:auto}
 }

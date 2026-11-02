@@ -73,8 +73,20 @@ export function parseSetupHash(hash: string): { user: string; secret: string } |
 /** Whether the role edits the trip; writing one's own memories is not editing it (MI-21). */
 export const anyWrite = (p: Perms) => Object.values(p.view).some((page) => Object.entries(page).some(([k, l]) => l === "write" && k !== "memories"));
 
-/** The installed app on the home screen is for the trip itself and shows only Uppleva (PW-15). */
-export const forInstalled = (p: Perms): Perms => (p.pages.includes("up") ? { ...p, pages: ["up"], settings: false } : p);
+/** The pages of the app on the home screen, in the order of its tab bar: the trip itself (PW-24). */
+const INSTALLED = ["up", "dr", "mi"] as const;
+/** The installed app shows Uppleva, Önska and Minnas of what the role may see, without the settings; a role with none of them keeps
+ * what it has (PW-24). */
+export function forInstalled(p: Perms): Perms {
+  const pages = INSTALLED.filter((x) => p.pages.includes(x));
+  return pages.length ? { ...p, pages, settings: false } : p;
+}
+/** A role that may see Nåla gets the link to the full app in Safari (PW-24). */
+export const needsFullApp = (p: Perms) => p.pages.some((x) => !(INSTALLED as readonly string[]).includes(x));
+/** The installed app opens a trip on Uppleva, else on the role's first page (PW-25). */
+export const installedTab = <T extends string>(pages: T[]): T | undefined => (pages.includes("up" as T) ? ("up" as T) : pages[0]);
+/** Back from the background after an hour or more, the installed app starts over on Uppleva and today (PW-25). */
+export const freshAgain = (hiddenAt: number | undefined, now: number) => hiddenAt !== undefined && now - hiddenAt >= 60 * 60_000;
 /** The fragment that a stored link came from, the inverse of parseLinkHash. */
 export function linkHash(key: string | null): string {
   const [kind, ...rest] = key?.split(".") ?? [];

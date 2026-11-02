@@ -35,6 +35,7 @@ import { emergencyFor, telHref } from "./emergency.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
+const TAB_ICONS: Record<Tab, Parameters<typeof Icon>[0]["name"]> = { dr: "heart", nala: "list", up: "compass", mi: "memories" }; // the phone app's tab bar (PW-24)
 /** Inline edits without a dialog; `build` gets the latest trip so a retry after a conflict uses fresh data. */
 export type Run = (build: (t: Trip) => Op[] | Result, reason: string) => void;
 
@@ -255,14 +256,15 @@ export type TripViewProps = {
   t: Trip; cover?: string; tab: Tab; open: Open; forecast: Record<string, Forecast>;
   setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; openDays: (ids: string[]) => void; // openDays: AI-84
   place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; back: () => void; admin: () => void;
-  today: string; upDay: string | null; setUpDay: (id: string) => void;
+  today: string; upDay: string | null; setUpDay: (id: string | null) => void;
   addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }, pick?: { choices: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
   edit: (d: EditDlg) => void; run: Run;
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
   feedback?: () => void; // "Tyck till" during the beta (US-27)
-  fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
+  fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-24)
+  bar?: boolean; // the app on the home screen: the pages as a tab bar at the bottom (PW-24)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
   notices: () => void; // the bell: notices on this phone (NT-03)
   forecastAt?: string; // offline: when the weather shown was fetched (PW-10)
@@ -338,9 +340,13 @@ export function TripView(p: TripViewProps) {
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
     <div className="titlerow"><h1>{t.title}</h1></div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · <TextEye t={t} texts={[t.note]} />{t.note}</> : ""}</p>
     <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <><TextEye t={t} texts={[t.purpose]} />{t.purpose || sv.noPurpose}</>}</div> {/* AU-30 */}
-    {perms.pages.length > 1 && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
+    {perms.pages.length > 1 && !p.bar && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>}
+    {perms.pages.length > 1 && p.bar && <nav className="tabbar" role="tablist" aria-label={sv.pagesLabel}>{perms.pages.map((k) => ( /* in the order of forInstalled (PW-24) */
+      <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => { if (k === "up" && tab === "up") p.setUpDay(null); p.setTab(k); window.scrollTo(0, 0); }}>
+        <Icon name={TAB_ICONS[k]} /><span>{sv.tabs[k]}</span></button> /* Uppleva again: back to today (PW-25) */
+    ))}</nav>}
     <div className={`${lock ? "lock" : ""} ${writes ? "" : "guest"}`}>{main}</div>
     {tab === "up" && Object.keys(p.forecast).length > 0 && ( /* WX-15: where the weather is shown (WX-17) */
       <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>{p.forecastAt && <> · {sv.offline.weatherFrom(stampText(p.forecastAt, new Date(), t.timezone))}</>}</p>

@@ -165,7 +165,13 @@ section h2{font-size:1.3rem;margin-bottom:6px}
 .on .spin{animation:orbit 1.1s linear infinite;transform-box:fill-box;transform-origin:center}
 .plus{border:1.5px dashed var(--acc);border-radius:16px;padding:14px 16px;background:color-mix(in srgb,var(--acc) 7%,var(--card))}
 .plus p{margin:4px 0 0}.does{margin:0;padding-left:20px}.does li{margin:2px 0}
-a.more{color:var(--acct);font-weight:600}
+/* UI-24: the films, as cards */
+.filmlist{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.film{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;padding:10px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none;min-height:44px}
+a.film:hover{border-color:var(--acc)}a.film:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.film .thumb{width:96px;height:54px;border-radius:8px;background:var(--sky)}
+.ftxt{display:grid;gap:2px}.ftxt b{font-family:var(--display)}.ftxt small{color:var(--mute);font-size:.85rem;line-height:1.4}
+.film.current{border-style:dashed;border-color:var(--sage)}.here{font-size:.8rem;font-weight:600;color:var(--sageT)}
 @media (prefers-reduced-motion:reduce){.on *{animation:none!important}}
 </style>
 </head>
@@ -219,7 +225,13 @@ a.more{color:var(--acct);font-weight:600}
     <h2>Basläger Plus kommer snart</h2>
     <p>AI-planeringen blir en del av Basläger Plus. Är du betatestare och vill vara med från början? Säg till via Tyck till i appen, så får du veta först.</p>
   </section>
-  <p><a class="more" href="/om.html">Se också filmen Om Basläger</a></p>
+  <section class="films" aria-labelledby="films-h">
+    <h2 id="films-h">Lär dig Basläger</h2>
+    <ul class="filmlist">
+      <li><a class="film" href="/om.html"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><path d="M38 46 L48 26 L58 46 Z" style="fill:var(--acc)"/><path d="M48 26 L45 46 L51 46 Z" style="fill:var(--acct)"/><g transform="translate(20 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(30 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(70 46) scale(0.75)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acct)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(80 46) scale(0.7)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Om Basläger</b><small>ca 3 min · Hur en resa går från dröm till minne: roller, Önska, Nåla, Uppleva och Minnas.</small></span></a></li>
+      <li><div class="film current" aria-current="page"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><path d="M38 46 L48 26 L58 46 Z" style="fill:var(--acc)"/><path d="M48 26 L45 46 L51 46 Z" style="fill:var(--acct)"/><path transform="translate(62 6) scale(.75)" d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z" fill="none" style="stroke:var(--acc)" stroke-width="2" stroke-linejoin="round"/><g transform="translate(22 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(74 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Skapa resan med AI</b><small>ca 2 min · Från några rader om er dröm till dagar, rutt och förslag som passar.</small><span class="here">Den här filmen</span></span></div></li>
+    </ul>
+  </section>
 </div>
 
 <script>

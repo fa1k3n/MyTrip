@@ -99,5 +99,5 @@ export const BetaButton = ({ onClick }: { onClick: () => void }) => (
   </button>
 );
 /** A suggestion from an AI helper, not yet taken (AI-02, AI-70). */
-export const AiMark = () => <span className="aimark" role="img" aria-label={sv.aiRun.suggestion} title={sv.aiRun.suggestion}><Icon name="sparkle" /></span>;
+export const AiMark = ({ label = sv.aiRun.suggestion }: { label?: string }) => <span className="aimark" role="img" aria-label={label} title={label}><Icon name="sparkle" /></span>;
 export const PlannedMark = () => <span className="planmark" role="img" aria-label={sv.wish.planned} title={sv.wish.planned}><Icon name="planned" /></span>;

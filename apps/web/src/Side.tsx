@@ -156,7 +156,7 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
             <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
-              {k.ai && <small className="ro"> · {sv.aiRun.verify}</small>}
+              {k.ai && <small className="ro"> · <AiMark label={sv.aiRun.aiMade} />{sv.aiRun.verify}</small>}
               {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}
               {isOverdue(k, today) && <> <span className="badge late">{sv.overdue}</span></>}</span>
           </label>

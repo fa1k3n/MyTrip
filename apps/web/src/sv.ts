@@ -177,7 +177,7 @@ export const sv = {
     never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
     left: (n: number) => `ca ${n} ${n === 1 ? "körning" : "körningar"} kvar`, capped: "Taket för månaden är nått",
     suggestion: "AI-förslag", take: (text: string) => `Lägg till: ${text}`, reject: (text: string) => `Avvisa: ${text}`,
-    verify: "AI · kontrollera", source: "Källa",
+    verify: "kontrollera", aiMade: "Föreslagen av AI", source: "Källa",
   },
   aiNoService: "Ingen AI-tjänst är kopplad till den här instansen. Inställningarna börjar gälla när en nyckel finns.",
   aiAreas: {

@@ -10,7 +10,7 @@ export const sv = {
     stale: "Resan har ändrats sedan förslaget gjordes. Avvisa det och be om ett nytt.", problems: "Förslaget går inte att godkänna:", none: "Förslaget ändrar ingenting.",
     pin: (title: string) => `Rubbar en nål: ${title}`,
     other: "Övrigt", added: "Ny", changed: "Ändrad", removed: "Tas bort", preview: "Så här blir planen med förslaget. Inget är sparat än.",
-    kinds: { stops: "Tidslinje", activity: "Aktivitet", days: "Dag", places: "Plats", bookings: "Bokning", budget: "Budgetpost", tasks: "Att göra", info: "Praktiskt", travelers: "Resenär", dreams: "Önskan", expenses: "Utlägg", payments: "Betalning" },
+    kinds: { title: "Namn", stops: "Tidslinje", activity: "Aktivitet", days: "Dag", places: "Plats", bookings: "Bokning", budget: "Budgetpost", tasks: "Att göra", info: "Praktiskt", travelers: "Resenär", dreams: "Önskan", expenses: "Utlägg", payments: "Betalning" },
   },
   pin: { on: "Nåla fast", off: "Ta bort nålen", mark: "Nålad", ask: (title: string) => `Ta bort nålen för ${title}? Då kan den flyttas, tidsändras och tas bort.`, locked: "Aktiviteten är nålad: tid och längd ändras inte, och den flyttas eller tas inte bort förrän nålen tas bort." }, // ED-24, ED-25
   undo: { button: "Ångra", failed: "Kunde inte ångra. Resan har ändrats sedan dess.", kinds: { add: "Lade till", change: "Ändrade", remove: "Tog bort" } }, // ED-22

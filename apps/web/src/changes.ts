@@ -24,7 +24,7 @@ const LISTS = {
   payments: (x: { amount: number }) => String(x.amount),
 } as const;
 type ListKey = keyof typeof LISTS;
-const SKIP = new Set(["revision", "days", "stops", ...Object.keys(LISTS)]);
+const SKIP = new Set(["revision", "days", "title", "stops", ...Object.keys(LISTS)]);
 
 function byId<X extends { id: string }>(before: X[], after: X[], name: (x: X) => string, label: string): Change[] {
   const old = new Map(before.map((x) => [x.id, x])), now = new Set(after.map((x) => x.id)), out: Change[] = [];
@@ -54,6 +54,7 @@ export function tripChanges(t: Trip, next: Trip): Change[] {
   out.push(...byId(t.days.map(bare), next.days.map(bare), (d) => `${dayLabel(d.date)} · ${d.title}`, label.days));
   for (const k of Object.keys(LISTS) as ListKey[])
     out.push(...byId((t[k] ?? []) as { id: string }[], (next[k] ?? []) as { id: string }[], LISTS[k] as unknown as (x: { id: string }) => string, label[k]));
+  if (t.title !== next.title) out.push({ kind: "change", text: `${label.title}: ${next.title}` }); // AI-10
   if (!same(t.stops, next.stops)) out.push({ kind: "change", text: `${label.stops}: ${next.stops.map((s) => s.label).join(", ")}` }); // AI-10
   const rest = [...new Set([...Object.keys(t), ...Object.keys(next)])].filter((k) => !SKIP.has(k) && !same(t[k as keyof Trip], next[k as keyof Trip]));
   if (rest.length) out.push({ kind: "change", text: `${sv.proposal.other}: ${rest.join(", ")}` });

@@ -29,7 +29,7 @@ test("MC-16 the changes are found by comparing the trip before and after, one ro
     ["add", `${sv.proposal.kinds.activity}: Museum · mån 26 okt 14.00`],
     ["change", `${sv.proposal.kinds.activity}: fika · tis 27 okt 11.00`],
     ["remove", `${sv.proposal.kinds.activity}: lunch · mån 26 okt 12.00`],
-    ["change", `${sv.proposal.other}: title`],
+    ["change", `${sv.proposal.kinds.title}: Berlin igen`], // AI-10: changed with the user's go-ahead (2026-11-02)
   ]);
 });
 

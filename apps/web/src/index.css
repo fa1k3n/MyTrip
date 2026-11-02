@@ -189,6 +189,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .check.switch input[type=checkbox]{flex:0 0 44px} /* but a switch keeps its whole track (AI-08) */
 .sub.off{opacity:.5} /* helpers greyed while the trip's AI switch is off (AI-74) */
 .aimark{display:inline-flex;vertical-align:-2px;margin-right:6px;color:var(--acc)}.aimark svg{width:16px;height:16px} /* an AI suggestion (AI-70) */
+.eye.lead{margin:0 6px 0 0;vertical-align:-3px} /* marks stand before a row's text (UI-21) */
 .stop::before{width:18px;height:18px;border-width:3.5px}.stop::after{top:8px} /* slightly larger dots */
 /* Every dialog closes with an X in the top right corner (UI-07, PL-12); headings leave room for it. */
 dialog{position:fixed} /* fixed, not relative: a relative modal sits at the top of the page and focusing it scrolls there (PL-18) */

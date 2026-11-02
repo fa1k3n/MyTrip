@@ -43,7 +43,7 @@ function Budget({ t, edit, part }: { part: MayOf; t: Trip; edit: (d: EditDlg) =>
       <BudgetPlanView t={t}>
         {items.length > 0 && <div className="bitems"><h4>{sv.plan.items}</h4>{items.map((i) => (
           <div className="row mid" key={i.id}>
-            <span>{i.hidden ? <HiddenText /> : <>{label(i)}<TextEye t={t} texts={[i.category, i.note]} /><br /><small className="ro">{[i.note && i.category, i.owner].filter(Boolean).join(" · ")}</small></>}</span>
+            <span>{i.hidden ? <HiddenText /> : <><TextEye t={t} texts={[i.category, i.note]} />{label(i)}<br /><small className="ro">{[i.note && i.category, i.owner].filter(Boolean).join(" · ")}</small></>}</span>
             <span className="end">{i.paid && !i.estimate && i.amount !== undefined && <span className="badge">{sv.badge.paid}</span>}{amountText(i, t.currency)}
               {!i.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut />}</span>
           </div>
@@ -104,7 +104,7 @@ function Bookings({ t, edit, onPlace, part }: { part: MayOf; t: Trip; edit: (d: 
       </div>}
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>
-          <span><KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
+          <span><KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /></>}<br />
             <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}</small>
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
           <span className="end"><span className={statusBadge(b.status)}>{sv.badge[b.status]}</span>
@@ -153,7 +153,7 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
         <div className="row mid todo" key={k.id}>
           <label className="check">
             <input type="checkbox" checked={k.done} disabled={!tick} onChange={() => run((x) => toggleTask(x, k.id), k.done ? "task undone" : "task done")} />
-            <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.ai && <AiMark label={sv.aiRun.aiMade} />}{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
+            <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.ai && <AiMark label={sv.aiRun.aiMade} />}<TextEye t={t} texts={[k.text]} placeId={k.placeId} />{k.text}</>}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
               {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}

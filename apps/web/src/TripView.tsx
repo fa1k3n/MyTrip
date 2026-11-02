@@ -45,12 +45,12 @@ export const HiddenText = () => <span className="hiddenact"><Icon name="eyeoff" 
 /** The eye beside a text that gives away a hidden activity, for those who see it, naming whom it is hidden from (AU-30). */
 export function TextEye({ t, texts, placeId }: { t: Trip; texts: (string | undefined)[]; placeId?: string }) {
   const who = textWho(t, texts, placeId);
-  return who.length ? <Eye t={t} who={who} /> : null;
+  return who.length ? <Eye t={t} who={who} lead /> : null;
 }
 
 /** The text of one piece of practical information, in Nåla and in Uppleva (PI-01..PI-04, UP-15). */
 export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; onPlace: (id: string) => void }) => x.hidden ? <span><HiddenText /></span> : (
-  <span><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b><TextEye t={t} texts={[x.title, x.text, x.unsuitable]} placeId={x.placeId} />
+  <span><TextEye t={t} texts={[x.title, x.text, x.unsuitable]} placeId={x.placeId} /><b>{x.placeId ? <PlaceLink t={t} id={x.placeId} text={x.title} onPlace={onPlace} /> : x.title}</b>
     {x.text && <><br /><small className="ro">{x.text}</small></>}
     {x.unsuitable && <><br /><small className="over">{sv.unsuitable}: {x.unsuitable}</small></>}
     {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
@@ -64,10 +64,11 @@ export function ActivityWhen({ a }: { a: Activity }) {
 }
 
 /** An eye naming the travelers something is hidden from; it opens the list of whom when it can (AU-25). */
-export function Eye({ t, who, open }: { t: Trip; who: string[]; open?: () => void }) {
+/** lead: before a text, like the AI mark, instead of after a title (UI-21). */
+export function Eye({ t, who, open, lead }: { t: Trip; who: string[]; open?: () => void; lead?: boolean }) {
   const label = sv.hiddenMark(t.travelers.filter((x) => who.includes(x.id)).map((x) => x.name).join(", "));
   return open ? <span className="eye" onClick={(e) => e.stopPropagation()}><IconButton icon="eyeoff" look="bare" label={label} onClick={open} /></span>
-    : <span className="eye" role="img" aria-label={label} title={label}><Icon name="eyeoff" /></span>;
+    : <span className={lead ? "eye lead" : "eye"} role="img" aria-label={label} title={label}><Icon name="eyeoff" /></span>;
 }
 
 /** The short title, then the places and the note on lines of their own (ED-19). A hidden activity reaches a Resenär or
@@ -251,8 +252,8 @@ export function TripView(p: TripViewProps) {
       </span>
     </div>
     {p.cover && <img className="cover hero" src={p.cover} alt={t.imageAlt ?? ""} />}
-    <div className="titlerow"><h1>{t.title}</h1></div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · {t.note}<TextEye t={t} texts={[t.note]} /></> : ""}</p>
-    <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <>{t.purpose || sv.noPurpose}<TextEye t={t} texts={[t.purpose]} /></>}</div> {/* AU-30 */}
+    <div className="titlerow"><h1>{t.title}</h1></div><p className="ro">{tripDates(t)}{t.hiddenNote ? <> · <HiddenText /></> : t.note ? <> · <TextEye t={t} texts={[t.note]} />{t.note}</> : ""}</p>
+    <div className="card manifest">{t.hiddenPurpose ? <HiddenText /> : <><TextEye t={t} texts={[t.purpose]} />{t.purpose || sv.noPurpose}</>}</div> {/* AU-30 */}
     {perms.pages.length > 1 && <div className="tabs" role="tablist">{(Object.keys(sv.tabs) as Tab[]).filter((k) => perms.pages.includes(k)).map((k) => (
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>}

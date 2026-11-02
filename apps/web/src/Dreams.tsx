@@ -38,7 +38,7 @@ export function DreamCard({ t, d, i, vote, votes = true, open, planned, children
       {open && !d.hidden ? <button type="button" className="img open" style={bg} aria-label={planned ? `${sv.wish.more(d.title)}, ${sv.wish.planned}` : sv.wish.more(d.title)} title={creditMark(d) ? sv.wish.credited : undefined} onClick={open}>{area}</button>
         : <div className="img" style={bg}>{area}</div>}
       {votes && <button className="heart" onClick={vote} aria-label={sv.vote} disabled={!vote}>♥ {d.votes}</button>}
-      <div className="in"><h3>{d.hidden ? <HiddenText /> : <>{d.title}<TextEye t={t} texts={[d.title, d.source]} /></>}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div>
+      <div className="in"><h3>{d.hidden ? <HiddenText /> : <><TextEye t={t} texts={[d.title, d.source]} />{d.title}</>}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div>
         {children}</div>
     </article>
   );

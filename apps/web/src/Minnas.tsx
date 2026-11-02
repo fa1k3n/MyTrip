@@ -113,7 +113,7 @@ function Budget({ t, addExpense, addPayment, expenses, budget, canAdd, approver,
   const group = t.travelers.length > 1;
   const row = (e: Trip["expenses"][number], actions?: ReactNode) => (
     <div className="row mid" key={e.id}>
-      <span>{e.hidden ? <HiddenText /> : <>{e.text}<TextEye t={t} texts={[e.text]} /></>}{"waiting" in e && <> <span className="badge">{sv.queue.waiting}</span></>}<br /><small className="ro">
+      <span>{e.hidden ? <HiddenText /> : <><TextEye t={t} texts={[e.text]} />{e.text}</>}{"waiting" in e && <> <span className="badge">{sv.queue.waiting}</span></>}<br /><small className="ro">
         {activityTitle(t, e) && activityTitle(t, e) !== e.text && <>{activityTitle(t, e)} · </> /* MI-14, not twice */}{e.category} · {sv.paidBy.toLowerCase()} {name(e.paidBy)} · {sv.sharedBy.toLowerCase()} {sharersText(e.sharedBy, t.travelers, name) /* MI-38 */}
         {e.addedBy && <> · {sv.addedBy.toLowerCase()} {name(e.addedBy)}</>}
       </small></span>
@@ -172,8 +172,8 @@ function Budget({ t, addExpense, addPayment, expenses, budget, canAdd, approver,
           <summary><h3>{sv.minnas.listed(sv.payments, t.payments.length)}</h3></summary>
           {t.payments.length ? t.payments.map((x) => (
             <div className="row mid" key={x.id}>
-              <span>{name(x.from)} → {name(x.to)}{(x.date || x.note || x.hidden) && <><br /><small className="ro">{[x.date && shortDate(x.date), x.note].filter(Boolean).join(" · ")}
-                {x.hidden && <>{x.date ? " · " : ""}<HiddenText /></>}<TextEye t={t} texts={[x.note]} /></small></>}</span>
+              <span>{name(x.from)} → {name(x.to)}{(x.date || x.note || x.hidden) && <><br /><small className="ro"><TextEye t={t} texts={[x.note]} />{[x.date && shortDate(x.date), x.note].filter(Boolean).join(" · ")}
+                {x.hidden && <>{x.date ? " · " : ""}<HiddenText /></>}</small></>}</span>
               <span className="end">{kr(x.amount)}{pays && /* MI-35 */ <IconButton icon="trash" look="bare" tip="left" label={sv.minnas.removePayment(`${name(x.from)} → ${name(x.to)}`)}
                 onClick={async () => { if (await ask(sv.minnas.removePaymentAsk(`${name(x.from)} → ${name(x.to)} ${kr(x.amount)}`))) run((y) => removePayment(y, x.id), "remove payment"); }} />}</span>
             </div>

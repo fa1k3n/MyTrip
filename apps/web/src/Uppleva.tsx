@@ -82,7 +82,7 @@ export function Uppleva(p: TripViewProps) {
             return (
               <div className="row mid" key={b.id}>
                 <span>
-                  <KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /></>}<br />
+                  <KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={p.place} /></>}<br />
                   <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}{b.startsToday ? ` · ${sv.startsToday}` : ""}</small>
                 </span>
                 <span className="end"><span className={statusBadge(b.status)}>{sv.badge[b.status]}</span><TicketButton b={b} edit={p.edit} /></span>

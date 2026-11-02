@@ -243,6 +243,7 @@ export type BookingInput = {
   note?: string; // undefined: keep, "": remove (BK-06)
   kind?: "stay" | "ticket" | "other" | "transport"; checkIn?: string; checkOut?: string; start?: string; activityId?: string; // undefined: keep (BK-07, BK-08)
   files?: TicketFile[]; // undefined: keep (BK-09)
+  price?: string; currency?: string; // the booking's own budget item; undefined: keep, "": remove (BK-25)
 };
 
 /** The activities a Biljett can be linked to: those on its first date (BK-08). */
@@ -263,6 +264,8 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   };
   if ([times.checkIn, times.checkOut, times.start].some((x) => x !== undefined && !isTime(x))) return fail(sv.errors.activityTime);
   if (times.activityId && !ticketActivities(t, input.from).some((a) => a.id === times.activityId)) return fail(sv.errors.activityDate);
+  const price = input.price?.trim() ? parseAmount(input.price) : undefined;
+  if (Number.isNaN(price)) return fail(sv.badAmount);
   const files = input.files === undefined ? old?.files : input.files.length ? input.files : undefined;
   const { files: _f, checkIn: _ci, checkOut: _co, start: _s, activityId: _a, ...rest } = old ?? {};
   const booking = clean({
@@ -271,8 +274,23 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     kind, ...times, files,
   });
-  return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking }]);
+  return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking },
+    ...(input.price === undefined ? [] : priceOps(t, booking as Booking, price, input.currency))]);
 }
+
+const PRICE_CATEGORY: Record<string, string> = { stay: "Boende", ticket: "Upplevelse", transport: "Transport" };
+/** The booking's own budget item: added, updated (keeping its category) or, without a price, removed (BK-25). */
+function priceOps(t: Trip, b: Booking, price: number | undefined, currency?: string): Op[] {
+  const i = t.budget.findIndex((x) => x.bookingId === b.id), old = t.budget[i];
+  if (price === undefined) return old ? removeAt("budget", [i]) : [];
+  const item = clean({
+    ...old, id: old?.id ?? uniqueId(`${b.id}-pris`, allIds(t)), bookingId: b.id, category: old?.category ?? PRICE_CATEGORY[b.kind ?? ""] ?? "Övrigt",
+    note: b.name, amount: price, currency: currency || t.currency, paid: b.status === "paid", amountMax: undefined, estimate: undefined,
+  });
+  return [old ? { op: "set", path: `budget/${i}`, value: item } : { op: "add", path: "budget/-", value: item }];
+}
+/** A price as the form shows it: "1250" or "1250,50". */
+const priceText = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","));
 
 /** The fields read from a mail or a pasted confirmation fill in the form; what was not read stays (BK-17, BK-18). */
 export function readingToForm(f: BookingInput, r: BookingReading): BookingInput {
@@ -280,6 +298,7 @@ export function readingToForm(f: BookingInput, r: BookingReading): BookingInput 
   return {
     ...f, kind, name: r.name ?? f.name, from: r.from ?? f.from, to: r.to ?? r.from ?? f.to, reference: r.reference ?? f.reference,
     status: r.status ?? f.status, checkIn: r.checkIn ?? f.checkIn, checkOut: r.checkOut ?? f.checkOut, start: r.start ?? f.start,
+    ...(r.price && { price: priceText(r.price.value), currency: r.price.currency }), // BK-25
   };
 }
 
@@ -291,9 +310,13 @@ export function bookingForm(t: Trip, b?: Booking): BookingInput {
   return {
     name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
     note: b?.note ?? "", kind: b?.kind ?? "other", checkIn: b?.checkIn ?? "", checkOut: b?.checkOut ?? "", start: b?.start ?? "", activityId: b?.activityId ?? "",
-    files: b?.files ?? [],
+    files: b?.files ?? [], ...priceField(t, b),
   };
 }
+const priceField = (t: Trip, b?: Booking) => {
+  const item = b && t.budget.find((x) => x.bookingId === b.id);
+  return { price: item?.amount !== undefined ? priceText(item.amount) : "", currency: item?.currency ?? t.currency };
+};
 
 const STOP = new Set(["till", "från", "eller", "efter", "inför", "under", "utan", "with", "from", "your", "this", "that", "bokning", "booking"]);
 /** The words of at least four letters, in lower case. */
@@ -325,7 +348,9 @@ export function ticketActivityFor(t: Trip, name: string, date: string, start?: s
   return scored[0] && scored[0].n !== scored[1]?.n ? scored[0].id : undefined;
 }
 
-export const removeBooking =(t: Trip, id: string): Op[] => removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]);
+export const removeBooking = (t: Trip, id: string): Op[] => [ // with its own budget item (BK-25)
+  ...removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]), ...removeAt("budget", t.budget.flatMap((x, i) => (x.bookingId === id ? [i] : []))),
+];
 
 export type BudgetInput = {
   category: string; amount: string; paid: boolean; owner: string;

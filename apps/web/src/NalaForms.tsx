@@ -381,6 +381,11 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
         {(Object.keys(sv.statuses) as (keyof typeof sv.statuses)[]).map((k) => <option key={k} value={k}>{sv.statuses[k]}</option>)}
       </select></label>
       <label>{sv.reference}<input {...text("reference")} /></label>
+      <div className="two">
+        <label>{sv.mail.price}<input inputMode="decimal" {...text("price")} /></label>
+        <label>{sv.currency}<select {...text("currency")}>{[...new Set([...sv.currencies, f.currency ?? p.t.currency])].map((c) => <option key={c}>{c}</option>)}</select></label>
+      </div>
+      <p className="ro note">{sv.mail.priceHint}</p>
       <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
       <label>{sv.description}<textarea {...text("note")} /></label>
       <fieldset className="files"><legend>{sv.tickets.title}</legend>

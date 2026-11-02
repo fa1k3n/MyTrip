@@ -105,6 +105,7 @@ export const BudgetItem = z.object({
   amountMax: z.number().nonnegative().optional(), // upper end of a range, e.g. 75–100 (BG-03)
   estimate: z.boolean().optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), // default: the trip's currency (BG-07)
   note: z.string().optional(),
+  bookingId: Id.optional(), // the booking whose price it is; not counted while that booking is cancelled (BK-25, BK-05)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
 /** Practical information such as parking options (PI-01..PI-05). */

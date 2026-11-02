@@ -4,6 +4,7 @@
 export type BookingReading = {
   kind?: "stay" | "ticket" | "other"; name?: string; from?: string; to?: string;
   checkIn?: string; checkOut?: string; start?: string; reference?: string; status?: "cancelled"; address?: string;
+  price?: { value: number; currency: string }; // BK-24
 };
 
 const ENTITIES: Record<string, string> = {
@@ -60,6 +61,26 @@ function reference(text: string): string | undefined {
   return undefined;
 }
 
+const CODES = "SEK|EUR|NOK|DKK|USD|GBP", SIGNS: Record<string, string> = { kr: "SEK", "€": "EUR", $: "USD", "£": "GBP" };
+const CUR = String.raw`(${CODES}|kr\.?|€|\$|£)`, AMOUNT = String.raw`(\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)`;
+const TOTAL_WORDS = "totalbelopp|totalt|summa|att betala|total price|amount paid|total", PRICE_WORDS = "pris|price";
+const currency = (c: string) => SIGNS[c.replace(".", "").toLowerCase()] ?? c.toUpperCase();
+/** "1 250,00", "1.250,00", "1,250.00" and "1250" as a number: the last separator followed by one or two digits is the decimal one. */
+function amount(s: string): number {
+  const m = /^(.*?)(?:[.,](\d{1,2}))?$/.exec(s)!;
+  return Number(m[1]!.replace(/[ .,]/g, "") + (m[2] ? `.${m[2]}` : ""));
+}
+/** The price after the first word of `words` that has an amount with a currency before or after it, within the same line. */
+function priceAfter(text: string, words: string): BookingReading["price"] {
+  const re = new RegExp(String.raw`(?:${words})\b[^\n\d€$£]{0,20}?(?:${CUR}\s*${AMOUNT}|${AMOUNT}\s*${CUR})(?![\d\p{L}])`, "giu");
+  for (const m of text.matchAll(re)) {
+    const value = amount(m[2] ?? m[3]!);
+    if (value > 0) return { value, currency: currency(m[1] ?? m[4]!) };
+  }
+  return undefined;
+}
+const price = (text: string) => priceAfter(text, TOTAL_WORDS) ?? priceAfter(text, PRICE_WORDS);
+
 const STAY = /hotell|hotel|incheckning|check-in|checkin|utcheckning|vandrarhem|hostel|stuga|nätter|\bnatt\b|dubbelrum|enkelrum|\blogi\b|boende/gi;
 const TICKET = /biljett|ticket|entré|inträde|evenemang/gi;
 function kind(text: string): BookingReading["kind"] {
@@ -103,13 +124,20 @@ function address(v: unknown): string | undefined {
 }
 const clean = (r: BookingReading) => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined)) as BookingReading;
 
+/** totalPrice as a number, a text or a PriceSpecification, with its currency (BK-24). */
+function ldPrice(r: Ld): BookingReading["price"] {
+  const spec = obj(r.totalPrice), v = r.totalPrice !== undefined && typeof r.totalPrice !== "object" ? r.totalPrice : spec.price;
+  const value = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".")) : NaN, cur = str(r.priceCurrency) ?? str(spec.priceCurrency);
+  return value > 0 && cur && /^[A-Z]{3}$/.test(cur) ? { value, currency: cur } : undefined;
+}
+
 /** The first reservation in the mail's schema.org data. */
 function fromLd(html: string): BookingReading {
   const r = ldObjects(html).find((o) => String(o["@type"]).endsWith("Reservation"));
   if (!r) return {};
   const type = String(r["@type"]), what = obj(r.reservationFor);
   const status = /Cancelled/i.test(str(r.reservationStatus) ?? "") ? "cancelled" as const : undefined;
-  const base = { name: str(what.name), reference: str(r.reservationNumber), status, address: address(what.address) ?? address(obj(what.location).address) };
+  const base = { name: str(what.name), reference: str(r.reservationNumber), status, price: ldPrice(r), address: address(what.address) ?? address(obj(what.location).address) };
   if (type === "LodgingReservation")
     return clean({ kind: "stay", ...base, from: dateOf(r.checkinTime), to: dateOf(r.checkoutTime), checkIn: timeOf(r.checkinTime), checkOut: timeOf(r.checkoutTime) });
   const at = what.startDate ?? r.startTime ?? what.departureTime;
@@ -126,7 +154,7 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
   const k = kind(`${mail.subject ?? ""}\n${text}`), checkIn = timeAfter(text, CHECK_IN);
   const stay = k === "stay" || (!k && !!checkIn);
   const fromText = clean({
-    kind: stay ? "stay" : k, name: mail.subject ? subjectName(mail.subject) : undefined, reference: reference(text),
+    kind: stay ? "stay" : k, name: mail.subject ? subjectName(mail.subject) : undefined, reference: reference(text), price: price(text),
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
   });

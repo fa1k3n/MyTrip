@@ -42,13 +42,15 @@ function Budget({ t, edit, part }: { part: MayOf; t: Trip; edit: (d: EditDlg) =>
   const label = (i: Trip["budget"][number]) => i.note ?? i.category;
   const rank = (c: string) => { const i = sv.budgetCategories.indexOf(c); return i < 0 ? sv.budgetCategories.length : i; };
   const items = [...t.budget].sort((a, b) => rank(a.category) - rank(b.category));
+  const cancelled = new Set(t.bookings.filter((b) => b.status === "cancelled").map((b) => b.id)); // BK-05
   return (
     <Section title={sv.budget} may={part("budget")} flag={<LimitIcon t={t} />} tint={limitClass(t)}>
       <BudgetPlanView t={t}>
         {items.length > 0 && <div className="bitems"><h4>{sv.plan.items}</h4>{items.map((i) => (
           <div className="row mid" key={i.id}>
             <span>{i.hidden ? <HiddenText /> : <><TextEye t={t} texts={[i.category, i.note]} />{label(i)}<br /><small className="ro">{[i.note && i.category, i.owner].filter(Boolean).join(" · ")}</small></>}</span>
-            <span className="end">{i.paid && !i.estimate && i.amount !== undefined && <span className="badge">{sv.badge.paid}</span>}{amountText(i, t.currency)}
+            <span className="end">{i.bookingId && cancelled.has(i.bookingId) ? <span className="badge">{sv.badge.cancelled}</span>
+              : i.paid && !i.estimate && i.amount !== undefined && <span className="badge">{sv.badge.paid}</span>}{amountText(i, t.currency)}
               {!i.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${label(i)}`} onClick={() => edit({ kind: "budget", id: i.id })} mut />}</span>
           </div>
         ))}</div>}

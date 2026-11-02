@@ -18,7 +18,8 @@ type Slice = { label: string; value: number; kind: "cat" | "unused" };
 
 type PlanTrip = {
   currency: string; budgetMax?: number;
-  budget: { category: string; amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean }[];
+  budget: { category: string; amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean; bookingId?: string }[];
+  bookings?: { id: string; status: string }[];
   expenses: { category: string; amount: number }[];
 };
 export type PlanRow = { category: string; planned: number; actual: number; forecast: number; spent: number; over: boolean };
@@ -31,8 +32,10 @@ export function budgetPlan(t: PlanTrip, used = false) {
   for (const c of sv.budgetCategories) rows.set(c, { planned: 0, actual: 0, spent: 0 });
   const seen = new Set<string>();
   const row = (c: string) => (seen.add(c), rows.get(c) ?? rows.set(c, { planned: 0, actual: 0, spent: 0 }).get(c)!);
+  const cancelled = new Set(t.bookings?.filter((b) => b.status === "cancelled").map((b) => b.id));
   for (const i of t.budget) {
     const r = row(i.category || sv.hiddenText); // a hidden budget item reaches the viewer without its category (AU-30)
+    if (i.bookingId && cancelled.has(i.bookingId)) continue; // listed, not counted (BK-05)
     if (i.currency && i.currency !== t.currency) continue; // listed, not counted (BG-07)
     r.planned += cents(i.amountMax ?? i.amount ?? 0);
     if (i.paid && !i.estimate && i.amount !== undefined) r.actual += cents(i.amount);

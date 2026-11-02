@@ -74,8 +74,8 @@ export function parseSetupHash(hash: string): { user: string; secret: string } |
 export const anyWrite = (p: Perms) => Object.values(p.view).some((page) => Object.entries(page).some(([k, l]) => l === "write" && k !== "memories"));
 
 /** The pages of the app on the home screen, in the order of its tab bar: the trip itself (PW-24). */
-const INSTALLED = ["up", "dr", "mi"] as const;
-/** The installed app shows Uppleva, Önska and Minnas of what the role may see, without the settings; a role with none of them keeps
+const INSTALLED = ["dr", "up", "mi"] as const; // Uppleva in the middle, chosen at start (PW-25)
+/** The installed app shows Önska, Uppleva and Minnas of what the role may see, without the settings; a role with none of them keeps
  * what it has (PW-24). */
 export function forInstalled(p: Perms): Perms {
   const pages = INSTALLED.filter((x) => p.pages.includes(x));

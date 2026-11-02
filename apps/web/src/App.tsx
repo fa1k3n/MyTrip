@@ -148,7 +148,7 @@ export function App() {
   const account = !!me && "user" in me;
   const perms = (x: { id?: string; access?: Trip["access"] }) => permsFor(roleOf(x.id).role, x, account);
   const { role, travelerId: self } = roleOf(tripId || undefined); // self: the traveler of a personal link or a tied user (AU-13, US-22)
-  /** The pages shown: Uppleva, Önska and Minnas in the app on the home screen (PW-24). */
+  /** The pages shown: Önska, Uppleva and Minnas in the app on the home screen (PW-24). */
   const pagePerms = (x: { id?: string; access?: Trip["access"] }) => (installed ? forInstalled(perms(x)) : perms(x));
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)

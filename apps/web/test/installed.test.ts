@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cookieLink, forInstalled, freshAgain, installedTab, needsFullApp, linkCookie, linkFromText, linkHash, parseLinkHash, permsFor, safariUrl } from "../src/access.ts";
 
-// REQ: PW-24 the app on the phone shows Uppleva, Önska and Minnas of what the role may see, in that order, and no settings
+// REQ: PW-24 the app on the phone shows Önska, Uppleva and Minnas of what the role may see, Uppleva in the middle, and no settings
 test("PW-24 the installed app's pages", () => {
   for (const role of ["admin", "planner", "traveler"] as const) {
     const p = forInstalled(permsFor(role, {}));
-    assert.deepEqual([p.pages, p.settings], [["up", "dr", "mi"], false], role);
+    assert.deepEqual([p.pages, p.settings], [["dr", "up", "mi"], false], role);
   }
   const some = { ...permsFor("admin", {}), pages: ["mi" as const, "nala" as const, "up" as const] };
   assert.deepEqual(forInstalled(some).pages, ["up", "mi"], "only what the role may see; Nåla stays in the full app");
@@ -17,12 +17,12 @@ test("PW-24 the installed app's pages", () => {
 // REQ: PW-24 a role that may see Nåla gets the link to the full app
 test("PW-24 needsFullApp", () => {
   assert.equal(needsFullApp(permsFor("admin", {})), true);
-  assert.equal(needsFullApp({ ...permsFor("admin", {}), pages: ["up", "dr", "mi"] }), false);
+  assert.equal(needsFullApp({ ...permsFor("admin", {}), pages: ["dr", "up", "mi"] }), false);
 });
 
 // REQ: PW-25 the app opens a trip on Uppleva, and again after an hour or more in the background
 test("PW-25 installedTab and freshAgain", () => {
-  assert.equal(installedTab(["up", "dr", "mi"]), "up");
+  assert.equal(installedTab(["dr", "up", "mi"]), "up", "Uppleva is chosen, though it is in the middle");
   assert.equal(installedTab(["dr", "mi"]), "dr", "a role without Uppleva gets its first page");
   assert.equal(freshAgain(0, 59 * 60_000), false);
   assert.equal(freshAgain(0, 60 * 60_000), true);

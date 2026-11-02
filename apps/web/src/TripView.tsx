@@ -9,7 +9,7 @@ import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
 import type { Transfer } from "./money.ts";
-import { Gear, Icon, IconButton } from "./Icons.tsx";
+import { BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
@@ -185,6 +185,7 @@ export type TripViewProps = {
   perms: Perms; // what the role may see and change on this trip (AU-20, AU-21)
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
+  feedback?: () => void; // "Tyck till" during the beta (US-27)
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-15)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
   notices: () => void; // the bell: notices on this phone (NT-03)
@@ -243,6 +244,7 @@ export function TripView(p: TripViewProps) {
         {p.who && (p.who.role === "follower"
           ? <span className="who follower">{p.who.name}</span>
           : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
+        {p.feedback && <BetaButton onClick={p.feedback} />}
         {/* the person's own settings for notices (NT-03) */}<IconButton icon="bell" label={sv.notice.bell} onClick={p.notices} tip="left" />
         {perms.settings && <Gear onClick={p.admin} label={sv.tripSettings} />}
         {p.fullApp && <IconButton icon="external" label={sv.fullApp} onClick={p.fullApp} tip="left" />}

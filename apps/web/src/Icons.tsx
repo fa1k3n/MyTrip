@@ -91,4 +91,10 @@ export function TripRoles({ me, id }: { me: Me; id: string }) {
     {owner && <span className="ro">{sv.roles.by(owner)}</span>}
   </span>;
 }
+/** "Tyck till" during the beta, clearly marked as a beta feature (US-27). */
+export const BetaButton = ({ onClick }: { onClick: () => void }) => (
+  <button type="button" className="btn ghost icon beta tip-left" onClick={onClick} aria-label={sv.beta.feedback} data-tip={sv.beta.feedback}>
+    <Icon name="comment" /><span className="betatag" aria-hidden="true">{sv.beta.tag}</span>
+  </button>
+);
 export const PlannedMark = () => <span className="planmark" role="img" aria-label={sv.wish.planned} title={sv.wish.planned}><Icon name="planned" /></span>;

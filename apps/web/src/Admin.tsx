@@ -60,16 +60,43 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
   </>;
 }
 
+/** US-26: what a beta tester accepts: what is kept and who can see it. */
+export const BetaNotice = () => <div className="betanotice">
+  <p>{sv.beta.consentLead}</p>
+  <ul>{sv.beta.consentPoints.map((t) => <li key={t}>{t}</li>)}</ul>
+</div>;
+
+/** US-26: an account that has not accepted the beta notice sees it before anything else. */
+export function ConsentPage({ onDone, logout }: { onDone: () => void; logout: () => void }) {
+  const [ok, setOk] = useState(false), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try { await api.consent(); onDone(); } catch { setErr(sv.error); }
+    setBusy(false);
+  };
+  return <>
+    <div className="top"><div className="logo">{sv.hub}</div><IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div>
+    <h1>{sv.beta.consentTitle}</h1>
+    <form className="card" onSubmit={submit}>
+      <BetaNotice />
+      <label className="check"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> {sv.beta.consentCheck}</label>
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn" type="submit" disabled={!ok || busy}>{sv.beta.consentGo}</button>
+    </form>
+  </>;
+}
+
 /** US-04, US-05: the password link opens this form; the password is chosen once, then the user is logged in. */
 export function SetupPassword({ user, secret, onDone }: { user: string; secret: string; onDone: () => void }) {
   const [who, setWho] = useState<{ name: string; email: string } | null | undefined>(undefined);
-  const [pw, setPw] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  const [pw, setPw] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [ok, setOk] = useState(false);
   useEffect(() => { api.setupInfo(user, secret).then(setWho, () => setWho(null)); }, [user, secret]);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if ([...pw].length < 10) { setErr(sv.login.setShort); return; }
     setBusy(true);
-    try { await api.setup(user, secret, pw); onDone(); } catch (x) { setErr(x instanceof ApiError && x.status === 410 ? sv.login.setGone : sv.error); }
+    try { await api.setup(user, secret, pw, ok); onDone(); } catch (x) { setErr(x instanceof ApiError && x.status === 410 ? sv.login.setGone : sv.error); }
     setBusy(false);
   };
   return <>
@@ -82,8 +109,10 @@ export function SetupPassword({ user, secret, onDone }: { user: string; secret: 
       <input type="email" autoComplete="username" value={who.email} readOnly hidden />
       <label>{sv.login.password}<input type="password" autoComplete="new-password" minLength={10} value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} autoFocus /></label>
       <p className="ro note">{sv.login.min}</p>
+      <h3>{sv.beta.consentTitle}</h3><BetaNotice /> {/* US-26 */}
+      <label className="check"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> {sv.beta.consentCheck}</label>
       {err && <p className="err" role="alert">{err}</p>}
-      <button className="btn" type="submit" disabled={busy || !pw}>{sv.login.setSave}</button>
+      <button className="btn" type="submit" disabled={busy || !pw || !ok}>{sv.login.setSave}</button>
     </form>}
   </>;
 }

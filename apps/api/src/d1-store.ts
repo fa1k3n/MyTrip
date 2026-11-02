@@ -1,7 +1,7 @@
 // The store on Cloudflare: trips, settings, links, personal links, accounts and trip owners (US-01, US-13), push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User } from "./app.ts";
+import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -117,6 +117,20 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
     },
     async removeUser(id) {
       await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+    },
+    async feedback() { // US-27
+      const { results } = await db.prepare("SELECT json FROM feedback ORDER BY at").all<{ json: string }>();
+      return results.map((r) => JSON.parse(r.json) as Feedback);
+    },
+    async saveFeedback(f) {
+      await db.prepare("INSERT INTO feedback (id, at, json) VALUES (?, ?, ?)").bind(f.id, f.at, JSON.stringify(f)).run();
+    },
+    async usage() { // US-28
+      const { results } = await db.prepare("SELECT trip_id, who, tab, day FROM usage ORDER BY trip_id, who, tab, day").all<{ trip_id: string; who: string; tab: Usage["tab"]; day: string }>();
+      return results.map((r) => ({ tripId: r.trip_id, who: r.who, tab: r.tab, day: r.day }));
+    },
+    async saveUsage(u) {
+      await db.prepare("INSERT OR IGNORE INTO usage (trip_id, who, tab, day) VALUES (?, ?, ?, ?)").bind(u.tripId, u.who, u.tab, u.day).run();
     },
     async owners() { // US-13
       const { results } = await db.prepare("SELECT trip_id, user_id FROM trip_owners").all<{ trip_id: string; user_id: string }>();

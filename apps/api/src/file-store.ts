@@ -3,7 +3,7 @@
 import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Settings, Trip } from "@trip/schema";
-import { bySubscriber, isFileId, pushMatch, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User } from "./app.ts";
+import { bySubscriber, isFileId, pushMatch, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage } from "./app.ts";
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -87,6 +87,13 @@ export function fileStore(dir: string): Store {
     users: async () => (await readJson<User[]>("users.json", [])).sort((a, b) => a.id.localeCompare(b.id)), // US-01
     saveUser: (u) => serial(async () => writeJson("users.json", [...(await readJson<User[]>("users.json", [])).filter((x) => x.id !== u.id), u])),
     removeUser: (id) => serial(async () => writeJson("users.json", (await readJson<User[]>("users.json", [])).filter((x) => x.id !== id))),
+    feedback: () => readJson<Feedback[]>("feedback.json", []), // US-27
+    saveFeedback: (f) => serial(async () => writeJson("feedback.json", [...(await readJson<Feedback[]>("feedback.json", [])), f])),
+    usage: () => readJson<Usage[]>("usage.json", []), // US-28
+    saveUsage: (u) => serial(async () => {
+      const all = await readJson<Usage[]>("usage.json", []);
+      if (!all.some((x) => x.tripId === u.tripId && x.who === u.who && x.tab === u.tab && x.day === u.day)) await writeJson("usage.json", [...all, u]);
+    }),
     owners: () => readJson<Record<string, string>>("owners.json", {}), // US-13
     saveOwner: (tripId, userId) => serial(async () => {
       const { [tripId]: _old, ...rest } = await readJson<Record<string, string>>("owners.json", {});

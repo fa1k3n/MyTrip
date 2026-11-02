@@ -480,3 +480,12 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .users .row{flex-wrap:wrap}.users .row .end{margin-left:auto}
 .adduser{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:12px}.adduser label{flex:1 1 180px}
 a.btn.google{display:flex;justify-content:center;margin-top:8px;text-decoration:none}
+/* US-26..US-29: the beta: the "Tyck till" button marked Beta, the notice to accept, and the superuser's overview */
+.btn.beta{position:relative}
+.betatag{position:absolute;top:-6px;right:-8px;padding:1px 6px;border-radius:99px;background:var(--acc);color:#fff;font:700 .62rem/1.4 "Instrument Sans",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
+.betatag.inline{position:static;vertical-align:middle;margin-left:6px}
+.betanotice ul{margin:6px 0 12px;padding-left:1.2rem;display:grid;gap:6px}
+.note-row{border-top:1px solid var(--line);padding:8px 0}.note-row p{margin:2px 0}
+.usage{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}.usage p{margin:0 0 6px}
+.tablewrap{overflow-x:auto}.usage table{border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
+.usage th,.usage td{padding:4px 10px 4px 0;text-align:left;white-space:nowrap}.usage thead th{color:var(--mute);font-weight:600}

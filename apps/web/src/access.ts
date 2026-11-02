@@ -41,7 +41,11 @@ export function permsFor(role: Role, t: { access?: AccessConfig }, account = fal
 /** What /api/me answers: a token, a link, or a user with their roles per trip (US-22). */
 export type Membership = { role: "admin" | "owner" | "traveler" | "planner"; roles: ("owner" | "traveler" | "planner")[]; travelerId?: string; owner?: string };
 export type Me = { role: "admin" | "read" | "propose" } | { role: "link"; tripId: string } | { role: "traveler" | "planner"; tripId: string; travelerId: string }
-  | { role: "admin" | "account"; user: { id: string; name: string; superuser: boolean }; trips: Record<string, Membership> };
+  | { role: "admin" | "account"; user: { id: string; name: string; superuser: boolean }; trips: Record<string, Membership>; consent?: boolean };
+/** US-26: an account that has not accepted the beta notice sees only the notice. */
+export const needsConsent = (me: Me) => "user" in me && !me.consent;
+/** US-28: one page open per trip, page and day is enough; the key the device remembers it under. */
+export const seenKey = (tripId: string, tab: string) => `mytrip.seen.${tripId}.${tab}`;
 /** The role on one trip, and the traveler a personal link or a tied user acts as (US-14, US-22). Without a trip: the start page. */
 export function roleIn(me: Me, tripId: string | undefined): { role: Role; travelerId?: string } {
   if ("user" in me) {

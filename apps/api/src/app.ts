@@ -21,6 +21,10 @@ export type LogEntry = { at: string; tripId: string; actor: string; reason: stri
 /** A traveler's personal link to one trip, with the permission Resenär (traveler) or Planerare (planner) (AU-11). */
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner"; account?: string }; // account: the tied address (US-21)
 /** A phone that wants notices for a trip (NT-03): who is a traveler id, "follower" for the common link, or "admin". */
+/** A note sent with "Tyck till" during the beta (US-27). */
+export type Feedback = { id: string; at: string; who: string; name: string; text: string; page: string; tripId?: string };
+/** That a consenting user opened one of the four pages of a trip on a day, in the trip's time zone (US-28). */
+export type Usage = { tripId: string; who: string; tab: "dr" | "nala" | "up" | "mi"; day: string };
 export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
 
 export interface Store {
@@ -60,6 +64,11 @@ export interface Store {
   removeUser(id: string): Promise<void>;
   owners(): Promise<Record<string, string>>;
   saveOwner(tripId: string, userId: string | null): Promise<void>;
+  /** Feedback and page opens during the beta (US-27, US-28); a page open is kept once per person, page and day. */
+  feedback(): Promise<Feedback[]>;
+  saveFeedback(f: Feedback): Promise<void>;
+  usage(): Promise<Usage[]>;
+  saveUsage(u: Usage): Promise<void>;
 }
 /** A Commons lookup: the stored file with its credit and size, or nothing found (DB-11). */
 export type CacheEntry = { key: string; at: string; found?: { file: string; page: string; author?: string; licence: string; licenceUrl?: string; size: number } };
@@ -83,8 +92,13 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   let subs: PushSub[] = [];
   const files = new Map<string, FileMeta & { bytes: Uint8Array<ArrayBuffer> }>();
   const cache = new Map<string, CacheEntry>();
-  let users: User[] = [], owners: Record<string, string> = {};
+  let users: User[] = [], owners: Record<string, string> = {}, notes: Feedback[] = [], seen: Usage[] = [];
+  const sameUse = (a: Usage, b: Usage) => a.tripId === b.tripId && a.who === b.who && a.tab === b.tab && a.day === b.day;
   return {
+    feedback: async () => structuredClone(notes),
+    saveFeedback: async (f) => { notes = [...notes, structuredClone(f)]; },
+    usage: async () => structuredClone(seen),
+    saveUsage: async (u) => { if (!seen.some((x) => sameUse(x, u))) seen = [...seen, { ...u }]; },
     users: async () => structuredClone(users).sort((a, b) => a.id.localeCompare(b.id)),
     saveUser: async (u) => { users = [...users.filter((x) => x.id !== u.id), structuredClone(u)]; },
     removeUser: async (id) => { users = users.filter((x) => x.id !== id); },
@@ -317,10 +331,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
 
   // US-04, US-05: the password link shows whose account it is, and sets the password once.
   const setupUser = async (c: Context<Env>) => {
-    const b = await c.req.json<{ user?: unknown; secret?: unknown; password?: unknown }>().catch(() => ({} as { user?: unknown; secret?: unknown; password?: unknown }));
+    const b = await c.req.json<{ user?: unknown; secret?: unknown; password?: unknown; consent?: unknown }>().catch(() => ({} as { user?: unknown; secret?: unknown; password?: unknown; consent?: unknown }));
     const u = (await store.users()).find((x) => x.id === b.user);
     const valid = !!u?.setup && !u.disabled && typeof b.secret === "string" && same(await sha256(b.secret), u.setup.hash) && Date.parse(u.setup.expires) > clock().getTime();
-    return { u: valid ? u : undefined, password: b.password };
+    return { u: valid ? u : undefined, password: b.password, consent: b.consent === true };
   };
   app.post("/api/setup/info", async (c) => {
     const { u } = await setupUser(c);
@@ -328,11 +342,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   });
   app.post("/api/setup", async (c) => {
     if (!sessionKey) return c.json({ error: "login is off" }, 404);
-    const { u, password } = await setupUser(c);
+    const { u, password, consent } = await setupUser(c);
     if (!u) return c.json({ error: "gone" }, 410);
     if (typeof password !== "string" || [...password].length < PASSWORD_MIN) return c.json({ error: "too short" }, 400);
     const { setup: _used, ...rest } = u;
-    await store.saveUser({ ...rest, passwordHash: await hashPassword(password), lastLogin: clock().toISOString() });
+    await store.saveUser({ ...rest, passwordHash: await hashPassword(password), lastLogin: clock().toISOString(), ...(consent ? { consentAt: clock().toISOString() } : {}) }); // US-26
     await startSession(c, `user.${u.id}`);
     return c.body(null, 204);
   });
@@ -441,7 +455,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
 
   app.get("/api/me", async (c) => {
     const u = c.get("user");
-    if (u) return c.json({ role: c.get("role"), user: { id: u.id, name: u.name, superuser: u.superuser }, trips: await membersOf(u) }); // US-22, US-23
+    if (u) return c.json({ role: c.get("role"), user: { id: u.id, name: u.name, superuser: u.superuser }, trips: await membersOf(u), consent: !!u.consentAt }); // US-22, US-23, US-26
     return c.json(!scoped(c) ? { role: c.get("role") }
       : { role: c.get("role"), tripId: c.get("tripId"), ...(c.get("travelerId") ? { travelerId: c.get("travelerId") } : {}) });
   });
@@ -919,6 +933,55 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     for (const [tripId, owner] of Object.entries(await store.owners())) if (owner === u.id) await store.saveOwner(tripId, heir ?? null); // US-13
     await store.removeUser(u.id);
     return c.body(null, 204);
+  });
+
+  // US-26: the beta notice, accepted once per account.
+  app.post("/api/consent", async (c) => {
+    const u = c.get("user");
+    if (!u) return c.json({ error: "accounts only" }, 404);
+    if (!u.consentAt) await store.saveUser({ ...u, consentAt: clock().toISOString() });
+    return c.body(null, 204);
+  });
+  // US-27: "Tyck till" during the beta, from an account that accepted the notice; the superuser reads it.
+  app.post("/api/feedback", async (c) => {
+    const u = c.get("user");
+    if (!u?.consentAt) return c.json({ error: "forbidden" }, 403);
+    const b = await c.req.json<{ text?: unknown; page?: unknown; tripId?: unknown }>().catch(() => ({} as { text?: unknown; page?: unknown; tripId?: unknown }));
+    const text = typeof b.text === "string" ? b.text.trim() : "";
+    if (!text || text.length > 2000) return c.json({ error: "1 to 2000 characters" }, 400);
+    const page = typeof b.page === "string" ? b.page.slice(0, 40) : "";
+    await store.saveFeedback({ id: crypto.randomUUID(), at: clock().toISOString(), who: u.id, name: u.name, text, page, ...(typeof b.tripId === "string" ? { tripId: b.tripId.slice(0, 80) } : {}) });
+    return c.body(null, 201);
+  });
+  app.get("/api/feedback", async (c) => (c.get("role") === "admin" && !scoped(c) ? c.json((await store.feedback()).sort((a, b) => b.at.localeCompare(a.at))) : c.json({ error: "forbidden" }, 403)));
+  const dayIn = (tz: string) => new Intl.DateTimeFormat("sv-SE", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(clock());
+  // US-28: a consenting user opened one of the trip's four pages today; kept once per day.
+  app.post("/api/trips/:id/seen", async (c) => {
+    const u = c.get("user");
+    if (!u?.consentAt) return c.body(null, 204); // nothing is kept without the notice accepted
+    const { tab } = await c.req.json<{ tab?: unknown }>().catch(() => ({ tab: undefined }));
+    if (tab !== "dr" && tab !== "nala" && tab !== "up" && tab !== "mi") return c.json({ error: "unknown page" }, 400);
+    const t = await load(c.req.param("id"));
+    await store.saveUsage({ tripId: t.id, who: u.id, tab, day: dayIn(t.timezone) });
+    return c.body(null, 204);
+  });
+  // US-29: per trip, who is active, Uppleva during the trip and Minnas, for the superuser.
+  app.get("/api/usage", async (c) => {
+    if (c.get("role") !== "admin" || scoped(c)) return c.json({ error: "forbidden" }, 403);
+    const [trips, users, owners, seen, log] = await Promise.all([store.list(), store.users(), store.owners(), store.usage(), store.log()]);
+    const name = (id: string) => users.find((u) => u.id === id)?.name ?? id;
+    const first = firstSuper(users)?.id;
+    return c.json(trips.map((t) => {
+      const dates = t.days.map((d) => d.date).sort(), from = dates[0], to = dates.at(-1);
+      const mine = seen.filter((x) => x.tripId === t.id), changes = log.filter((e) => e.tripId === t.id && e.reason !== "create");
+      const names = [...new Set([...mine.map((x) => name(x.who)), ...changes.map((e) => e.actor).filter((a) => a !== "user" && a !== "llm" && a !== "mejl")])];
+      const people = names.map((n) => {
+        const own = mine.filter((x) => name(x.who) === n), days = (tab: Usage["tab"]) => own.filter((x) => x.tab === tab).length;
+        return { name: n, days: { dr: days("dr"), nala: days("nala"), up: days("up"), mi: days("mi") },
+          upDuring: own.filter((x) => x.tab === "up" && from && to && x.day >= from && x.day <= to).length, changes: changes.filter((e) => e.actor === n).length };
+      });
+      return { tripId: t.id, title: t.title, owner: name(owners[t.id] ?? first ?? ""), ...(from ? { from, to } : {}), memories: t.memories.length, people };
+    }));
   });
   return app;
 }

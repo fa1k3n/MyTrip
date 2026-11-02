@@ -40,3 +40,15 @@ for (const [name, make] of stores) {
     assert.deepEqual(await s.personLinks(), [{ tripId: "berlin", travelerId: "anna", secret: "x", role: "traveler", account: "anna@example.org" }, { tripId: "berlin", travelerId: "bo", secret: "y", role: "planner" }]);
   });
 }
+
+for (const [name, make] of stores) {
+  // REQ: US-27 US-28 feedback and page opens are kept in every store; a page open once per person, page and day
+  test(`US-27 US-28 ${name} store keeps feedback and page opens`, async () => {
+    const s = await make();
+    await s.saveFeedback({ id: "f1", at: "2026-11-02T08:00:00.000Z", who: "olle", name: "Olle", text: "Bra!", page: "up", tripId: "berlin" });
+    assert.deepEqual(await s.feedback(), [{ id: "f1", at: "2026-11-02T08:00:00.000Z", who: "olle", name: "Olle", text: "Bra!", page: "up", tripId: "berlin" }]);
+    const u = { tripId: "berlin", who: "olle", tab: "up" as const, day: "2026-11-02" };
+    await s.saveUsage(u); await s.saveUsage(u); await s.saveUsage({ ...u, tab: "mi" });
+    assert.deepEqual((await s.usage()).map((x) => x.tab).sort(), ["mi", "up"]);
+  });
+}

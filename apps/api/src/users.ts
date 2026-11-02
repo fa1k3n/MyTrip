@@ -4,6 +4,7 @@
 export type User = {
   id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string;
   passwordHash?: string; googleId?: string; lastLogin?: string; setup?: { hash: string; expires: string };
+  consentAt?: string; // when the beta notice was accepted (US-26)
 };
 /** The Google OAuth client of the instance (US-10). */
 export type Google = { clientId: string; clientSecret: string };

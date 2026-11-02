@@ -5,6 +5,7 @@ import { api, maskedToken } from "./api.ts";
 import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { Users } from "./Users.tsx";
+import { BetaNotes, BetaUsage } from "./Beta.tsx";
 
 /** On/off switch with an explanation shown on hover or keyboard focus, and read by screen readers. */
 export function Switch({ id, label, tip, checked, onChange }: { id: string; label: string; tip: string; checked: boolean; onChange: (on: boolean) => void }) {
@@ -72,6 +73,8 @@ function ImageCache() {
 export function AppAdmin() {
   return <>
     <Users />
+    <BetaNotes />
+    <BetaUsage />
     {maskedToken() && <div className="card"><h3>{sv.apiKey}</h3><p>{maskedToken()}</p></div>}
     <ImageCache />
   </>;

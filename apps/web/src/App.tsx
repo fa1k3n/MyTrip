@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { ABOUT_PAGE, forInstalled, landsOnAbout, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint, whoChip } from "./access.ts";
+import { ABOUT_PAGE, forInstalled, landsOnAbout, needsConsent, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -21,13 +21,15 @@ import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
 import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, wishExpense, type Transfer } from "./money.ts";
 import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
-import { Gear, IconButton, TripRoles } from "./Icons.tsx";
+import { BetaButton, Gear, IconButton, TripRoles } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
 const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AiSettings })));
 const AppAdmin = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AppAdmin })));
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
+const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
+const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
 const SetupPassword = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.SetupPassword }))); // US-05
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
@@ -91,6 +93,7 @@ export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined: asking, null: no access (AU-07)
   const [expired, setExpired] = useState(false);
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
+  const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -210,6 +213,14 @@ export function App() {
   useEffect(() => { // a link opens its trip directly, on the tab of the trip's phase (AU-03, MT-09)
     if (me && "tripId" in me && trips && view !== "trip" && trips.some((x) => x.id === me.tripId)) openTrip(me.tripId);
   }, [me, trips]); // eslint-disable-line react-hooks/exhaustive-deps -- openTrip is recreated every render
+  /** "Tyck till" for an account that accepted the beta notice (US-26, US-27). */
+  const beta = me && "user" in me && me.consent ? () => setFeedbackOpen(true) : undefined;
+  useEffect(() => { // US-28: which of the four pages a consenting user opens, once per trip, page and day
+    if (!me || !("user" in me) || !me.consent || view !== "trip" || !tripId) return;
+    const k = seenKey(tripId, tab), today = new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem(k) === today) return; localStorage.setItem(k, today); } catch { /* storage blocked: send anyway, the server keeps one a day */ }
+    api.seen(tripId, tab).catch(() => {});
+  }, [me, view, tab, tripId]);
   const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
   const newTrip = async () => {
@@ -371,6 +382,7 @@ export function App() {
   let page;
   if (setupLink) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><SetupPassword user={setupLink.user} secret={setupLink.secret}
     onDone={() => { history.replaceState(null, "", location.pathname + location.search); setSetupLink(null); setMe(undefined); start(); }} /></Suspense>;
+  else if (me && needsConsent(me)) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><ConsentPage onDone={() => { setMe(undefined); start(); }} logout={logout} /></Suspense>; // US-26
   else if (choosing) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Choose onPick={pick} /></Suspense>;
   else if (failed) page = <p className="ro">{sv.error}</p>;
   else if (me === null) page = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Login expired={expired} onDone={() => { setExpired(false); start(); }} /></Suspense>;
@@ -381,7 +393,7 @@ export function App() {
     {me && roleIn(me, undefined).role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13, US-02 */}
   </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><div className="topr">{me && <span className="chip">{whoChip(me)}</span>}<Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr">{me && <span className="chip">{whoChip(me)}</span>}{beta && <BetaButton onClick={beta} />}<Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
       <IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div></div>
     <div className="grid">
       {trips.map((x) => (
@@ -417,6 +429,7 @@ export function App() {
         : me?.role === "link" ? { name: sv.who.follower, role: "follower" } : undefined}
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
       review={{ approve: approveProposal, reject: rejectMail }} // MC-18
+      feedback={beta}
     />
   );
 
@@ -425,6 +438,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
+    {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog
       ref={dialog} className={dlg?.kind === "tickets" ? "full" : dlg?.kind === "expense" && !dlg.short.activity ? "sheet" : undefined} aria-label={!dlg ? undefined

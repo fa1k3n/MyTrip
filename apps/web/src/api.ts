@@ -154,13 +154,21 @@ export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner";
 /** An account as the superuser's list shows it (US-02). */
 export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
 export type SetupLink = { secret: string; expires: string }; // US-04
+export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string }; // US-27
+export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
+  people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[] }; // US-29
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
   login: (password: string, email = "") => call<void>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
   authConfig: () => call<{ google: boolean }>("/api/auth/config"), // US-10
   setupInfo: (user: string, secret: string) => call<{ name: string; email: string }>("/api/setup/info", { method: "POST", body: JSON.stringify({ user, secret }) }), // US-05
-  setup: (user: string, secret: string, password: string) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password }) }),
+  setup: (user: string, secret: string, password: string, consent = false) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password, consent }) }),
+  consent: () => call<void>("/api/consent", { method: "POST" }), // US-26
+  feedback: (text: string, page: string, tripId?: string) => call<void>("/api/feedback", { method: "POST", body: JSON.stringify({ text, page, tripId }) }), // US-27
+  notes: () => call<FeedbackNote[]>("/api/feedback"),
+  seen: (tripId: string, tab: string) => call<void>(`${trip(tripId)}/seen`, { method: "POST", body: JSON.stringify({ tab }) }), // US-28
+  usage: () => call<TripUsage[]>("/api/usage"), // US-29
   users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12
   addUser: (name: string, email: string) => call<{ user: UserInfo; setup: SetupLink }>("/api/users", { method: "POST", body: JSON.stringify({ name, email }) }),
   changeUser: (id: string, patch: Partial<Pick<UserInfo, "disabled" | "superuser" | "ai">>) => call<UserInfo>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),

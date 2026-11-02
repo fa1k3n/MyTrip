@@ -75,6 +75,22 @@ export const sv = {
   budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  beta: { // US-26..US-29: the beta
+    tag: "Beta", feedback: "Tyck till (beta)", title: "Tyck till", lead: "Basläger är i beta. Skriv vad som var krångligt, vad du saknar eller vad du gillar.",
+    label: "Din synpunkt", send: "Skicka", sent: "Tack! Synpunkten är skickad.", failed: "Det gick inte att skicka. Försök igen.",
+    goes: "Det du skriver går till den som driver Basläger, tillsammans med ditt namn och vilken sida du var på.",
+    consentTitle: "Basläger är i beta", consentLead: "Tack för att du testar Basläger. Innan du börjar:",
+    consentPoints: [
+      "Dina resor, önskningar och utlägg sparas i Basläger, på servrar i EU.",
+      "Den som driver Basläger kan se allt som finns i appen och kan läsa era planer för att göra appen bättre.",
+      "Under betan sparas också vilka av sidorna Önska, Nåla, Uppleva och Minnas du öppnar och vilken dag, för att se vad som används. Inget av detta lämnas till någon annan.",
+      "Du kan när som helst be om att ditt konto och dina resor tas bort.",
+    ],
+    consentCheck: "Jag har läst detta och godkänner det.", consentGo: "Godkänn och fortsätt",
+    notes: "Synpunkter (beta)", noNotes: "Inga synpunkter än.", page: (p: string) => `från ${p}`,
+    usage: "Användning (beta)", usageLead: "Per resa: vilka som är aktiva, hur många dagar de öppnat varje sida, Uppleva under resans dagar och antal ändringar. Bara konton som godkänt betan räknas.",
+    noUsage: "Ingen användning än.", upDuring: "Uppleva under resan", changes: "ändringar", memories: (n: number) => `${n} betyg i Minnas`, days: "dagar",
+  },
   roles: { owner: "Skapare", planner: "Planerare", traveler: "Resenär", by: (n: string) => `Skapad av ${n}` }, // US-23, US-24
   fullApp: "Öppna hela appen i Safari", // PW-15
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12

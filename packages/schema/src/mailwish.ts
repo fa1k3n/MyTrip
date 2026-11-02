@@ -1,5 +1,5 @@
-// A mail to a trip's wish address becomes a wish (DB-23): read without AI, from the subject, the text and the HTML part.
-import { FORWARD_PREFIX, htmlText } from "./mailbooking.ts";
+// A mail sorted as a wish becomes a wish (DB-23, BK-28): read without AI, from the subject, the text and the HTML part.
+import { bareSubject, htmlText } from "./mailbooking.ts";
 
 export type WishReading = { title?: string; url?: string; category: string };
 
@@ -26,7 +26,7 @@ function firstLink(text: string, html: string): string | undefined {
 /** The wish a mail describes (DB-23); without a title it cannot become one. */
 export function readWish(mail: { subject?: string; text?: string; html?: string }): WishReading {
   const html = mail.html ?? "", text = [mail.text ?? "", html ? htmlText(html) : ""].join("\n");
-  const subject = (mail.subject ?? "").replace(FORWARD_PREFIX, "").trim();
+  const subject = bareSubject(mail.subject ?? ""); // BK-28: without "Önskan:" or "Bokning:"
   const line = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l && l.replace(LINK, "").trim());
   const title = (subject || line)?.slice(0, 120), url = firstLink(text, html);
   const words = `${title ?? ""}\n${text}`.replace(new RegExp(LINK.source, "gi"), " ").toLowerCase();

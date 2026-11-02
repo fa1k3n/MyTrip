@@ -6,6 +6,7 @@ import { bookingDates, bookingTimes, kr, shortDate, statusBadge, toBook } from "
 import { api, type MailProposal } from "./api.ts";
 import { BudgetPlanView, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText } from "./budget.ts";
+import { MailInButton } from "./MailIn.tsx";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
@@ -125,7 +126,8 @@ function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Tri
       ))}
       {review && suggested.map((p) => <Suggestion key={p.id} p={p} review={review} done={setErr} />)}
       {err && <p className="err" role="alert">{err}</p>}
-      <div className="add"><IconButton icon="plus" label={sv.addBooking} onClick={() => edit({ kind: "booking" })} mut tip="right" /></div>
+      <div className="add"><IconButton icon="plus" label={sv.addBooking} onClick={() => edit({ kind: "booking" })} mut tip="right" />
+        <MailInButton t={t} may={part("bookings")} tip="right" /></div>{/* BK-27 */}
     </Section>
   );
 }

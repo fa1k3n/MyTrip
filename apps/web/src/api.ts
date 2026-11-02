@@ -238,9 +238,10 @@ export const api = {
     call<unknown>(`${trip(t.id)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops }) }),
   rejectMail: (tripId: string, pid: string) => call<unknown>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/reject`, { method: "POST" }),
   approve: (tripId: string, pid: string) => call<{ result: { problems?: string[]; revision?: number } }>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/approve`, { method: "POST" }), // MC-18
-  inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-14
-  newInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }),
-  newWishInbox: (id: string) => call<{ address: string }>(`${trip(id)}/wish-inbox`, { method: "POST" }), // DB-21
+  inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-27: mail import on, for this viewer
+  openInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }), // BK-26: made when first asked for
+  replaceInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox/replace`, { method: "POST" }),
+  mailToWish: (tripId: string, pid: string) => call<unknown>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/wish`, { method: "POST" }), // BK-29
   image: async (id: string, key = link) => {
     const r = await fetch(`${trip(id)}/image`, { headers: headers(key) });
     if (!r.ok) throw new Error(`${r.status} image`);

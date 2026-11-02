@@ -38,23 +38,6 @@ async function setup(store: Store = memoryStore([trip()])) {
   return { app, store, address: address as string };
 }
 
-// REQ: BK-14 a Planerare or the superuser creates and replaces the inbox address; the old one stops at once; only they see it
-test("BK-14 the trip's inbox address", async () => {
-  const { app, store, address } = await setup();
-  assert.match(address, /^berlin-[a-z0-9]{12,}@resa\.example\.org$/);
-  assert.deepEqual(await json(call(app, "/api/trips/berlin/inbox", "a")), { enabled: true, address });
-  const planner = await person(app, "bo", "planner"), traveler = await person(app, "anna", "traveler");
-  assert.equal((await json(call(app, "/api/trips/berlin", planner))).inbox, address);
-  assert.equal((await json(call(app, "/api/trips/berlin", traveler))).inbox, undefined, "a Resenär does not see it");
-  assert.equal((await call(app, "/api/trips/berlin/inbox", traveler, "POST")).status, 403);
-  const next = (await json(call(app, "/api/trips/berlin/inbox", planner, "POST"))).address;
-  assert.notEqual(next, address);
-  assert.deepEqual(await receiveMail(store, mail(address), address), { error: "unknown address" }, "the old address stops at once");
-  const off = createApp(memoryStore([trip()]), tokens);
-  assert.deepEqual(await json(call(off, "/api/trips/berlin/inbox", "a")), { enabled: false });
-  assert.equal((await call(off, "/api/trips/berlin/inbox", "a", "POST")).status, 404);
-});
-
 // REQ: BK-15 a mail to the inbox becomes a proposed booking with its ticket attachments; the trip does not change
 test("BK-15 a mail becomes a proposal", async () => {
   const { app, store, address } = await setup();

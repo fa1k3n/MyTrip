@@ -123,8 +123,8 @@ export const Trip = z.object({
   purpose: z.string().default(""),
   image: z.string().regex(/^[a-z0-9][a-z0-9-]*\.(jpg|jpeg|png|webp)$/).optional(), imageAlt: z.string().optional(),
   dateLabel: z.string().optional(), // shown when the trip has no days, e.g. "jul 2026 · avslutad"
-  note: z.string().optional(), inbox: z.string().email().optional(),
-  wishInbox: z.string().email().optional(), // the address whose mail becomes wishes (DB-21)
+  note: z.string().optional(), inbox: z.string().email().optional(), // the trip's one mail address (BK-26)
+  wishInbox: z.string().email().optional(), // a wish address made before BK-26: still received until the address is replaced
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   aiHelpers: z.record(z.string(), z.boolean()).optional(), // the AI helpers turned on for the trip, e.g. { prep: true } (AI-68)

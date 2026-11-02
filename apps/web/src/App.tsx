@@ -328,6 +328,7 @@ export function App() {
     }
   };
   const rejectMail = async (pid: string) => { await api.rejectMail(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); };
+  const mailToWish = async (pid: string) => { await api.mailToWish(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); }; // BK-29
   /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
   const run: Run = async (build, reason) => {
     let cur = t!;
@@ -501,7 +502,7 @@ export function App() {
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
-        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} />
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} mailToWish={mailToWish} />
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (

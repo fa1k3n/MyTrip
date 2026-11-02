@@ -21,15 +21,10 @@ export const svAdmin = {
     accountHint: "Skriv in mejladressen till en resenärs konto, så ser hen resan när hen loggar in. Saknar adressen konto kopplas det när kontot skapas.",
     accountTaken: "Adressen används redan av en annan resenär i resan.", accountBad: "Det där är ingen mejladress.",
   },
-  inbox: { // BK-14
-    title: "Mejlimport", none: "Ingen adress än.", create: "Skapa adress", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
-    hint: "Vidarebefordra bokningsbekräftelser hit. De blir förslag under Bokningar i Nåla, som du granskar innan de sparas.",
+  inbox: { // BK-26
+    title: "Mejla in till resan", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
+    hint: "Planerare och resenärer som ser önskningar kan mejla hit. Bokningsbekräftelser blir förslag under Bokningar i Nåla, andra mejl blir önskningar i Önska. Den som har adressen kan skicka, så byt den om den har spridits.",
     off: "Mejlimport är inte inställd på servern: den behöver en egen domän (INBOX_DOMAIN).",
-    confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram.",
-  },
-  wishInbox: { // DB-21
-    title: "Mejla in önskningar",
-    hint: "Planerare och resenärer kan mejla eller dela sidor hit. Varje mejl blir en önskan direkt i Önska. Den som har adressen kan skicka, så byt den om den har spridits.",
     confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram, och alla behöver den nya.",
   },
   users: { // US-02..US-04, US-12, US-16

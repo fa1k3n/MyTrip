@@ -9,6 +9,7 @@ import { AiKeep, HiddenText, SuggestionActions, TextEye, type Run, type TripView
 import type { WishSuggestion } from "./aiWishes.ts";
 import { dayLabel } from "./format.ts";
 import { api } from "./api.ts";
+import { MailInButton } from "./MailIn.tsx";
 import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
 
 const pictures = new Map<string, Promise<string>>(); // object URLs of wish images, fetched once per page (DB-09)
@@ -80,10 +81,8 @@ function Suggested({ t, list, review }: { t: Trip; list: WishSuggestion[]; revie
 export default function Dreams({ t, write, vote, addDream, editImage, open, suggestions = [], review, run }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void;
   suggestions?: WishSuggestion[]; review?: TripViewProps["review"]; run: Run }) {
   const planned = plannedWishes(t); // DB-19
-  const [mail, setMail] = useState(false);
   return <>
-    {t.wishInbox && <div className="dreambar"><IconButton icon="mail" look="bare" tip="left" label={sv.wish.mail.open} onClick={() => setMail(true)} /></div> /* DB-22 */}
-    {mail && t.wishInbox && <WishMail address={t.wishInbox} close={() => setMail(false)} />}
+    <div className="dreambar"><MailInButton t={t} may /></div>{/* BK-27; the server answers only those who may have the address */}
     {review && <Suggested t={t} list={suggestions} review={review} />}
     <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} planned={!d.hidden && planned.has(d.id)} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
       {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} />
@@ -91,33 +90,4 @@ export default function Dreams({ t, write, vote, addDream, editImage, open, sugg
     </DreamCard>)}</div>
     {write && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={addDream} />}
   </>;
-}
-
-/** DB-22: the trip's wish address, to copy, with what a mail to it becomes. */
-function WishMail({ address, close }: { address: string; close: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    const d = ref.current!, opener = document.activeElement as HTMLElement | null;
-    d.showModal();
-    document.body.style.overflow = "hidden"; // PL-14
-    return () => { document.body.style.overflow = ""; opener?.focus(); };
-  }, []);
-  const copy = async () => { try { await navigator.clipboard.writeText(address); setCopied(true); } catch { /* the field can still be copied by hand */ } };
-  return (
-    <dialog ref={ref} aria-label={sv.wish.mail.open} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
-      <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
-      <h3>{sv.wish.mail.open}</h3>
-      <p className="ro note">{sv.wish.mail.hint}</p>
-      <div className="row mid">
-        <input className="linkfield" readOnly value={address} aria-label={sv.wish.mail.open} onFocus={(e) => e.currentTarget.select()} />
-        <span className="end"><IconButton icon="copy" look="bare" tip="left" label={sv.wish.mail.copy} onClick={copy} /></span>
-      </div>
-      {copied && <p className="ro" role="status">{sv.wish.mail.copied}</p>}
-    </dialog>
-  );
 }

@@ -90,12 +90,16 @@ function kind(text: string): BookingReading["kind"] {
 
 /** Forwarding and reply prefixes such as Fwd:, VB: and Re: at the start of a subject. */
 export const FORWARD_PREFIX = /^\s*((fwd?|fw|vb|vs|sv|re|tr|aw|wg)\s*:\s*)+/i;
+/** "Bokning:" or "Önskan:" first in a subject, after forwarding prefixes: the sender's own sorting (BK-28). */
+export const KIND_PREFIX = /^\s*(bokning|önskan)\s*:\s*/i;
+/** A subject without forwarding prefixes and the sorting prefix. */
+export const bareSubject = (s: string) => s.replace(FORWARD_PREFIX, "").replace(KIND_PREFIX, "").trim();
 const GENERIC = new RegExp("^(bokningsbekräftelse|orderbekräftelse|bekräftelse på din (bokning|beställning)|bekräftelse|din bokning|din beställning"
   + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?)"
   + "\\s*(?:[-–—:|,]\\s*|\\s+(?:hos|till|på|från)\\s+)", "i");
 /** The subject without forwarding prefixes and words that only say it is a confirmation. */
 function subjectName(subject: string): string | undefined {
-  let s = subject.replace(FORWARD_PREFIX, "").trim();
+  let s = bareSubject(subject);
   for (let g = GENERIC.exec(s); g && s.length > g[0].length; g = GENERIC.exec(s)) s = s.slice(g[0].length).trim();
   return s || undefined;
 }
@@ -159,4 +163,15 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
   });
   return clean({ ...fromText, ...(mail.html ? fromLd(mail.html) : {}) });
+}
+
+const CONFIRM = /bokningsbekräftelse|orderbekräftelse|bekräftelse|e-biljett|kvitto|booking confirmation|order confirmation|reservation/i;
+/** Whether a mail to the trip's one address is a booking or a wish, without AI (BK-28): the sender's prefix decides, else
+ * schema.org reservation data, a reference, a confirmation word in the subject or a PDF attachment make it a booking. */
+export function mailKind(mail: { subject?: string; text?: string; html?: string }, pdf = false): "booking" | "wish" {
+  const kind = KIND_PREFIX.exec((mail.subject ?? "").replace(FORWARD_PREFIX, ""))?.[1]?.toLowerCase();
+  if (kind) return kind === "bokning" ? "booking" : "wish";
+  const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n");
+  const ld = mail.html ? ldObjects(mail.html).some((o) => String(o["@type"]).endsWith("Reservation")) : false;
+  return ld || reference(text) || CONFIRM.test(mail.subject ?? "") || pdf ? "booking" : "wish";
 }

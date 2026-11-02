@@ -34,6 +34,7 @@ export type Save = (ops: Op[], reason: string) => Promise<string | null>;
 type Props = {
   t: Trip; save: Save; close: () => void; self?: string; // self: the traveler of a personal link (AU-18)
   approveMail?: (pid: string, ops: Op[]) => Promise<string | null>; rejectMail?: (pid: string) => Promise<void>; // BK-17
+  mailToWish?: (pid: string) => Promise<void>; // BK-29
 };
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
@@ -346,7 +347,8 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
     : p.id ? () => s.remove(removeBooking(p.t, p.id!), "remove booking") : undefined;
   return (
     <Form title={mail ? sv.mail.review : p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close} onSubmit={submit} onRemove={remove}>
-      {mail && <p className="ro note mailfrom"><span className="ico"><Icon name="mail" /></span>{sv.mail.from(mail.source?.subject || sv.mail.noSubject, mail.source?.from ?? "")}<br />{sv.mail.checkFilled}</p>}
+      {mail && <p className="ro note mailfrom"><span className="ico"><Icon name="mail" /></span>{sv.mail.from(mail.source?.subject || sv.mail.noSubject, mail.source?.from ?? "")}<br />{sv.mail.checkFilled}
+        {p.mailToWish && <IconButton icon="refresh" look="bare" tip="left" label={sv.mail.toWish} onClick={async () => { if (await ask(sv.mail.confirmToWish, { ok: sv.mail.toWish })) p.mailToWish!(mail.id).then(p.close); }} /> /* BK-29 */}</p>}
       {matches.length > 0 && <label>{sv.mail.target}<select value={target} onChange={(e) => retarget(e.target.value)}>
         <option value="">{sv.mail.newBooking}</option>
         {matches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

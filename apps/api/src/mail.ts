@@ -1,26 +1,31 @@
-// Mail to a trip's inbox becomes a proposed booking (BK-15, BK-16): read without AI, with its ticket attachments, and stored
-// as a proposal that a Planerare or the superuser reviews (BK-17). Nothing in the trip changes here.
-// Mail to a trip's wish address becomes a wish at once (DB-23..DB-25).
+// Mail to a trip's one address (BK-26) is sorted without AI (BK-28): a booking becomes a proposed booking (BK-15, BK-16), read
+// with its ticket attachments and stored as a proposal that a Planerare or the superuser reviews (BK-17), so nothing in the trip
+// changes here; anything else becomes a wish at once (DB-23..DB-25).
 import PostalMime from "postal-mime";
-import { applyOps, checkTrip, readBooking, readWish, Trip } from "@trip/schema";
+import { applyOps, checkTrip, mailKind, readBooking, readWish, Trip, type WishReading } from "@trip/schema";
 import { MAX_FILE, newFileId, storeTicket, ticketType, type Proposal, type Store } from "./app.ts";
 import { IMAGE_MAX, imageType } from "./wishimage.ts";
 import { sv } from "../../web/src/sv.ts";
 
 const MAX_PENDING = 20, MAX_FILES = 5;
-const MAX_WISHES = 20, DAY_MS = 86_400_000, MIN_PHOTO = 8 * 1024; // DB-24: smaller images are taken to be logos
+const MAX_WISHES = 20, DAY_MS = 86_400_000;
+export const MIN_PHOTO = 8 * 1024; // DB-24: smaller images are taken to be logos
 type Result = { proposalId: string } | { error: "unknown address" | "too many" };
 export type WishResult = { wishId: string } | { error: "unknown address" | "too many" | "no title" | "invalid" };
 
-/** A mail for the trip with this inbox or wish address; an unknown address is rejected (BK-14, BK-15, DB-21). */
-/** `f` fetches a linked page for a wish without a title (DB-26). */
+/** A mail for the trip with this address, or with a booking or wish address made before BK-26; an unknown address is rejected
+ * (BK-15, BK-26). `f` fetches a linked page for a wish without a title (DB-26). */
 export async function receiveMail(store: Store, raw: Uint8Array | ArrayBuffer, to: string, f: typeof fetch = fetch): Promise<Result | WishResult> {
   const address = (/<([^>]+)>/.exec(to)?.[1] ?? to).trim().toLowerCase();
-  const trips = address ? await store.list() : [];
-  const t = trips.find((x) => x.inbox?.toLowerCase() === address);
-  if (t) return importMail(store, t, raw);
-  const w = trips.find((x) => x.wishInbox?.toLowerCase() === address);
-  return w ? importWish(store, w, raw, f) : { error: "unknown address" };
+  const t = address ? (await store.list()).find((x) => x.inbox?.toLowerCase() === address || x.wishInbox?.toLowerCase() === address) : undefined;
+  return t ? sortMail(store, t, raw, f) : { error: "unknown address" };
+}
+
+/** A booking becomes a proposal, anything else a wish (BK-28). */
+export async function sortMail(store: Store, t: Trip, raw: Uint8Array | ArrayBuffer, f: typeof fetch = fetch): Promise<Result | WishResult> {
+  const m = await PostalMime.parse(raw);
+  const pdf = m.attachments.some((a) => ticketType(a.mimeType, typeof a.content === "string" ? new TextEncoder().encode(a.content) : new Uint8Array(a.content)) === "application/pdf");
+  return mailKind({ subject: m.subject, text: m.text, html: m.html }, pdf) === "booking" ? importMail(store, t, raw) : importWish(store, t, raw, f);
 }
 
 /** Reads the mail into a pending proposal for the trip, with at most five PDF, PNG or JPEG attachments of at most 2 MB. */
@@ -38,9 +43,10 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   const from = m.from && "address" in m.from && m.from.address ? (m.from.name ? `${m.from.name} <${m.from.address}>` : m.from.address) : "";
   const subject = m.subject ?? "", at = new Date().toISOString();
   const booking = readBooking({ subject, text: m.text, html: m.html }, t.days.map((d) => d.date));
+  const wish = { ...readWish({ subject, text: m.text, html: m.html }), source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }; // BK-29
   const p: Proposal = {
     id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "pending", at,
-    source: { kind: "mail", from, subject, at }, booking: { ...booking, ...(files.length ? { files } : {}) },
+    source: { kind: "mail", from, subject, at }, booking: { ...booking, ...(files.length ? { files } : {}) }, wish,
   };
   await store.saveProposal(p);
   return { proposalId: p.id };
@@ -94,9 +100,16 @@ export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayB
     .sort((a, b) => b.bytes.length - a.bytes.length)[0];
   const file = photo && newFileId();
   if (photo && file) await store.saveFile({ id: file, tripId: t.id, type: photo.type! }, photo.bytes);
+  const r2 = await addWish(store, t, { ...r, title: r.title, source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }, file, "mejl", now);
+  if ("error" in r2 && file) await store.removeFiles([file]);
+  return r2;
+}
+
+/** Adds a wish read from a mail, with an own photo when there is one (DB-23, BK-29). */
+export async function addWish(store: Store, t: Trip, r: WishReading & { title: string; source: string }, file: string | undefined, actor: string, now = Date.now()): Promise<WishResult> {
   const id = `dream-${crypto.randomUUID().slice(0, 8)}`;
   const wish = {
-    id, title: r.title, category: r.category, source: wishSource(m.from && "name" in m.from ? m.from.name : undefined), icon: "✨", votes: 0,
+    id, title: r.title, category: r.category, source: r.source, icon: "✨", votes: 0,
     ...(r.url ? { url: r.url } : {}), ...(file ? { image: { file, kind: "own" as const } } : {}), mailedAt: new Date(now).toISOString(),
   };
   // Like every change: applyOps, the schema, checkTrip; a change that came first is read again (DP-03).
@@ -106,13 +119,12 @@ export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayB
     try { next = Trip.parse(applyOps(base, ops)); } catch { break; }
     if (checkTrip(next).length) break;
     if (await store.save({ ...next, id: base.id, revision: base.revision + 1 }, base.revision)) {
-      await store.appendLog({ at: wish.mailedAt, tripId: base.id, actor: "mejl", reason: `wish by mail: ${r.title}`, ops });
+      await store.appendLog({ at: wish.mailedAt, tripId: base.id, actor, reason: `wish by mail: ${r.title}`, ops });
       return { wishId: id };
     }
     const again = await store.load(t.id);
     if (!again) break;
     base = again;
   }
-  if (file) await store.removeFiles([file]);
   return { error: "invalid" };
 }

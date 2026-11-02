@@ -40,41 +40,13 @@ const pages = (html: string | null, asked: string[] = []) => (async (url: string
 
 async function setup(store: Store = memoryStore([trip()])) {
   const app = createApp(store, tokens, { inboxDomain: "resa.example.org" });
-  const { address } = await json(call(app, "/api/trips/berlin/wish-inbox", "a", "POST"));
+  const { address } = await json(call(app, "/api/trips/berlin/inbox", "a", "POST")); // BK-26: the trip's one address
   return { app, store, address: address as string };
 }
 
-// REQ: DB-21 one wish address per trip, apart from the booking inbox; replaced at once; never sent to a Följare
-test("DB-21 the trip's wish address", async () => {
-  const { app, store, address } = await setup();
-  assert.match(address, /^berlin-onska-[a-z0-9]{12,}@resa\.example\.org$/);
-  const inbox = (await json(call(app, "/api/trips/berlin/inbox", "a", "POST"))).address;
-  assert.notEqual(inbox, address, "the booking inbox is another address");
-  const planner = await person(app, "bo", "planner"), traveler = await person(app, "anna", "traveler");
-  assert.equal((await json(call(app, "/api/trips/berlin", planner))).wishInbox, address);
-  assert.equal((await json(call(app, "/api/trips/berlin", traveler))).wishInbox, address, "a Resenär who sees wishes gets it");
-  assert.equal((await json(call(app, "/api/trips/berlin", traveler))).inbox, undefined, "but not the booking inbox");
-  const secret = (await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret;
-  assert.equal((await json(call(app, "/api/trips/berlin", `link.berlin.${secret}`))).wishInbox, undefined, "a Följare does not");
-  assert.equal((await json(call(app, "/api/trips/berlin", "r"))).wishInbox, undefined, "nor a read token");
-  assert.equal((await call(app, "/api/trips/berlin/wish-inbox", traveler, "POST")).status, 403);
-  const next = (await json(call(app, "/api/trips/berlin/wish-inbox", planner, "POST"))).address;
-  assert.notEqual(next, address);
-  assert.deepEqual(await receiveMail(store, mail(address), address), { error: "unknown address" }, "the old address stops at once");
-  const off = createApp(memoryStore([trip()]), tokens);
-  assert.equal((await call(off, "/api/trips/berlin/wish-inbox", "a", "POST")).status, 404);
-});
-
-// REQ: DB-21 a Resenär whose role does not see wishes does not get the address
-test("DB-21 hidden wishes, no address", async () => {
-  const { app } = await setup(memoryStore([trip({ access: { traveler: { dr: { parts: { dreams: "hidden" } } } } })]));
-  const traveler = await person(app, "anna", "traveler");
-  assert.equal((await json(call(app, "/api/trips/berlin", traveler))).wishInbox, undefined);
-});
-
-// REQ: DB-23 a mail to the wish address becomes a wish at once, logged as mejl; the booking inbox still makes proposals
+// REQ: DB-23 a mail sorted as a wish becomes a wish at once, logged as mejl
 test("DB-23 a mail becomes a wish", async () => {
-  const { app, store, address } = await setup();
+  const { store, address } = await setup();
   const r = await receiveMail(store, mail(`Önska <${address.toUpperCase()}>`), `Önska <${address.toUpperCase()}>`);
   assert.ok("wishId" in r, JSON.stringify(r));
   const t = (await store.load("berlin"))!;
@@ -84,8 +56,6 @@ test("DB-23 a mail becomes a wish", async () => {
   assert.ok(w.mailedAt);
   assert.equal((await store.log()).at(-1)!.actor, "mejl");
   assert.equal((await store.proposals("berlin")).length, 0, "no proposal");
-  const inbox = (await json(call(app, "/api/trips/berlin/inbox", "a", "POST"))).address;
-  assert.ok("proposalId" in (await receiveMail(store, mail(inbox), inbox)), "a booking mail is still a proposal");
   assert.deepEqual(await receiveMail(store, bare(address, "Fwd:", ""), address), { error: "no title" }, "neither a title nor a link");
   assert.deepEqual(await receiveMail(store, mail("nagon@resa.example.org"), "nagon@resa.example.org"), { error: "unknown address" });
 });
@@ -94,7 +64,7 @@ test("DB-23 a mail becomes a wish", async () => {
 test("DB-23 posting a wish mail", async () => {
   const { app, address } = await setup();
   const traveler = await person(app, "anna", "traveler");
-  const post = (auth: string) => app.request("/api/trips/berlin/wish-mail", { method: "POST", headers: { authorization: `Bearer ${auth}` }, body: mail(address) });
+  const post = (auth: string) => app.request("/api/trips/berlin/mail", { method: "POST", headers: { authorization: `Bearer ${auth}` }, body: mail(address) });
   assert.equal((await post(traveler)).status, 403);
   const r = await post("a");
   assert.equal(r.status, 201);

@@ -468,7 +468,7 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .img.open{width:100%;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.img.open:focus-visible{outline:3px solid var(--sage);outline-offset:-3px}.picinfo{position:absolute;right:6px;bottom:6px;width:18px;height:18px;border-radius:50%;background:var(--card);color:var(--mute);font:italic 700 .72rem/18px Georgia,serif;text-align:center;box-shadow:var(--sh);opacity:.85} /* DB-09: the credit lives under Om önskan */
 .wishbig{position:relative;margin:0 0 10px;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:var(--bg)} /* DB-15 */
 .wishtools{position:absolute;top:6px;left:6px}.wishtools .btn.icon{background:var(--card);box-shadow:var(--sh)} /* top left, opposite the heart, never under the add button */
-.dreambar{display:flex;justify-content:flex-end;margin:-4px 0 6px} /* DB-22: the mail button above the wishes */
+.dreambar{display:flex;justify-content:flex-end;margin:-4px 0 6px} /* BK-27: the mail button above the wishes */
 .cand{margin:12px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .cand img{width:100%;height:160px;object-fit:contain;background:var(--bg)}.cand figcaption{padding:8px 10px;font-size:.78rem;color:var(--mute)}
 .cand .btn{margin:0 10px 10px;align-self:flex-start}

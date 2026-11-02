@@ -16,10 +16,6 @@ export const sv = {
   undo: { button: "Ångra", failed: "Kunde inte ångra. Resan har ändrats sedan dess.", kinds: { add: "Lade till", change: "Ändrade", remove: "Tog bort" } }, // ED-22
   wish: { // DB-05..DB-14
     fromMail: (name?: string) => (name ? `Mejl från ${name}` : "Mejl"), // DB-23
-    mail: { // DB-22
-      open: "Mejla in en önskan", copy: "Kopiera adressen", copied: "Kopierad.",
-      hint: "Mejla eller dela en sida hit, så blir den en önskan direkt. Ämnesraden blir titel, första länken blir önskans länk och en bifogad bild blir dess foto.",
-    },
     url: "Länk till sidan (valfri)", badUrl: "Ange en adress som börjar med https:// eller http://.", photoBy: "Foto:", commons: "Wikimedia Commons", about: "Om önskan", more: (title: string) => `Mer om ${title}`, openPage: "Öppna sidan", credited: "Fotograf och licens finns under Om önskan",
     image: (title: string) => `Bild för ${title}`, query: "Sök bild med orden", find: "Sök", finding: "Söker…", use: "Använd",
     none: "Hittade ingen bild med fri licens. Prova andra ord eller ladda upp ett eget foto.", busy: "Wikimedia svarar inte just nu. Försök igen om en stund.",
@@ -69,6 +65,10 @@ export const sv = {
     removeDay: "Ta bort AI-förslagen för dagen",
     kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"],
       info: ["kort i Praktisk info", "kort i Praktisk info"] }, // AI-87
+  },
+  mailIn: { // BK-26, BK-27
+    open: "Mejla in till resan", copy: "Kopiera adressen", copied: "Kopierad.", failed: "Kunde inte hämta adressen just nu.",
+    hint: "Vidarebefordra bokningsbekräftelser hit, så blir de förslag under Bokningar i Nåla. Andra mejl, som en delad sida, blir önskningar i Önska. Skriv Bokning: eller Önskan: först i ämnet för att bestämma själv.",
   },
   emergency: { // PI-06
     title: "Nödnummer", eu: "112 fungerar i hela EU.", call: (label: string, n: string) => `${label}: ring ${n}`,
@@ -280,6 +280,7 @@ export const sv = {
     reject: "Ta bort förslaget", confirmReject: "Ta bort bokningen från mejlet? Dess filer raderas.", checkFilled: "Ifyllt från mejlet. Kontrollera innan du sparar.",
     paste: "Fyll i från bekräftelse", pasteLabel: "Klistra in texten från bokningsbekräftelsen", read: "Fyll i",
     filled: "Fälten är ifyllda från texten. Kontrollera dem innan du sparar.", nothing: "Hittade inget att fylla i.", noSubject: "(utan ämne)",
+    toWish: "Gör till önskan", confirmToWish: "Göra mejlet till en önskan i Önska i stället för en bokning? Bifogade filer utom en bild tas bort.", // BK-29
     price: "Pris", priceHint: "Priset läggs i budgeten som en egen post.", // BK-25
     target: "Gäller", newBooking: "Ny bokning", targetHint: "Bokningen som stod som Att boka fylls i och blir klar.", // BK-22
   },

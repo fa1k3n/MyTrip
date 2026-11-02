@@ -1,14 +1,14 @@
 import { Hono, type Context } from "hono";
 import { cacheKey, commonsImage, fetchImage, IMAGE_MAX, imageType, type CommonsImage } from "./wishimage.ts";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
+import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part, type WishReading } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
 import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
-import { importMail, importWish } from "./mail.ts";
+import { addWish, MIN_PHOTO, sortMail } from "./mail.ts";
 import { checkPassword, firstSuper, googleAuthUrl, googleIdentity, hashPassword, memberships, normEmail, PASSWORD_MIN, pkce, publicUser, SETUP_DAYS, sha256, validEmail, type Google, type User } from "./users.ts";
 export type { User } from "./users.ts";
 
@@ -17,6 +17,7 @@ export type Proposal = {
   source?: { kind: "mail"; from: string; subject: string; at: string } // a mail to the trip's inbox (BK-15)
     | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string }; // an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
+  wish?: WishReading & { source: string }; // the same mail read as a wish, for Gör till önskan (BK-29)
 };
 /** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
 export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] | "image/webp" }; // webp: wish images (DB-08); tripId "_commons": the shared cache (DB-11)
@@ -456,7 +457,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const ar = accessRole(role);
     if (!ar) return t;
     const rules = accessFor(t, ar), hide = (p: Part) => rules.parts[p] === "hidden";
-    const { budgetMax, access: _all, ...rest } = ar === "planner" ? t : withoutInbox(t); // the inbox address is for managers (BK-14)
+    const { budgetMax, access: _all, wishInbox: _w, ...rest } = ar === "planner" ? t : withoutInbox(t); // the address: BK-26, below
     const own = t.access?.[ar]; // the role's own choices, so the app shows the same as the server sends
     const out: Trip = { ...rest, ...(!hide("budget") && budgetMax !== undefined ? { budgetMax } : {}), ...(own ? { access: { [ar]: own } } : {}) };
     if (hide("bookings")) out.bookings = [];
@@ -465,8 +466,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (hide("expenses")) { out.expenses = []; out.payments = []; }
     if (hide("tasks")) out.tasks = [];
     if (hide("info")) out.info = [];
-    if (hide("dreams")) { out.dreams = []; delete out.wishInbox; }
-    if (ar === "follower") delete out.wishInbox; // DB-21
+    if (hide("dreams")) out.dreams = [];
+    if (ar === "traveler" && !hide("dreams") && t.inbox) out.inbox = t.inbox; // BK-26: a Resenär who sees wishes may mail in
     if ((rules.view.mi.memories ?? "hidden") === "hidden") { out.memories = []; delete out.album; } // MI-21
     else if (ar !== "planner") out.memories = t.memories.map(({ note, ...m }) => (note !== undefined && m.by === travelerId ? { ...m, note } : m)); // MI-18: only one's own comment
     if (hide("packing")) { out.packing = []; out.packed = []; out.travelers = t.travelers.map((x) => ({ ...x, packing: [], packed: [] })); }
@@ -789,41 +790,55 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   }
   app.get("/api/image-cache/ended", async (c) => (need(c, "admin") ? c.json(await endedCache(false)) : c.json({ error: "forbidden" }, 403)));
   app.post("/api/image-cache/ended", async (c) => (need(c, "admin") ? c.json(await endedCache(true)) : c.json({ error: "forbidden" }, 403)));
-  // BK-14: the trip's inbox address, under the instance's mail domain; a new one replaces the old at once.
+  /** BK-26: who may have the trip's address: those who manage it, and a Resenär whose role sees wishes. */
+  const mayMail = (c: Context<Env>, t: Trip) => manager(c) || (c.get("role") === "traveler" && accessFor(t, "traveler").parts.dreams !== "hidden");
+  const newAddress = () => `resa-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
+  // BK-27: whether mail import is set up, for those who may have the address, so the app shows its mail buttons; nothing is made here.
   app.get("/api/trips/:id/inbox", async (c) => {
-    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const t = await load(c.req.param("id"));
+    if (!mayMail(c, t)) return c.json({ error: "forbidden" }, 403);
     return c.json(opts.inboxDomain ? { enabled: true, ...(t.inbox ? { address: t.inbox } : {}) } : { enabled: false });
   });
+  // BK-26: the trip's one address, made the first time someone who may have it asks for it.
   app.post("/api/trips/:id/inbox", async (c) => {
+    const t = await load(c.req.param("id"));
+    if (!mayMail(c, t)) return c.json({ error: "forbidden" }, 403);
+    if (!opts.inboxDomain) return c.json({ error: "mail import is off" }, 404);
+    if (t.inbox) return c.json({ address: t.inbox });
+    const address = newAddress(), r = await apply(t, [{ op: "set", path: "inbox", value: address }], actorName(c, t), "trip address");
+    return "revision" in r ? c.json({ address }) : c.json({ address: (await load(t.id)).inbox ?? null }, "conflict" in r ? 409 : 422);
+  });
+  // BK-26: a new address replaces the old at once, and any earlier wish address with it.
+  app.post("/api/trips/:id/inbox/replace", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     if (!opts.inboxDomain) return c.json({ error: "mail import is off" }, 404);
-    const t = await load(c.req.param("id"));
-    const address = `${t.id.slice(0, 40)}-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
-    const r = await apply(t, [{ op: "set", path: "inbox", value: address }], actorName(c, t), "new inbox address");
+    const t = await load(c.req.param("id")), address = newAddress();
+    const ops: Op[] = [{ op: "set", path: "inbox", value: address }, ...(t.wishInbox ? [{ op: "remove" as const, path: "wishInbox" }] : [])];
+    const r = await apply(t, ops, actorName(c, t), "new trip address");
     return "revision" in r ? c.json({ address }) : c.json({ error: "conflict" }, 409);
   });
-  // BK-15: on the Node server a manager posts a raw message; on Cloudflare mail arrives through the Worker's email handler.
+  // BK-15, BK-28: on the Node server a manager posts a raw message, sorted like mail through the Worker's email handler.
   app.post("/api/trips/:id/mail", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
-    const r = await importMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
-    return "proposalId" in r ? c.json(r, 202) : c.json(r, 429);
+    const r = await sortMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
+    return "proposalId" in r ? c.json(r, 202) : "wishId" in r ? c.json(r, 201) : c.json(r, r.error === "too many" ? 429 : 422);
   });
-
-  // DB-21: the trip's wish address, apart from the booking inbox; a new one replaces the old at once.
-  app.post("/api/trips/:id/wish-inbox", async (c) => {
+  // BK-29: a mail proposal becomes the wish DB-23 would have made, with the first attached photo; its other files go.
+  app.post("/api/trips/:id/proposals/:pid/wish", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
-    if (!opts.inboxDomain) return c.json({ error: "mail import is off" }, 404);
-    const t = await load(c.req.param("id"));
-    const address = `${t.id.slice(0, 40)}-onska-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
-    const r = await apply(t, [{ op: "set", path: "wishInbox", value: address }], actorName(c, t), "new wish address");
-    return "revision" in r ? c.json({ address }) : c.json({ error: "conflict" }, 409);
-  });
-  // DB-23: on the Node server a manager posts a raw message; on Cloudflare mail arrives through the Worker's email handler.
-  app.post("/api/trips/:id/wish-mail", async (c) => {
-    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
-    const r = await importWish(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
-    return "wishId" in r ? c.json(r, 201) : c.json(r, r.error === "too many" ? 429 : 422);
+    const p = (await store.proposals(c.req.param("id"))).find((x) => x.id === c.req.param("pid") && x.status === "pending" && x.source?.kind === "mail");
+    if (!p) return c.json({ error: "not found" }, 404);
+    const files = p.booking?.files ?? [], t = await load(p.tripId);
+    const photo = files.find((f) => (f.type === "image/png" || f.type === "image/jpeg") && f.size >= MIN_PHOTO && f.size <= IMAGE_MAX);
+    const w = p.wish ?? { category: "Aktivitet", source: "Mejl" };
+    const title = w.title || (p.source?.kind === "mail" && p.source.subject) || w.url;
+    if (!title) return c.json({ error: "no title" }, 422);
+    p.status = "approved";
+    await store.saveProposal(p);
+    const r = await addWish(store, t, { ...w, title }, photo?.id, actorName(c, t));
+    if ("error" in r) { p.status = "pending"; await store.saveProposal(p); return c.json(r, 422); }
+    await store.removeFiles(files.map((f) => f.id).filter((id) => id !== photo?.id));
+    return c.json(r, 201);
   });
 
   app.post("/api/trips/:id/changes", async (c) => {

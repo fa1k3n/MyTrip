@@ -113,12 +113,14 @@ export const statusBadge = (status: string) => (status === "paid" || status === 
 
 /** What the app says when an AI feature could not run (AI-03, AI-65). */
 /** What the AI added when the trip was made, for the notice when it is done (AI-82). */
-export function aiDoneText(n: { activities: number; tasks: number; bookings: number }) {
-  const d = sv.newTripAi.done, parts = ([["activities", d.activities], ["tasks", d.tasks], ["bookings", d.bookings]] as const)
-    .filter(([k]) => n[k] > 0).map(([k, w]) => `${n[k]} ${n[k] === 1 ? w[0] : w[1]}`);
+export function aiDoneText(n: { activities: number; tasks: number; bookings: number; info?: number }) {
+  const d = sv.newTripAi.done, c = { ...n, info: n.info ?? 0 };
+  const parts = ([["activities", d.activities], ["tasks", d.tasks], ["bookings", d.bookings], ["info", d.info]] as const)
+    .filter(([k]) => c[k] > 0).map(([k, w]) => `${c[k]} ${c[k] === 1 ? w[0] : w[1]}`);
   if (!parts.length) return d.nothing;
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} och ${parts.at(-1)}` : parts[0]!;
-  return d.text(list, parts.length === 1 && Object.values(n).reduce((a, b) => a + b, 0) === 1);
+  const one = parts.length === 1 && Object.values(c).reduce((a, b) => a + b, 0) === 1;
+  return d.text(list, one, one && c.info === 1); // "kort" is neuter: inlagt
 }
 export function aiErrorText(r: { error: string; scope?: string }) {
   const e = sv.aiRun.errors;

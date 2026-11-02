@@ -31,6 +31,7 @@ import { atLeast } from "@trip/schema/src/rules.ts";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { hasTickets, ticketFor } from "./tickets.ts";
 import type { MinnasView } from "./memories.ts";
+import { emergencyFor, telHref } from "./emergency.ts";
 
 type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
@@ -59,6 +60,15 @@ export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; 
     {x.unsuitable && <><br /><small className="over">{sv.unsuitable}: {x.unsuitable}</small></>}
     {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
 );
+
+/** PI-06: the emergency numbers of the trip's countries, each a link that calls it. */
+export function Emergency({ t }: { t: Trip }) {
+  const sos = emergencyFor(t);
+  return sos.length > 0 && <div className="row sos"><span><b>{sv.emergency.title}</b>{sos.map((c) => (
+    <span key={c.country}><br /><small className="ro">{c.name}: {c.numbers.map((n, i) => <span key={i}>{i > 0 && " · "}{n.label}{" "}
+      <a className="place" href={telHref(n.number)} aria-label={`${c.name}, ${sv.emergency.call(n.label, n.number)}`}>{n.number}</a></span>)}
+      {c.eu && ` ${sv.emergency.eu}`}</small></span>))}</span></div>;
+}
 
 export type Activity = Day["activities"][number];
 
@@ -102,13 +112,14 @@ export function AiKeep({ item, text, run }: { item: AiItem; text: string; run: R
 /** AI-84: what the AI added and nobody has confirmed yet, as buttons that show it, and Behåll allt. Calm, not a warning. */
 function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (ids: string[]) => void; setTab: (t: Tab) => void }) {
   const n = aiCounts(t), r = sv.aiReview;
-  if (!n.activities && !n.tasks && !n.bookings && !n.wishes) return null;
+  if (!n.activities && !n.tasks && !n.bookings && !n.wishes && !n.info) return null;
   const section = (id: string) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } };
   const count = (k: keyof typeof r.kinds, v: number, go: () => void) => v > 0 && <button type="button" className="aicount" onClick={go}>{v} {v === 1 ? r.kinds[k][0] : r.kinds[k][1]}</button>;
   return <div className="ainew" role="region" aria-label={r.title}>
     <span className="ainew-h"><AiMark label={r.title} />{r.title}</span>
     {count("activities", n.activities, () => openDays(n.days))}{count("tasks", n.tasks, () => section("sec-tasks"))}
     {count("bookings", n.bookings, () => section("sec-bookings"))}{count("wishes", n.wishes, () => setTab("dr"))}
+    {count("info", n.info ?? 0, () => section("sec-info"))}
     <button type="button" className="btn ghost aikeepall" onClick={() => run((x) => keepAllAi(x), "keep ai")}><Icon name="check" />{r.keepAll}</button>
   </div>;
 }

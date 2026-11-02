@@ -114,6 +114,7 @@ export const Info = z.object({
   id: Id, title: z.string().min(1), text: z.string().default(""), placeId: Id.optional(),
   unsuitable: z.string().optional(), // the reason when the option does not suit the trip (PI-03)
   verify: z.boolean().optional(), // from a source that may be out of date (PI-04)
+  ai: z.boolean().optional(), // suggested by the AI service (AI-02, AI-87)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
 

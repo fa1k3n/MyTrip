@@ -10,7 +10,7 @@ import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleT
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
-import { AiKeep, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
+import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 import { suggestionsAt, type Pending } from "./proposals.ts";
@@ -144,8 +144,8 @@ function useAiSuggestions(t: Trip, may: boolean, feature: string, path: string) 
 
 /** AI-70, BK-21: a suggested task or booking to book, marked as AI, with its source, to take or reject. */
 function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (err: string | null) => void }) {
-  const v = (p.ops[0]?.value ?? {}) as { text?: string; name?: string; due?: string; url?: string; from?: string; to?: string };
-  const text = v.text ?? v.name ?? "";
+  const v = (p.ops[0]?.value ?? {}) as { title?: string; text?: string; name?: string; due?: string; url?: string; from?: string; to?: string };
+  const text = v.title ?? v.text ?? v.name ?? ""; // title: an info card (AI-87)
   return <div className="row mid todo">
     <span><AiMark />{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
       {v.from && <small className="ro"> · {bookingDates({ from: v.from, to: v.to ?? v.from })}</small>}
@@ -185,16 +185,22 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
   );
 }
 
-function Info({ t, edit, onPlace, part }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Info({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review; run: Run }) {
+  const suggested = useAiSuggestions(t, !!review && part("info"), "prep", "info/-"); // AI-87
+  const [err, setErr] = useState<string | null>(null);
   return (
-    <Section title={sv.info} may={part("info")}>
+    <Section title={sv.info} may={part("info")} id="sec-info" flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
+      <Emergency t={t} />
       {!t.info.length && <p className="ro">{sv.noInfo}</p>}
       {t.info.map((x) => (
         <div className="row mid" key={x.id}>
-          <InfoText t={t} x={x} onPlace={onPlace} />
-          {!x.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${x.title}`} onClick={() => edit({ kind: "info", id: x.id })} mut />}
+          <span>{x.ai && <AiMark label={sv.aiRun.aiMade} />}<InfoText t={t} x={x} onPlace={onPlace} /></span>
+          <span className="end">{x.ai && part("info") && <AiKeep item={{ kind: "info", id: x.id }} text={x.title} run={run} /> /* AI-87 */}
+            {!x.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${x.title}`} onClick={() => edit({ kind: "info", id: x.id })} mut />}</span>
         </div>
       ))}
+      {review && suggested.map((p) => <Suggestion key={p.id} p={p} review={review} done={setErr} />)}
+      {err && <p className="err" role="alert">{err}</p>}
       <div className="add"><IconButton icon="plus" label={sv.addInfo} onClick={() => edit({ kind: "info" })} mut tip="right" /></div>
     </Section>
   );
@@ -250,7 +256,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
-    {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}
+    {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}
   </>;
 }

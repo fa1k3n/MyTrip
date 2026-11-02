@@ -67,7 +67,12 @@ export const sv = {
   aiReview: { // AI-83..AI-85
     title: "Nytt från AI", keepAll: "Behåll allt", kept: "Behållet, AI-märket är borttaget", keep: (n: string) => `Behåll: ${n}`, remove: (n: string) => `Ta bort: ${n}`,
     removeDay: "Ta bort AI-förslagen för dagen",
-    kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"] },
+    kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"],
+      info: ["kort i Praktisk info", "kort i Praktisk info"] }, // AI-87
+  },
+  emergency: { // PI-06
+    title: "Nödnummer", eu: "112 fungerar i hela EU.", call: (label: string, n: string) => `${label}: ring ${n}`,
+    kinds: { all: "Larm", police: "Polis", ambulance: "Ambulans", fire: "Brand", policeLow: "Polis, ej akut", advice: "Sjukvårdsrådgivning" },
   },
   travelHere: "Resväg hit", noTravel: "Ingen", travelMin: "Restid (minuter)", // TR-20
   travelVehicles: { walk: "Till fots", transit: "Kollektivt", car: "Bil", train: "Tåg", ferry: "Färja" } as Record<string, string>,
@@ -163,7 +168,8 @@ export const sv = {
     addedCount: (n: number) => (n ? `${n} inlagda` : "inget nytt"), // AI-80
     done: { // AI-82
       activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning att boka", "bokningar att boka"],
-      text: (list: string, one: boolean) => `AI är klar: ${list} är ${one ? "inlagd" : "inlagda"}. Ta bort det du inte vill ha.`,
+      info: ["kort i Praktisk info", "kort i Praktisk info"], // AI-87
+      text: (list: string, one: boolean, neuter = false) => `AI är klar: ${list} är ${one ? (neuter ? "inlagt" : "inlagd") : "inlagda"}. Ta bort det du inte vill ha.`,
       nothing: "AI är klar men hittade inget mer att lägga in.",
     },
     draftLater: "Utkastet ligger kvar under Förslag i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",

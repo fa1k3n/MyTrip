@@ -4,7 +4,7 @@ import type { AiFeature } from "./ai.ts";
 
 const valueOf = (o: Op) => (o.value && typeof o.value === "object" ? (o.value as Record<string, unknown>) : {});
 
-const isBooking = (o: Op) => o.path === "bookings/-";
+const isBooking = (o: Op) => o.path === "bookings/-", isInfo = (o: Op) => o.path === "info/-";
 
 /** Bra att veta inför resan: rules, documents and things to order before the trip, as tasks (AI-70); what must be booked, as bookings to book (BK-21). */
 const prep: AiFeature = {
@@ -16,21 +16,27 @@ consent for travelling with only one parent, the European health insurance card)
 and practical matters such as power plugs, currency and cash. Use web search to check current rules and give each one its official or best source.
 Leave out what does not apply to this trip, its means of transport or its travelers' ages. At most 10 tasks, the most important first.
 What must be booked ahead and is not among the trip's bookings yet (a hotel the description asks for, tickets, a ferry crossing, a table)
-is a booking to book, not a task: at most 4, only what the trip clearly needs.`,
+is a booking to book, not a task: at most 4, only what the trip clearly needs.
+Also give at most 6 cards of practical information: when the trip goes by car, where to park near the stays and the planned activities
+(name, height limit, price and opening hours when found); and where the travelers will use public transport, how to buy tickets in that town
+(which app, ticket machines, whether one can pay on board).`,
   task: `Propose the tasks with add operations on tasks/-. Each task: { id, text, done: false, url, due? }. text: one short Swedish sentence
 saying what to do, for example "Beställ miljödekal (Umweltplakette) till bilen". url: the source. due: the last sensible day (YYYY-MM-DD)
 when it must be ordered or booked ahead, counted back from the trip's first day; leave it out otherwise.
 Propose each booking to book with an add operation on bookings/-: { id, name (short Swedish name, for example "Hotell med pool i Hamburg"),
-kind: stay|ticket|transport|other, from and to (YYYY-MM-DD, days of the trip it is for), status: "tobook", url (where it is booked) }.`,
-  allows: (o) => o.op === "add" && (o.path === "tasks/-" || isBooking(o)),
+kind: stay|ticket|transport|other, from and to (YYYY-MM-DD, days of the trip it is for), status: "tobook", url (where it is booked) }.
+Propose each card of practical information with an add operation on info/-: { id, title (short Swedish title, for example "Parkering vid hotellet"
+or "Bussbiljett i Hamburg"), text (the facts in one to three Swedish sentences) }.`,
+  allows: (o) => o.op === "add" && (o.path === "tasks/-" || isBooking(o) || isInfo(o)),
   helper: {
     fingerprint: (t: Trip) => JSON.stringify({
       purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null),
       days: t.days.map((d) => [d.date, d.location ?? "", d.country ?? "", d.legs.map((l) => [l.vehicle, l.origin, l.destination])]),
     }),
-    known: (t: Trip) => [...t.tasks.map((k) => k.text), ...t.bookings.map((b) => b.name)],
-    textOf: (o) => String(valueOf(o).text ?? valueOf(o).name ?? ""),
-    finish: (o) => ({ ...o, value: isBooking(o) ? { ...valueOf(o), status: "tobook", ai: true } : { ...valueOf(o), done: false, ai: true } }),
+    known: (t: Trip) => [...t.tasks.map((k) => k.text), ...t.bookings.map((b) => b.name), ...t.info.map((i) => i.title)],
+    textOf: (o) => String((isInfo(o) ? valueOf(o).title : undefined) ?? valueOf(o).text ?? valueOf(o).name ?? ""),
+    finish: (o) => ({ ...o, value: isBooking(o) ? { ...valueOf(o), status: "tobook", ai: true }
+      : isInfo(o) ? { text: "", ...valueOf(o), verify: true, ai: true } : { ...valueOf(o), done: false, ai: true } }), // AI-87: info, to verify (PI-04)
   },
 };
 
@@ -42,7 +48,8 @@ const tidyDay = (o: Op): Op => {
   const v = valueOf(o), legs = Array.isArray(v.legs) ? (v.legs as { vehicle?: unknown }[]) : [];
   const icons = (Array.isArray(v.icons) ? v.icons : []).map(String).filter((x) => DAY_ICONS.includes(x)).slice(0, 2);
   const fallback = legs.map((l) => String(l.vehicle)).find((x) => DAY_ICONS.includes(x)) ?? "Resa";
-  return { ...o, value: { ...v, icons: icons.length ? icons : [fallback], aiTitle: true } }; // AI-86
+  const country = typeof v.country === "string" && /^[A-Z]{2}$/.test(v.country) ? v.country : undefined; // PI-06: for the emergency numbers
+  return { ...o, value: { ...v, icons: icons.length ? icons : [fallback], aiTitle: true, country } }; // AI-86
 };
 
 /** A draft of a new trip from "Beskriv din dröm", the trip's purpose: title, travelers and days, as one proposal (AI-10). */
@@ -59,7 +66,7 @@ Do not add activities, bookings or wishes: the family adds those themselves.`,
 add days/- for each day as { id, date: "YYYY-MM-DD", title (a short Swedish title of at most 40 characters saying what the day holds, its travel and
 what it is about, for example "Färjan till Rostock" or "Lugn dag vid Alster"; never only the town's name or "Transport mot <town>"), summary (one Swedish sentence without clock times),
 icons (one or two of exactly these ids, never emoji: ${DAY_ICONS.join(", ")}; the means of transport on travel days, otherwise what the day is mostly about, or Resa),
-start: "09:00", end: "18:00", location (the town), legs: [{ vehicle: car|ferry|train|transit|walk, origin, destination, durationMin? }], activities: [] };
+start: "09:00", end: "18:00", location (the town), country (the town's ISO 3166 country code, for example "DE"), legs: [{ vehicle: car|ferry|train|transit|walk, origin, destination, durationMin? }], activities: [] };
 and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place.`,
   allows: (o) => (o.op === "set" && o.path === "title") || (o.op === "add" && ["travelers/-", "days/-", "stops/-"].includes(o.path)),
   tidy: tidyDay,

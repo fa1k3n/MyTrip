@@ -161,7 +161,7 @@ export type TripUsage = { tripId: string; title: string; owner: string; from?: s
 /** A helper on a trip: whether it can run and is on, its latest run and about how many runs are left (AI-68, AI-72). */
 export type HelperStatus = { available: boolean; on: boolean; at?: string; result?: string; remaining: number };
 /** How an AI feature went: a proposal (or none worth making), or why it did not run (AI-03, AI-64, AI-65). */
-export type AiAdded = { activities: number; tasks: number; bookings: number; wishes: number };
+export type AiAdded = { activities: number; tasks: number; bookings: number; wishes: number; info?: number }; // info: AI-87
 export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string; applied?: boolean; added?: AiAdded } | { ok: false; error: string; scope?: string };
 
 export const api = {

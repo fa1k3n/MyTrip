@@ -9,7 +9,8 @@ import { guessWish, wishChoices } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { BudgetDonut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
-import { ActivityText, TravelRow, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
+import { emergencyFor } from "./emergency.ts";
+import { ActivityText, TravelRow, Emergency, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 import { ticketFor } from "./tickets.ts";
@@ -24,7 +25,7 @@ export function Uppleva(p: TripViewProps) {
   if (!day) return <section className="card"><p className="ro">{sv.noDays}</p></section>;
   const bookings = bookingsOn(t.bookings, day.date);
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
-  const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && t.info.length > 0; // practical information as in Nåla (UP-15)
+  const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && (t.info.length > 0 || emergencyFor(t).length > 0); // practical information as in Nåla (UP-15, PI-06)
   const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info; // Uppleva's components (AU-20)
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.manager || !!p.self); // the superuser, the owner and personal links (UP-12, AU-22, US-14)
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))]; // UP-14
@@ -92,6 +93,7 @@ export function Uppleva(p: TripViewProps) {
         </section>}
         {info && <details className="card sec lock">{/* closed at first, read-only (UP-15) */}
           <summary><h3>{sv.info}</h3></summary>
+          <Emergency t={t} />
           {t.info.map((x) => <div className="row mid" key={x.id}><InfoText t={t} x={x} onPlace={p.place} /></div>)}
         </details>}
       </div>}

@@ -1,7 +1,7 @@
 // Reviewing what the AI added: keep it (the AI mark goes, AI-02) or remove it at once (AI-83..AI-85). Pure, so it runs under node --test.
 import type { Op, Trip } from "@trip/schema";
 
-export type AiItem = { kind: "activity"; dayId: string; id: string } | { kind: "task" | "booking" | "wish"; id: string };
+export type AiItem = { kind: "activity"; dayId: string; id: string } | { kind: "task" | "booking" | "wish" | "info"; id: string };
 
 /** The items still marked as AI, and the days with AI activities (AI-84). */
 export function aiCounts(t: Trip) {
@@ -9,6 +9,7 @@ export function aiCounts(t: Trip) {
   return {
     activities: t.days.reduce((n, d) => n + d.activities.filter((a) => a.ai).length, 0),
     tasks: t.tasks.filter((k) => k.ai).length, bookings: t.bookings.filter((b) => b.ai).length, wishes: t.dreams.filter((w) => w.ai).length, days,
+    ...(t.info.some((i) => i.ai) && { info: t.info.filter((i) => i.ai).length }), // AI-87
   };
 }
 
@@ -17,7 +18,7 @@ const pathOf = (t: Trip, x: AiItem): string | undefined => {
     const di = t.days.findIndex((d) => d.id === x.dayId), ai = t.days[di]?.activities.findIndex((a) => a.id === x.id) ?? -1;
     return ai < 0 ? undefined : `days/${di}/activities/${ai}`;
   }
-  const list = { task: "tasks", booking: "bookings", wish: "dreams" }[x.kind], i = (t[list as "tasks"] as { id: string }[]).findIndex((y) => y.id === x.id);
+  const list = { task: "tasks", booking: "bookings", wish: "dreams", info: "info" }[x.kind], i = (t[list as "tasks"] as { id: string }[]).findIndex((y) => y.id === x.id);
   return i < 0 ? undefined : `${list}/${i}`;
 };
 /** Keeps one item: its AI mark goes, and that of its AI wish or of the wish's AI activities, which belong together (AI-83). */
@@ -32,7 +33,7 @@ export function keepAi(t: Trip, x: AiItem): Op[] {
 /** Behåll allt: every AI mark in the trip goes (AI-84). */
 export const keepAllAi = (t: Trip): Op[] => [
   ...t.days.flatMap((d, di) => d.activities.flatMap((a, ai) => (a.ai ? [`days/${di}/activities/${ai}`] : []))),
-  ...(["tasks", "bookings", "dreams"] as const).flatMap((k) => (t[k] as { ai?: boolean }[]).flatMap((x, i) => (x.ai ? [`${k}/${i}`] : []))),
+  ...(["tasks", "bookings", "dreams", "info"] as const).flatMap((k) => (t[k] as { ai?: boolean }[]).flatMap((x, i) => (x.ai ? [`${k}/${i}`] : []))),
 ].map((p) => ({ op: "remove", path: `${p}/ai` }));
 
 /** The trip without the given activities and wishes, and without what only they used: an AI wish no other activity makes come true,
@@ -51,13 +52,14 @@ function without(t: Trip, acts: Set<string>, wishes: Set<string>): Trip {
 /** The changes from one trip to the next, list by list, so a removal is one change that Ångra can take back (ED-22). */
 const diff = (t: Trip, next: Trip): Op[] => [
   ...next.days.flatMap((d, i) => (d.activities.length !== t.days[i]!.activities.length ? [{ op: "set" as const, path: `days/${i}/activities`, value: d.activities }] : [])),
-  ...(["dreams", "places", "tasks", "bookings"] as const).flatMap((k) => (next[k].length !== t[k].length ? [{ op: "set" as const, path: k, value: next[k] }] : [])),
+  ...(["dreams", "places", "tasks", "bookings", "info"] as const).flatMap((k) => (next[k].length !== t[k].length ? [{ op: "set" as const, path: k, value: next[k] }] : [])),
 ];
 
 /** Removes one AI item at once, with what only it used (AI-83). */
 export function removeAi(t: Trip, x: AiItem): Op[] {
   if (x.kind === "task") return diff(t, { ...t, tasks: t.tasks.filter((k) => k.id !== x.id) });
   if (x.kind === "booking") return diff(t, { ...t, bookings: t.bookings.filter((b) => b.id !== x.id) });
+  if (x.kind === "info") return diff(t, { ...t, info: t.info.filter((i) => i.id !== x.id) }); // AI-87
   return diff(t, without(t, new Set(x.kind === "activity" ? [x.id] : []), new Set(x.kind === "wish" ? [x.id] : [])));
 }
 /** Removes a day's AI activities, with what only they used (AI-85). */

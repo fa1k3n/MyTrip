@@ -1,5 +1,5 @@
 // The superuser's view of the beta (US-27, US-29): the feedback sent with "Tyck till" and how each trip is used.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, type FeedbackNote, type TripUsage } from "./api.ts";
 import { aiCostLine } from "./format.ts";
 import { sv } from "./sv.ts";
@@ -15,8 +15,24 @@ export function BetaNotes() {
     {notes?.map((n) => <div className="note-row" key={n.id}>
       <p className="ro"><b>{n.name}</b> · {when(n.at)} · {sv.beta.page(PAGE[n.page] ?? n.page)}</p>
       <p>{n.text}</p>
+      <Answer n={n} />
     </div>)}
   </div>;
+}
+
+/** US-34: the superuser's answer to a note, which its writer reads in "Tyck till". */
+function Answer({ n }: { n: FeedbackNote }) {
+  const [text, setText] = useState(n.reply ?? ""), [state, setState] = useState<"" | "saved" | "failed">("");
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    try { await api.reply(n.id, text); setState("saved"); } catch { setState("failed"); }
+  };
+  return <form className="answerform" onSubmit={save}>
+    <label>{sv.beta.answerLabel(n.name)}<textarea rows={2} maxLength={1000} value={text} onChange={(e) => { setText(e.target.value); setState(""); }} /></label>
+    <button className="btn ghost" type="submit" disabled={text.trim() === (n.reply ?? "")}>{sv.beta.answerSave}</button>
+    {state === "saved" && <span className="ro" role="status">{sv.beta.answerSaved}</span>}
+    {state === "failed" && <span className="err" role="alert">{sv.beta.answerFailed}</span>}
+  </form>;
 }
 
 export function BetaUsage() {

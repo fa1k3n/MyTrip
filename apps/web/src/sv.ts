@@ -104,6 +104,8 @@ export const sv = {
     ],
     consentCheck: "Jag har läst detta och godkänner det.", consentGo: "Godkänn och fortsätt",
     notes: "Synpunkter (beta)", noNotes: "Inga synpunkter än.", page: (p: string) => `från ${p}`,
+    mine: "Dina synpunkter", answer: "Svar", answerLabel: (n: string) => `Svar till ${n}`, answerSave: "Spara svar", answerSaved: "Svaret är sparat.", answerFailed: "Svaret gick inte att spara.", // US-34
+    newAnswer: "Tyck till (beta), nytt svar",
     usage: "Användning (beta)", usageLead: "Per resa: vilka som är aktiva, hur många dagar de öppnat varje sida, Uppleva under resans dagar och antal ändringar. Bara konton som godkänt betan räknas.",
     noUsage: "Ingen användning än.", upDuring: "Uppleva under resan", changes: "ändringar", memories: (n: number) => `${n} betyg i Minnas`, days: "dagar",
   },
@@ -261,6 +263,14 @@ export const sv = {
     setSave: "Spara och logga in", setGone: "Länken gäller inte längre. Be den som skapade kontot om en ny.", setShort: "Lösenordet behöver minst 10 tecken.",
     pasteLink: "Klistra in länken du fått", openLink: "Öppna resan", badLink: "Det där är ingen länk till en resa.", // PW-02
     wrong: "Fel mejladress eller lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
+    forgot: "Glömt lösenordet?", // US-33
+    forgotHelp: "Be den som bjöd in dig om en ny lösenordslänk. Hen gör den under resans inställningar, Resenärer.",
+    forgotGoogle: "Har du ett Google-konto med samma mejladress kan du också logga in med Google.",
+  },
+  invite: { // US-31: the mail the phone's own mail app sends
+    subject: (trip: string) => `Inbjudan till ${trip} i Basläger`,
+    body: (name: string, trip: string, url: string, until: string) =>
+      `Hej ${name}!\n\nDu är inbjuden till ${trip} i Basläger. Öppna länken, välj ett lösenord och logga in, så ser du resan:\n\n${url}\n\nLänken gäller till ${until}. Lägg gärna till Basläger på hemskärmen efteråt, så har du resan i telefonen även utan nät.`,
   },
   prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",

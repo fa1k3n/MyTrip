@@ -263,6 +263,7 @@ export type TripViewProps = {
   self?: string; // the traveler of a personal link
   who?: { name: string; role: "traveler" | "planner" | "follower" }; // who is looking, shown in the header (AU-16)
   feedback?: () => void; // "Tyck till" during the beta (US-27)
+  feedbackDot?: boolean; // a new answer to one's feedback (US-34)
   fullApp?: () => void; // in the app on the home screen: open the full app in Safari (PW-24)
   bar?: boolean; // the app on the home screen: the pages as a tab bar at the bottom (PW-24)
   toChooser?: () => void; // back to the trips of the links on the phone (PW-16)
@@ -331,7 +332,7 @@ export function TripView(p: TripViewProps) {
         {p.who && (p.who.role === "follower"
           ? <span className="who follower">{p.who.name}</span>
           : <span className={`who ${p.who.role}`} role="img" aria-label={`${p.who.name}, ${sv.who[p.who.role]}`} title={sv.who[p.who.role]}>{p.who.name}</span>)}
-        {p.feedback && <BetaButton onClick={p.feedback} />}
+        {p.feedback && <BetaButton onClick={p.feedback} dot={p.feedbackDot} />}
         {/* the person's own settings for notices (NT-03) */}<IconButton icon="bell" label={sv.notice.bell} onClick={p.notices} tip="left" />
         {perms.settings && <Gear onClick={p.admin} label={sv.tripSettings} />}
         {p.fullApp && <IconButton icon="external" label={sv.fullApp} onClick={p.fullApp} tip="left" />}

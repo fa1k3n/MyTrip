@@ -153,4 +153,11 @@ export function helperLine(s: { at?: string; result?: string; remaining: number 
 }
 
 /** The line under a traveler's name in the card Resenärer: the permission, and when the traveler does not share costs (AU-38, MI-38). */
+/** US-31: the invitation as a mailto link for the phone's own mail app; spaces as %20, which every mail app reads. */
+export function inviteMail(x: { to: string; name: string; trip: string; url: string; until: string }) {
+  const q = (v: string) => encodeURIComponent(v);
+  return `mailto:${q(x.to)}?subject=${q(sv.invite.subject(x.trip))}&body=${q(sv.invite.body(x.name, x.trip, x.url, x.until))}`;
+}
+/** US-34: an answer to one's feedback that came after the dialog was last opened on this device. */
+export const newReply = (notes: { replyAt?: string }[], seen: string | null) => notes.some((n) => !!n.replyAt && (!seen || n.replyAt > seen));
 export const travelerLine = (role: "traveler" | "planner", shares: boolean) => [sv.people[role], ...(shares ? [] : [sv.people.noShare])].join(" · ");

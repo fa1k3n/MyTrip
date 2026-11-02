@@ -26,7 +26,7 @@ export type LogEntry = { at: string; tripId: string; actor: string; reason: stri
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner"; account?: string }; // account: the tied address (US-21)
 /** A phone that wants notices for a trip (NT-03): who is a traveler id, "follower" for the common link, or "admin". */
 /** A note sent with "Tyck till" during the beta (US-27). */
-export type Feedback = { id: string; at: string; who: string; name: string; text: string; page: string; tripId?: string };
+export type Feedback = { id: string; at: string; who: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string }; // reply: US-34
 /** That a consenting user opened one of the four pages of a trip on a day, in the trip's time zone (US-28). */
 export type Usage = { tripId: string; who: string; tab: "dr" | "nala" | "up" | "mi"; day: string };
 export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
@@ -112,7 +112,7 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   const sameUse = (a: Usage, b: Usage) => a.tripId === b.tripId && a.who === b.who && a.tab === b.tab && a.day === b.day;
   return {
     feedback: async () => structuredClone(notes),
-    saveFeedback: async (f) => { notes = [...notes, structuredClone(f)]; },
+    saveFeedback: async (f) => { notes = [...notes.filter((x) => x.id !== f.id), structuredClone(f)]; }, // US-34: an answer replaces the note
     usage: async () => structuredClone(seen),
     saveUsage: async (u) => { if (!seen.some((x) => sameUse(x, u))) seen = [...seen, { ...u }]; },
     aiUses: async (month) => structuredClone(ais.filter((x) => !month || x.month === month)),
@@ -1100,6 +1100,25 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return { secret, expires };
   };
   app.get("/api/users", async (c) => c.json((await store.users()).map(publicUser)));
+  // US-30, US-32: whoever manages a trip invites a traveler with an address: an account and a password link, or a new link for an
+  // account they invited; an account that can log in already gets none.
+  app.post("/api/trips/:id/people/:tid/invite", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id")), x = t.travelers.find((y) => y.id === c.req.param("tid"));
+    const address = (await people(t.id)).find((l) => l.travelerId === x?.id)?.account;
+    if (!x || !address) return c.json({ error: "no address" }, 409);
+    const { renew } = await c.req.json<{ renew?: unknown }>().catch(() => ({ renew: undefined }));
+    const users = await store.users(), me = await selfOf(c), u = users.find((y) => y.email === address);
+    if (!u) {
+      let id = slug(x.name);
+      for (let n = 2; users.some((y) => y.id === id); n++) id = `${slug(x.name)}-${n}`;
+      const made: User = { id, name: x.name, email: address, superuser: false, disabled: false, ai: false, createdAt: clock().toISOString(), ...(me ? { invitedBy: me } : {}) };
+      return c.json({ user: id, setup: await newSetup(made) }, 201);
+    }
+    if (!u.superuser && !u.disabled && !u.passwordHash && !u.googleId) return c.json({ user: u.id, setup: await newSetup(u) });
+    const mayRenew = !!me && u.invitedBy === me && !u.superuser && !u.disabled;
+    return renew === true && mayRenew ? c.json({ user: u.id, setup: await newSetup(u) }) : c.json({ exists: true, mayRenew });
+  });
   app.post("/api/users", async (c) => {
     const b = await c.req.json<{ name?: unknown; email?: unknown }>().catch(() => ({} as { name?: unknown; email?: unknown }));
     const name = typeof b.name === "string" ? b.name.trim().slice(0, 80) : "", email = typeof b.email === "string" ? normEmail(b.email) : "";
@@ -1158,6 +1177,26 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const page = typeof b.page === "string" ? b.page.slice(0, 40) : "";
     await store.saveFeedback({ id: crypto.randomUUID(), at: clock().toISOString(), who: u.id, name: u.name, text, page, ...(typeof b.tripId === "string" ? { tripId: b.tripId.slice(0, 80) } : {}) });
     return c.body(null, 201);
+  });
+  // US-34: the superuser answers a note; an empty text clears the answer.
+  app.put("/api/feedback/:fid/reply", async (c) => {
+    if (c.get("role") !== "admin" || scoped(c)) return c.json({ error: "forbidden" }, 403);
+    const f = (await store.feedback()).find((x) => x.id === c.req.param("fid"));
+    if (!f) return c.json({ error: "not found" }, 404);
+    const { text } = await c.req.json<{ text?: unknown }>().catch(() => ({ text: undefined }));
+    const reply = typeof text === "string" ? text.trim() : "";
+    if (reply.length > 1000) return c.json({ error: "at most 1000 characters" }, 400);
+    const { reply: _r, replyAt: _a, ...rest } = f;
+    const next: Feedback = reply ? { ...rest, reply, replyAt: clock().toISOString() } : rest;
+    await store.saveFeedback(next);
+    return c.json(next);
+  });
+  // US-34: the writer's own notes with their answers, newest first.
+  app.get("/api/feedback/mine", async (c) => {
+    const u = c.get("user");
+    if (!u?.consentAt) return c.json({ error: "forbidden" }, 403);
+    const own = (await store.feedback()).filter((x) => x.who === u.id).sort((a, b) => b.at.localeCompare(a.at));
+    return c.json(own.map(({ id, at, text, page, reply, replyAt }) => ({ id, at, text, page, ...(reply ? { reply, replyAt } : {}) })));
   });
   app.get("/api/feedback", async (c) => (c.get("role") === "admin" && !scoped(c) ? c.json((await store.feedback()).sort((a, b) => b.at.localeCompare(a.at))) : c.json({ error: "forbidden" }, 403)));
   const dayIn = (tz: string) => new Intl.DateTimeFormat("sv-SE", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(clock());

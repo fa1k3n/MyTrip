@@ -95,9 +95,9 @@ export function TripRoles({ me, id }: { me: Me; id: string }) {
   </span>;
 }
 /** "Tyck till" during the beta, clearly marked as a beta feature (US-27). */
-export const BetaButton = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" className="btn ghost icon beta tip-left" onClick={onClick} aria-label={sv.beta.feedback} data-tip={sv.beta.feedback}>
-    <Icon name="comment" /><span className="betatag" aria-hidden="true">{sv.beta.tag}</span>
+export const BetaButton = ({ onClick, dot }: { onClick: () => void; dot?: boolean }) => ( // dot: a new answer (US-34)
+  <button type="button" className="btn ghost icon beta tip-left" onClick={onClick} aria-label={dot ? sv.beta.newAnswer : sv.beta.feedback} data-tip={dot ? sv.beta.newAnswer : sv.beta.feedback}>
+    <Icon name="comment" /><span className="betatag" aria-hidden="true">{sv.beta.tag}</span>{dot && <span className="newdot" aria-hidden="true" />}
   </button>
 );
 /** A suggestion from an AI helper, not yet taken (AI-02, AI-70). */

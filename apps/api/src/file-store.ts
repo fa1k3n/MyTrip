@@ -88,7 +88,7 @@ export function fileStore(dir: string): Store {
     saveUser: (u) => serial(async () => writeJson("users.json", [...(await readJson<User[]>("users.json", [])).filter((x) => x.id !== u.id), u])),
     removeUser: (id) => serial(async () => writeJson("users.json", (await readJson<User[]>("users.json", [])).filter((x) => x.id !== id))),
     feedback: () => readJson<Feedback[]>("feedback.json", []), // US-27
-    saveFeedback: (f) => serial(async () => writeJson("feedback.json", [...(await readJson<Feedback[]>("feedback.json", [])), f])),
+    saveFeedback: (f) => serial(async () => writeJson("feedback.json", [...(await readJson<Feedback[]>("feedback.json", [])).filter((x) => x.id !== f.id), f])), // US-34: an answer replaces the note
     aiUses: async (month) => (await readJson<AiUse[]>("ai-usage.json", [])).filter((x) => !month || x.month === month), // AI-03
     saveAiUse: (u) => serial(async () => writeJson("ai-usage.json", [...(await readJson<AiUse[]>("ai-usage.json", [])), u])),
     aiHelper: async (tripId, name) => (await readJson<Record<string, AiHelperState>>("ai-helpers.json", {}))[`${tripId}/${name}`], // AI-68

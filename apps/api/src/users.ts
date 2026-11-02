@@ -5,6 +5,7 @@ export type User = {
   id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string;
   passwordHash?: string; googleId?: string; lastLogin?: string; setup?: { hash: string; expires: string };
   consentAt?: string; // when the beta notice was accepted (US-26)
+  invitedBy?: string; // the account that invited it from a trip (US-30), which may renew its password link (US-32)
 };
 /** The Google OAuth client of the instance (US-10). */
 export type Google = { clientId: string; clientSecret: string };

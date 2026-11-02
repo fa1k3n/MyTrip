@@ -123,7 +123,7 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
       return results.map((r) => JSON.parse(r.json) as Feedback);
     },
     async saveFeedback(f) {
-      await db.prepare("INSERT INTO feedback (id, at, json) VALUES (?, ?, ?)").bind(f.id, f.at, JSON.stringify(f)).run();
+      await db.prepare("INSERT INTO feedback (id, at, json) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET json = excluded.json").bind(f.id, f.at, JSON.stringify(f)).run();
     },
     async usage() { // US-28
       const { results } = await db.prepare("SELECT trip_id, who, tab, day FROM usage ORDER BY trip_id, who, tab, day").all<{ trip_id: string; who: string; tab: Usage["tab"]; day: string }>();

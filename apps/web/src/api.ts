@@ -1,7 +1,7 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, useCopy, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, parseSetupHash, removeLink, type Me } from "./access.ts";
 export type { Me } from "./access.ts";
@@ -149,7 +149,7 @@ export function sendWaiting(tripId = ""): Promise<boolean> {
   return sendQueue();
 }
 
-/** A read that falls back on the phone's copy when the server cannot be reached; links and accounts keep one (PW-03, PW-05, PW-22). */
+/** A read that falls back on the phone's copy when the server cannot be reached or fails; links and accounts keep one (PW-03, PW-05, PW-22, PW-26). */
 async function kept<T>(part: "me" | "trips", path: string): Promise<T> {
   try {
     const v = await call<T>(path);
@@ -159,7 +159,7 @@ async function kept<T>(part: "me" | "trips", path: string): Promise<T> {
     return v;
   } catch (e) {
     const c = copy.load();
-    if (e instanceof ApiError || c?.[part] === undefined) throw e;
+    if (!useCopy(e) || c?.[part] === undefined) throw e; // PW-26: a server error too
     setOffline({ at: c.at });
     return c[part] as T;
   }
@@ -179,7 +179,8 @@ export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner";
 /** An account as the superuser's list shows it (US-02). */
 export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
 export type SetupLink = { secret: string; expires: string }; // US-04
-export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string }; // US-27
+export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string }; // US-27, US-34
+export type MyNote = { id: string; at: string; text: string; page: string; reply?: string; replyAt?: string }; // US-34
 export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
   people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[]; // US-29
   ai?: { name: string; calls: number; usd: number }[] }; // AI-03
@@ -198,6 +199,8 @@ export const api = {
   consent: () => call<void>("/api/consent", { method: "POST" }), // US-26
   feedback: (text: string, page: string, tripId?: string) => call<void>("/api/feedback", { method: "POST", body: JSON.stringify({ text, page, tripId }) }), // US-27
   notes: () => call<FeedbackNote[]>("/api/feedback"),
+  myNotes: () => call<MyNote[]>("/api/feedback/mine"), // US-34
+  reply: (id: string, text: string) => call<FeedbackNote>(`/api/feedback/${encodeURIComponent(id)}/reply`, { method: "PUT", body: JSON.stringify({ text }) }),
   seen: (tripId: string, tab: string) => call<void>(`${trip(tripId)}/seen`, { method: "POST", body: JSON.stringify({ tab }) }), // US-28
   usage: () => call<TripUsage[]>("/api/usage"), // US-29
   ai: async (tripId: string, feature: string, body?: { apply: true }): Promise<AiStart> => { // apply: the first run after "Skapa med AI" (AI-80) // AI-65: the server's reason is kept, unlike call()
@@ -221,6 +224,8 @@ export const api = {
   people: (id: string) => call<PersonLinkInfo[]>(`${trip(id)}/people`),
   setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"], account?: string | null) => // account left out: kept (US-21)
     call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify(account === undefined ? { role } : { role, account }) }),
+  invite: (id: string, travelerId: string, renew = false) => // US-30, US-32
+    call<{ user: string; setup: SetupLink } | { exists: true; mayRenew: boolean }>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/invite`, { method: "POST", body: JSON.stringify(renew ? { renew: true } : {}) }),
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => kept<Trip[]>("trips", "/api/trips"),

@@ -14,7 +14,7 @@ const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.Pl
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
 const TicketView = lazy(() => import("./TicketView.tsx"));
-import { aiDoneText, excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
+import { aiDoneText, excerpt, jumpTo, newReply, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
@@ -232,7 +232,17 @@ export function App() {
     if (me && "tripId" in me && trips && view !== "trip" && trips.some((x) => x.id === me.tripId)) openTrip(me.tripId);
   }, [me, trips]); // eslint-disable-line react-hooks/exhaustive-deps -- openTrip is recreated every render
   /** "Tyck till" for an account that accepted the beta notice (US-26, US-27). */
-  const beta = me && "user" in me && me.consent ? () => setFeedbackOpen(true) : undefined;
+  const consenting = !!me && "user" in me && !!me.consent;
+  const [answered, setAnswered] = useState(""); // US-34: the latest answer to one's feedback, and whether it is new on this device
+  const ANSWER_SEEN = "mytrip.answerSeen", seenAnswer = () => { try { return localStorage.getItem(ANSWER_SEEN); } catch { return null; } };
+  useEffect(() => {
+    if (!consenting) return;
+    api.myNotes().then((ns) => setAnswered(newReply(ns, seenAnswer()) ? ns.map((n) => n.replyAt ?? "").sort().at(-1)! : ""), () => {});
+  }, [consenting, feedbackOpen]);
+  const beta = consenting ? () => {
+    setFeedbackOpen(true);
+    if (answered) { try { localStorage.setItem(ANSWER_SEEN, answered); } catch { /* blocked: the dot stays */ } setAnswered(""); }
+  } : undefined;
   useEffect(() => { // US-28: which of the four pages a consenting user opens, once per trip, page and day
     if (!me || !("user" in me) || !me.consent || view !== "trip" || !tripId) return;
     const k = seenKey(tripId, tab), today = new Date().toISOString().slice(0, 10);
@@ -446,7 +456,7 @@ export function App() {
     {me && roleIn(me, undefined).role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13, US-02 */}
   </>;
   else if (view === "portal" || !t) page = <>
-    <div className="top"><div className="logo">{sv.hub}</div><div className="topr">{me && <span className="chip">{whoChip(me)}</span>}{beta && <BetaButton onClick={beta} />}<Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
+    <div className="top"><div className="logo">{sv.hub}</div><div className="topr">{me && <span className="chip">{whoChip(me)}</span>}{beta && <BetaButton onClick={beta} dot={!!answered} />}<Gear onClick={() => { setSettingsBack("portal"); setView("settings"); }} />
       <IconButton icon="logout" label={sv.login.logout} onClick={logout} tip="left" /></div></div>
     <div className="grid">
       {trips.map((x) => (
@@ -483,6 +493,7 @@ export function App() {
       addPayment={(x) => (x ? savePayment(x) : setDlg({ kind: "payment" }))} // MI-06: one action from a proposal
       review={{ approve: approveProposal, reject: rejectMail }} // MC-18
       feedback={beta}
+      feedbackDot={!!answered}
     />
   );
 

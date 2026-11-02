@@ -73,6 +73,11 @@ export function withRate(e: Expense, r: { rate: number; date: string }): Expense
   const f = e.foreign as Foreign;
   return { ...e, amount: Math.round(f.amount * r.rate * 100) / 100, foreign: { amount: f.amount, currency: f.currency, rate: r.rate, rateDate: r.date } };
 }
+/** A read that failed for want of a network or of a working server uses the copy on the phone; a refusal does not (PW-26). */
+export function useCopy(x: unknown) {
+  const status = x instanceof Error && typeof (x as { status?: unknown }).status === "number" ? (x as unknown as { status: number }).status : undefined;
+  return status === undefined || status >= 500;
+}
 /** What sending one expense gave: recorded, not now (try later, with why: PW-18), or rejected with a reason. */
 export type Sent = { ok: true } | { offline: true; why?: string } | { failed: string };
 

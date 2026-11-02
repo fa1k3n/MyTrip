@@ -1,13 +1,17 @@
 // "Tyck till" during the beta (US-27): a short note to the one who runs Basläger, with the page it was written on.
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { api } from "./api.ts";
+import { api, type MyNote } from "./api.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 import { onOutside } from "./outside.ts";
 
+const when = (iso: string) => new Date(iso).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
 export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?: string; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [text, setText] = useState(""), [state, setState] = useState<"" | "busy" | "sent" | "failed">("");
+  const [mine, setMine] = useState<MyNote[]>([]); // US-34: one's own notes with their answers
+  useEffect(() => { api.myNotes().then(setMine, () => {}); }, [state]);
   useEffect(() => {
     const d = ref.current!, opener = document.activeElement as HTMLElement | null;
     d.showModal();
@@ -30,6 +34,12 @@ export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?:
         {state === "failed" && <p className="err" role="alert">{sv.beta.failed}</p>}
         <button className="btn" type="submit" disabled={!text.trim() || state === "busy"}>{sv.beta.send}</button>
       </form>
+      {!!mine.length && <section className="mynotes" aria-label={sv.beta.mine}><h4>{sv.beta.mine}</h4>
+        {mine.map((n) => <div className="note-row" key={n.id}>
+          <p className="ro">{when(n.at)}</p><p>{n.text}</p>
+          {n.reply && <p className="answer"><b>{sv.beta.answer}:</b> {n.reply}</p>}
+        </div>)}
+      </section>}
     </dialog>
   );
 }

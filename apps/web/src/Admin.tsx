@@ -1,11 +1,11 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
-import { LEVEL_ICON, linkFromText, missingLinks, nextLevel, PERM_ROLES, personUrl, shareUrl } from "./access.ts";
+import { api, ApiError, installed, type PersonLinkInfo, type SetupLink } from "./api.ts";
+import { LEVEL_ICON, linkFromText, missingLinks, nextLevel, PERM_ROLES, personUrl, setupUrl, shareUrl } from "./access.ts";
 import { CONTENT, contentLevels, DEFAULT_CONTENT, DEFAULT_TABS, ownAccess, PAGES, type Level, type RoleAccess } from "@trip/schema/src/rules.ts";
 import { renameTraveler, tripRange } from "./edit.ts";
-import { travelerLine, tripDates } from "./format.ts";
+import { inviteMail, travelerLine, tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
@@ -56,9 +56,19 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
       {google && !installed && <a className="btn ghost google" href="/api/auth/google">{sv.login.google}</a>}
       {google && installed && <p className="ro note">{sv.login.googleInstalled}</p>}
     </form>
+    <Forgot google={google} /> {/* US-33 */}
     {installed && <PasteLink />}
     <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a></p> {/* UI-13 */}
   </>;
+}
+
+/** US-33: how to get in again without a password: the inviter makes a new link, or Google with the same address. */
+function Forgot({ google }: { google: boolean }) {
+  const [open, setOpen] = useState(false);
+  return <div className="forgot">
+    <button type="button" className="place" aria-expanded={open} onClick={() => setOpen(!open)}>{sv.login.forgot}</button>
+    {open && <p className="ro note" role="status">{sv.login.forgotHelp}{google ? ` ${sv.login.forgotGoogle}` : ""}</p>}
+  </div>;
 }
 
 /** US-26: what a beta tester accepts: what is kept and who can see it. */
@@ -297,11 +307,43 @@ function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["tra
         <p className="ro note">{svAdmin.people.sharesHint}</p>
         <label>{svAdmin.people.account}<input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
         <p className="ro note">{svAdmin.people.accountHint}</p>
+        {link.account && account.trim().toLowerCase() === link.account && <Invite t={t} x={x} to={link.account} />}
         {err && <p className="err" role="alert">{err}</p>}
         <div className="dlgbar"><button className="btn" type="submit" disabled={busy}>{sv.save}</button></div>
       </form>
     </dialog>
   );
+}
+
+const until = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
+/** US-30..US-32: the invitation of a traveler with an address: an account and a password link to mail, copy or show, or a new
+ * link for an account one invited, after asking. */
+function Invite({ t, x, to }: { t: Trip; x: Trip["travelers"][number]; to: string }) {
+  const [got, setGot] = useState<{ user: string; setup: SetupLink } | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
+  const go = async (renew = false) => {
+    try {
+      const r = await api.invite(t.id, x.id, renew);
+      if ("setup" in r) { setGot(r); setNote(""); setCopied(false); return; }
+      if (r.mayRenew && await ask(svAdmin.people.askRenew(x.name), { ok: sv.askOk.replace })) return go(true);
+      setNote(svAdmin.people.hasAccount(x.name));
+    } catch { setNote(svAdmin.people.inviteFailed); }
+  };
+  const url = got && setupUrl(location.origin, got.user, got.setup.secret);
+  const copy = async () => { try { await navigator.clipboard.writeText(url!); setCopied(true); } catch { /* no clipboard */ } };
+  return <div className="invite">
+    <div className="row mid"><IconButton icon="mail" tip="right" label={svAdmin.people.invite(x.name)} onClick={() => go()} /><small className="ro">{svAdmin.people.inviteHint}</small></div>
+    {got && url && <div className="setuplink" role="status">
+      <p>{svAdmin.people.invited(x.name, until(got.setup.expires))}</p>
+      <span className="end">
+        <a className="btn ghost icon bare tip-left" href={inviteMail({ to, name: x.name, trip: t.title, url, until: until(got.setup.expires) })} aria-label={svAdmin.people.mail(x.name)} data-tip={svAdmin.people.mail(x.name)}><Icon name="mail" /></a>
+        <IconButton icon="copy" look="bare" tip="left" label={svAdmin.people.copyInvite(x.name)} onClick={copy} />
+        <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(x.name)} onClick={() => setQr(true)} />
+      </span>
+      {copied && <p className="ro">{svAdmin.people.copied2}</p>}
+    </div>}
+    {note && <p className="ro" role="status">{note}</p>}
+    {qr && url && <QrDialog url={url} name={x.name} close={() => setQr(false)} />}
+  </div>;
 }
 
 const ROLES = PERM_ROLES; // AU-37: Resenär, then Följare

@@ -512,6 +512,7 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .tperson:focus-visible{outline:3px solid var(--sage);outline-offset:2px;border-radius:10px}.rolemark.initial{width:40px;height:40px;font-weight:700;font-size:1rem;flex:0 0 auto}
 .tname{display:flex;flex-direction:column;min-width:0}.tname small{font-size:.85rem}.sharebar{gap:8px;justify-content:center}fieldset.trole{border:0;padding:0;margin:8px 0}.trole .rolename{margin-left:6px;font-weight:600}
 .setuplink{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}.setuplink p{margin:0}
+.invite{margin:6px 0 10px}.invite .row small{flex:1}.forgot{margin:4px 0 12px}.forgot p{margin:6px 0 0}
 .users .row{flex-wrap:wrap}.users .row .end{margin-left:auto}
 .adduser{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:12px}.adduser label{flex:1 1 180px}
 a.btn.google{display:flex;justify-content:center;margin-top:8px;text-decoration:none}
@@ -519,6 +520,7 @@ a.btn.google{display:flex;justify-content:center;margin-top:8px;text-decoration:
 .btn.beta{position:relative}
 .betatag{position:absolute;top:-6px;right:-8px;padding:1px 6px;border-radius:99px;background:var(--acc);color:#fff;font:700 .62rem/1.4 "Instrument Sans",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
 .betatag.inline{position:static;vertical-align:middle;margin-left:6px}
+.newdot{position:absolute;bottom:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px var(--bg)}.mynotes{margin-top:14px;border-top:1px solid var(--line);padding-top:8px}.mynotes h4{margin:0 0 6px}.answer{background:var(--sand);border-left:3px solid var(--sage);padding:6px 10px;border-radius:6px}.answerform{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin-bottom:10px}.answerform label{flex:1 1 240px}
 .betanotice ul{margin:6px 0 12px;padding-left:1.2rem;display:grid;gap:6px}
 .note-row{border-top:1px solid var(--line);padding:8px 0}.note-row p{margin:2px 0}
 .usage{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}.usage p{margin:0 0 6px}

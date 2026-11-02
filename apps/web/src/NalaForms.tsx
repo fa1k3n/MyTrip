@@ -3,7 +3,7 @@ import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { Op, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
-  saveActivity, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
+  saveActivity, travelInput, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
   readingToForm, ticketActivities, type BookingInput, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
@@ -235,6 +235,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
   const { f, text, check } = useFields({
     start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
     category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "", dreamId: a?.dreamId ?? "",
+    vehicle: a?.travel?.vehicle ?? "", travelMin: String(a?.travel?.durationMin ?? ""), // TR-20
   });
   const [hiddenFrom, setHiddenFrom] = useState<string[]>(a?.hiddenFrom ?? []); // AU-18
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
@@ -244,7 +245,7 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
       onSubmit={() => {
         const durationMin = a?.pinned ? undefined : Number(f.duration) || undefined; // ED-25: a pinned activity keeps its time
         const miss = f.text.trim() && !a?.pinned ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
-        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, dreamId: f.dreamId, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)) }, p.id), p.id ? "edit activity" : "add activity");
+        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, dreamId: f.dreamId, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)), travel: travelInput(f.vehicle, f.travelMin) }, p.id), p.id ? "edit activity" : "add activity");
       }}
       onRemove={p.id && !a?.pinned ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
@@ -258,6 +259,13 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
         <option value="">{sv.chooseDuration}</option>
         {[...new Set([...DURATIONS, ...(a?.durationMin ? [a.durationMin] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
       </select></label>}
+      <div className="two">{/* the way here from the place before (TR-20) */}
+        <label>{sv.travelHere}<select {...text("vehicle")}>
+          <option value="">{sv.noTravel}</option>
+          {(["walk", "transit", "car", "train", "ferry"] as const).map((v) => <option key={v} value={v}>{sv.travelVehicles[v]}</option>)}
+        </select></label>
+        {f.vehicle && <label>{sv.travelMin}<input inputMode="numeric" {...text("travelMin")} /></label>}
+      </div>
       <label>{sv.category}<select {...text("category")}>
         <option value="">{sv.noCategory}</option>
         {ACTIVITY_CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}

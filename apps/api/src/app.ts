@@ -902,16 +902,21 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const item = p.source?.kind === "ai" && p.source.item; // AI-70: one added suggestion goes onto the trip as it is now
     if (t.revision !== p.baseRevision && !item) return c.json({ error: "conflict", revision: t.revision }, 409);
     let ops = p.ops;
-    if (p.source?.kind === "ai" && p.source.day) { // AI-77: the activity goes onto its day wherever that day is now
-      const i = t.days.findIndex((d) => d.id === (p.source as { day: string }).day);
-      if (i < 0) { p.status = "rejected"; await store.saveProposal(p); return c.json({ error: "day gone", problems: ["day gone"] }, 409); }
-      ops = ops.map((o) => ({ ...o, path: o.path.replace(/^days\/\d+\//, `days/${i}/`) }));
+    if (p.source?.kind === "ai" && p.source.day) {
+      const on = onItsDay(t, p);
+      if (!on) { p.status = "rejected"; await store.saveProposal(p); return c.json({ error: "day gone", problems: ["day gone"] }, 409); }
+      ops = on;
     }
     const r = await apply(t, ops, p.source?.kind === "ai" ? "ai" : "llm", p.reason, { c, who: "admin" });
     if ("conflict" in r) return c.json({ error: "conflict" }, 409);
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
   });
+  /** AI-77: a suggestion's activity goes onto its day wherever that day is now; undefined when the day is gone. */
+  const onItsDay = (t: Trip, p: Proposal) => {
+    const day = p.source?.kind === "ai" ? p.source.day : undefined, i = day ? t.days.findIndex((d) => d.id === day) : -1;
+    return !day ? p.ops : i < 0 ? undefined : p.ops.map((o) => ({ ...o, path: o.path.replace(/^days\/\d+\//, `days/${i}/`) }));
+  };
 
   const features = () => opts.ai?.features ?? FEATURES;
   const featureOf = (name: string) => (Object.hasOwn(features(), name) ? features()[name] : undefined);
@@ -965,8 +970,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
         .map((g) => {
           const ids = new Map<string, string>();
           for (const o of g) { const v = o.value as { id: string }; let id = v.id; for (let n = 2; taken.has(id); n++) id = `${v.id}-${n}`; taken.add(id); ids.set(v.id, id); }
-          return g.map((o) => { const v = o.value as { id: string; dreamId?: string };
-            return { ...o, value: { ...v, id: ids.get(v.id)!, ...(v.dreamId && ids.has(v.dreamId) ? { dreamId: ids.get(v.dreamId) } : {}) } }; });
+          return g.map((o) => { const v = o.value as { id: string; dreamId?: string; placeIds?: string[] }; // the links inside a suggestion follow its new ids (AI-77, AI-81)
+            return { ...o, value: { ...v, id: ids.get(v.id)!, ...(v.dreamId && ids.has(v.dreamId) ? { dreamId: ids.get(v.dreamId) } : {}),
+              ...(Array.isArray(v.placeIds) ? { placeIds: v.placeIds.map((x) => ids.get(x) ?? x) } : {}) } }; });
         });
     }
     const result = "error" in r ? "error" : groups.length ? "proposal" : "nothing";
@@ -1021,8 +1027,29 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const t = await load(c.req.param("id"));
     if (!mayRun(await store.loadSettings(), f, t)) return c.json({ error: "off" }, 409);
     if (!t.aiConsent) return c.json({ error: "consent" }, 409); // AI-64
+    const { apply: wantsApply } = await c.req.json<{ apply?: unknown }>().catch(() => ({ apply: undefined }));
+    // AI-80: the helpers' first run right after "Skapa med AI" is applied at once, since that press was the approval
+    const applyFirst = wantsApply === true && !!f.helper && !(await store.aiHelper(t.id, name))
+      && (await store.proposals(t.id)).some((p) => p.source?.kind === "ai" && p.source.feature === "draft" && p.status === "approved");
     const r = await runFeature(t, name, f, c.get("user")?.id ?? whoOf(c), actorName(c, t));
     if ("error" in r) return r.error === "cap" ? c.json({ error: "cap", scope: r.scope }, 429) : c.json({ error: r.error }, 502);
+    if (applyFirst && !("error" in r)) {
+      const applied = { activities: 0, tasks: 0, bookings: 0, wishes: 0 }, actor = `ai (${actorName(c, t)})`;
+      for (const p of (await store.proposals(t.id)).filter((x) => r.proposalIds.includes(x.id))) { // one at a time, so one that fails stays a proposal
+        const ops = onItsDay(await load(t.id), p);
+        if (!ops) continue;
+        const done = await apply(await load(t.id), ops, actor, p.reason || `ai ${name}`);
+        if (!("revision" in done)) continue;
+        p.status = "approved"; await store.saveProposal(p);
+        for (const o of ops) {
+          if (/^days\/\d+\/activities\/-$/.test(o.path)) applied.activities++;
+          else if (o.path === "tasks/-") applied.tasks++;
+          else if (o.path === "bookings/-") applied.bookings++;
+          else if (o.path === "dreams/-") applied.wishes++;
+        }
+      }
+      return c.json({ applied, proposalIds: r.proposalIds, reason: r.reason });
+    }
     const [pid] = r.proposalIds;
     if (f.applyToNew && pid && isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip
       const p = (await store.proposals(t.id)).find((x) => x.id === pid)!;

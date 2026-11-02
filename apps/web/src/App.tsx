@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type AiAdded, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { ABOUT_PAGE, forInstalled, landsOnAbout, needsConsent, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
@@ -14,7 +14,7 @@ const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.Pl
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
 const TicketView = lazy(() => import("./TicketView.tsx"));
-import { excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
+import { aiDoneText, excerpt, jumpTo, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
@@ -97,7 +97,7 @@ export function App() {
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
   const [newOpen, setNewOpen] = useState(false); // AI-10: "Beskriv din dröm"
-  const aiRun = useRef<{ tripId: string; ids: string[]; undone: boolean } | null>(null); // AI-79: the helpers' suggestions after a draft, rejected with its Ångra
+  const aiRun = useRef<{ tripId: string; before: Trip; undone: boolean } | null>(null); // AI-80: the trip before "Skapa med AI", for Ångra of all it added
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -231,17 +231,30 @@ export function App() {
   /** AI-10: a trip with its draft opens on Nåla with Ångra for the draft (AI-78); one without, on Drömmar. */
   const created = async (id: string, msg?: string, drafted?: Drafted) => {
     setNewOpen(false);
+    if (drafted && aiRun.current?.tripId !== id) aiRun.current = { tripId: id, before: drafted.before, undone: false }; // before any await: the helpers may be done (AI-82)
     await load();
     openTrip(id, drafted ? "nala" : "dr");
-    if (drafted) setUndo({ text: sv.newTripAi.drafted, ...drafted, draft: true });
+    if (drafted && !aiRun.current?.undone) setUndo((u) => (u?.draft && u.after.id === id ? u : { text: sv.newTripAi.drafted, ...drafted, draft: true }));
     if (msg) setNotice(msg);
   };
-  /** AI-79: a helper's suggestions after a draft are shown when they come, or rejected when the draft was undone meanwhile. */
-  const helperDone = (tripId: string, ids: string[]) => {
-    const r = aiRun.current?.tripId === tripId ? aiRun.current : (aiRun.current = { tripId, ids: [], undone: false });
-    if (r.undone) { ids.forEach((id) => void api.rejectMail(tripId, id).catch(() => {})); return; }
-    r.ids.push(...ids);
-    void load();
+  /** Sets a trip made with AI back to its state before the draft, built on the latest trip (AI-78, AI-80). */
+  const undoAi = async (tripId: string) => {
+    const r = aiRun.current, fresh = (await api.trips()).find((x) => x.id === tripId);
+    if (!r || r.tripId !== tripId || !fresh) return;
+    r.undone = true;
+    await api.change(fresh, undoOps(r.before, fresh), "undo");
+  };
+  /** AI-80: what a helper added shows when it comes; when the trip was set back meanwhile, it is taken out again. */
+  const helperDone = (tripId: string) => {
+    if (aiRun.current?.tripId === tripId && aiRun.current.undone) void undoAi(tripId).catch(() => {}).then(load);
+    else void load();
+  };
+  /** AI-82: the notice of what the AI added, with Ångra for all of it. */
+  const allDone = async (tripId: string, added: AiAdded) => {
+    const r = aiRun.current, fresh = (await api.trips().catch(() => [])).find((x) => x.id === tripId);
+    if (r?.tripId !== tripId || r.undone || !fresh) return;
+    setNotice("");
+    setUndo({ text: aiDoneText(added), before: r.before, after: fresh, draft: true });
   };
   /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
   const draftAi = !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas.changes !== false;
@@ -277,12 +290,7 @@ export function App() {
     const u = undo;
     setUndo(null);
     if (!u) return;
-    try { await api.change(u.after, undoOps(u.before, u.after), "undo"); } catch { setNotice(sv.undo.failed); await load(); return; }
-    if (u.draft) { // AI-78: the helpers' suggestions on the draft go with it, also those still to come (AI-79)
-      const r = aiRun.current?.tripId === u.after.id ? aiRun.current : (aiRun.current = { tripId: u.after.id, ids: [], undone: false });
-      r.undone = true;
-      await Promise.all(r.ids.splice(0).map((id) => api.rejectMail(u.after.id, id).catch(() => {})));
-    }
+    try { await (u.draft ? undoAi(u.after.id) : api.change(u.after, undoOps(u.before, u.after), "undo")); } catch { setNotice(sv.undo.failed); } // AI-78: all the AI added, also what comes later (AI-80)
     await load();
   };
   /** Edits from the Nåla forms: the error text or null (ED-10). */
@@ -459,7 +467,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
-    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} close={() => setNewOpen(false)} /></Suspense>}
+    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} allDone={(id, added) => void allDone(id, added)} close={() => setNewOpen(false)} /></Suspense>}
     {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog

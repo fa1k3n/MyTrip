@@ -1,5 +1,5 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
-import { lazy, Suspense, useEffect, useState, type DragEvent } from "react";
+import { Fragment, lazy, Suspense, useEffect, useState, type DragEvent } from "react";
 import { WISH_DRAG } from "./drag.ts";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
@@ -82,13 +82,20 @@ export function ActivityText({ t, a, who, eye, onPlace }: { t: Trip; a: Activity
   const one = a.placeIds.length === 1;
   return (
     <span className="what">
-      <span className="name">{one ? <PlaceLink t={t} id={a.placeIds[0]} text={a.text} onPlace={onPlace} /> : a.text}
+      <span className="name">{a.ai && <AiMark label={sv.aiRun.aiMade} /> /* AI-80, UI-21 */}{one ? <PlaceLink t={t} id={a.placeIds[0]} text={a.text} onPlace={onPlace} /> : a.text}
         {!!who?.length && <Eye t={t} who={who} open={eye} />}</span>
       {!one && a.placeIds.length > 0 && <small className="places">{a.placeIds.map((id, n) => <span key={id}>{n ? ", " : ""}<PlaceLink t={t} id={id} onPlace={onPlace} /></span>)}</small>}
       {a.note && <small className="ro anote">{a.note}</small>}
     </span>
   );
 }
+
+/** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. */
+export const TravelRow = ({ travel, li }: { travel?: Activity["travel"]; li?: boolean }) => {
+  if (!travel) return null;
+  const row = <><CatIcon id={travel.vehicle} /><span>{fmtDuration(travel.durationMin)}</span></>;
+  return li ? <li className="travel">{row}</li> : <div className="travel">{row}</div>;
+};
 
 /** A booking's kind as an icon, with the kind as accessible name and tooltip (BK-07). */
 export function KindIcon({ kind }: { kind?: string }) {
@@ -105,13 +112,13 @@ export const PinMark = () => <span className="pinmark" role="img" aria-label={sv
 
 export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
   const who = hiddenFromIn(x);
-  return <>{x.activities.map((a) => (
-    <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`} key={a.id}>
+  return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} />
+    <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`}>
       <ActivityWhen a={a} />{a.pinned && <PinMark />}
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />
       {(() => { const b = ticketFor(t, a.id); return b && <TicketButton b={b} edit={edit} />; })() /* BK-08 */}
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
-    </div>
+    </div></Fragment>
   ))}</>;
 }
 
@@ -139,13 +146,13 @@ export function SuggestionActions({ id, text, review }: { id: string; text: stri
 
 /** AI-77: the activities the wish helper suggests for a day, marked as AI, each taken or rejected together with its wish. */
 function DaySuggestions({ list, review }: { list: WishSuggestion[]; review: Review }) {
-  return <>{list.map((s) => { const a = s.activity!; return (
-    <div className="act sug" key={s.id}>
+  return <>{list.map((s) => { const a = s.activity!; return (<Fragment key={s.id}><TravelRow travel={a.travel} />
+    <div className="act sug">
       <span className="when">{a.start ?? ""}</span>
       <span className="what-col"><span><AiMark />{a.text}</span>
         <small className="ro">{[a.durationMin && fmtDuration(a.durationMin), s.wish.url && <a key="u" className="place" href={s.wish.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a>].filter(Boolean).map((x, i) => <span key={i}>{i > 0 && " · "}{x}</span>)}</small></span>
       <SuggestionActions id={s.id} text={a.text} review={review} />
-    </div>); })}</>;
+    </div></Fragment>); })}</>;
 }
 
 type Review = NonNullable<TripViewProps["review"]>;

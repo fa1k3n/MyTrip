@@ -7,7 +7,7 @@ import { TIME_POINT } from "./categories.ts";
 
 export { activityEnd };
 type Activity = Trip["days"][number]["activities"][number];
-type Timed = { start?: string; end?: string; durationMin?: number };
+type Timed = { start?: string; end?: string; durationMin?: number; travel?: { durationMin: number } };
 
 /** A gap shorter than this is a buffer, not a hole in the plan. */
 export const GAP_MIN = 30;
@@ -24,13 +24,13 @@ export function activityMissing(input: { start: string; durationMin?: number; ca
 
 export type Row<A> = { kind: "act"; a: A } | { kind: "gap" | "clash"; min: number };
 
-/** The activities with a gap or clash row between them where the plan has a hole or an overlap (ED-17). */
+/** The activities with a gap or clash row between them where the plan has a hole or an overlap (ED-17); the way to an activity counts (TR-20). */
 export function scheduleRows<A extends Timed>(list: A[]): Row<A>[] {
   const rows: Row<A>[] = [];
   let latest: number | undefined; // the latest end so far; undefined when it is not known
   for (const a of list) {
     if (a.start && latest !== undefined) {
-      const d = toMin(a.start) - latest;
+      const d = toMin(a.start) - latest - (a.travel?.durationMin ?? 0);
       if (d < 0) rows.push({ kind: "clash", min: -d });
       else if (d >= GAP_MIN) rows.push({ kind: "gap", min: d });
     }

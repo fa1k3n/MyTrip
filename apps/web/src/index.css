@@ -55,6 +55,9 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .sum{color:var(--mute);font-size:.92rem}.time{font-size:.85rem;color:var(--sageT);font-weight:600}
 .body{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}.day.open .body{display:block}
 .act{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}.act time{min-width:64px;font-weight:600}
+.travel{display:flex;align-items:center;gap:8px;padding:4px 0 4px 74px;color:var(--mute);font-size:.85rem;border-bottom:1px dashed var(--line)}.travel .cat{transform:scale(.8)} /* TR-20 */
+.upday>.travel{list-style:none;padding:2px 0 2px 18px;border:0}
+.step.wait{opacity:.5}.step.wait .mark{border:2px dashed var(--line)} /* AI-76: not started yet */
 .place{background:none;border:0;border-bottom:2px solid var(--acc);color:var(--acct);padding:0;font-weight:600}
 .badge{display:inline-block;background:var(--bg);border-radius:8px;padding:1px 8px;font-size:.8rem;margin-right:4px}
 .ok{background:var(--sage);color:#1b2a20}

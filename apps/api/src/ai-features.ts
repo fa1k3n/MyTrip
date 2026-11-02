@@ -72,13 +72,19 @@ const wishes: AiFeature = {
   area: "suggestions", web: true,
   instructions: `Your job: suggest 5 to 8 real places or activities that this family would love on this trip: follow what the purpose says they love,
 the places where the days are spent and the travelers' ages. Use web search to find real places that are open at the time of the trip, each with its official page.
-Put each on a day spent in or near the place, fitting the day's pace: nothing on a long travel day, at most two on a day, and not on a day that is already full.`,
-  task: `For each suggestion add two operations, the wish first:
+Put each on a day spent in or near the place, fitting the day's pace: nothing on a long travel day, at most two on a day, and not on a day that is already full.
+Give every activity an estimated start time that fits the day's start and end, the activities already on the day and the travel to it,
+and the way there from the place before (the previous activity, or where the day starts): walking, public transport or car, with a realistic duration.`,
+  task: `For each suggestion add three operations, the wish first:
 add dreams/- with { id, title (the place's name, short), category (one of ${WISH_CATEGORIES.join(", ")}), url (its official page) };
-then add days/<index>/activities/- on the day it fits, with { id, text (a short Swedish title), dreamId (the wish's id), category (the same),
-durationMin (a sensible length), start (HH:MM, only when the time matters, for example a show) }.`,
-  allows: (o) => o.op === "add" && (o.path === "dreams/-" || ON_DAY.test(o.path)),
-  tidy: (o) => (o.path === "dreams/-" ? { ...o, value: { source: "AI-hjälpen", icon: "✨", votes: 0, ...valueOf(o) } } : { ...o, value: { estimated: true, ...valueOf(o) } }),
+then add days/<index>/activities/- on the day it fits, with { id, text (a short Swedish title), dreamId (the wish's id), placeIds: [the place's id],
+category (the same), start (HH:MM, estimated), durationMin (a sensible length), travel: { vehicle: walk|transit|car|train|ferry, durationMin } };
+then add places/- with { id, name, address (street, postcode and town), website (its official page), phone (when found),
+notes (opening hours on those dates and other practical facts in one or two Swedish sentences, when found) }.
+List the day's suggestions in the order of their start times.`,
+  allows: (o) => o.op === "add" && (o.path === "dreams/-" || o.path === "places/-" || ON_DAY.test(o.path)),
+  tidy: (o) => (o.path === "dreams/-" ? { ...o, value: { source: "AI-hjälpen", icon: "✨", votes: 0, ...valueOf(o) } }
+    : ON_DAY.test(o.path) ? { ...o, value: { estimated: true, ...valueOf(o) } } : o),
   helper: {
     fingerprint: (t: Trip) => JSON.stringify({
       purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null), places: t.places.map((p) => p.name),
@@ -86,10 +92,12 @@ durationMin (a sensible length), start (HH:MM, only when the time matters, for e
     }),
     known: (t: Trip) => t.dreams.map((w) => w.title),
     textOf: (o) => String(valueOf(o).title ?? valueOf(o).text ?? ""),
-    finish: (o) => ({ ...o, value: o.path === "dreams/-" ? { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } : { ...valueOf(o), estimated: true } }),
-    group: (ops) => ops.filter((o) => o.path === "dreams/-").flatMap((w) => { // a wish without its activity is no whole suggestion
+    finish: (o) => (o.path === "dreams/-" ? { ...o, value: { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } }
+      : ON_DAY.test(o.path) ? { ...o, value: { ...valueOf(o), estimated: true, ai: true } } : o),
+    group: (ops) => ops.filter((o) => o.path === "dreams/-").flatMap((w) => { // a wish without its activity is no whole suggestion; its place goes with it (AI-81)
       const a = ops.find((o) => ON_DAY.test(o.path) && valueOf(o).dreamId === valueOf(w).id);
-      return a ? [[w, a]] : [];
+      const ids = (a && Array.isArray(valueOf(a).placeIds) ? valueOf(a).placeIds as unknown[] : []).map(String);
+      return a ? [[w, a, ...ops.filter((o) => o.path === "places/-" && ids.includes(String(valueOf(o).id)))]] : [];
     }),
   },
 };

@@ -165,7 +165,17 @@ export type ActivityInput = {
   note?: string; // undefined: keep, "": remove (ED-19)
   hiddenFrom?: string[]; // undefined: keep, []: shown to everyone (AU-18)
   dreamId?: string; // undefined: keep, "": no wish (MI-19)
+  travel?: Activity["travel"] | false | null; // undefined: keep, false: none, null: not valid (TR-20)
 };
+
+const VEHICLES = ["walk", "transit", "car", "train", "ferry"] as const;
+/** The way to an activity as typed in the form: false when no vehicle is chosen; null when the minutes are no whole number (TR-20). */
+export function travelInput(vehicle: string, minutes: string): Activity["travel"] | false | null {
+  if (!vehicle) return false;
+  const n = Number(minutes.trim());
+  if (!(VEHICLES as readonly string[]).includes(vehicle) || !Number.isInteger(n) || n <= 0) return null;
+  return { vehicle: vehicle as (typeof VEHICLES)[number], durationMin: n };
+}
 
 /** Timed activities in time order, untimed last (ED-05). */
 export const byTime = (list: Activity[]) =>
@@ -177,6 +187,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
   const text = input.text.trim();
   if (!text) return fail(sv.errors.text);
   if (input.start && !isTime(input.start)) return fail(sv.errors.activityTime);
+  if (input.travel === null) return fail(sv.errors.travel);
   const ops: Op[] = [];
   const taken = allIds(t);
   let placeIds: string[] = [];
@@ -201,6 +212,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     hiddenFrom: input.hiddenFrom === undefined ? old?.hiddenFrom : input.hiddenFrom.length ? input.hiddenFrom : undefined,
     dreamId: input.dreamId === undefined ? old?.dreamId : input.dreamId || undefined,
+    travel: input.travel === undefined ? old?.travel : input.travel || undefined,
     end: point ? input.start : input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });
   const fixed = (a: Activity) => JSON.stringify([a.start, a.end, a.durationMin, !!a.estimated]);

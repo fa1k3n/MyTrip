@@ -20,6 +20,8 @@ export const Activity = z.object({
   dreamId: Id.optional(), // the wish it makes come true; experienced when its day has passed (MI-19)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: hidden from them, title and places removed (AU-18)
   pinned: z.boolean().optional(), // nålad: fixed, not moved, retimed or removed until unpinned (ED-24, ED-25, MC-20)
+  travel: z.object({ vehicle: z.enum(["car", "ferry", "train", "transit", "walk"]), durationMin: z.number().int().positive() }).optional(), // the way here from the place before (TR-20)
+  ai: z.boolean().optional(), // added by the AI service when the trip was made (AI-02, AI-80)
 });
 export const Leg = z.object({
   vehicle: z.enum(["car", "ferry", "train", "transit", "walk"]), origin: z.string().min(1), destination: z.string().min(1),

@@ -1,11 +1,11 @@
 // Nåla in edit mode: drag and drop of activities and wishes (DB-17), and gap and clash rows (ED-15..ED-17). Loaded on demand (PF-01).
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { Fragment, useState, type DragEvent, type KeyboardEvent } from "react";
 import type { Trip } from "@trip/schema";
 import { moveActivity, planWish, scheduleRows, WISH_DRAG } from "./schedule.ts";
 import { fmtDuration } from "./transport.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
-import { ActivityText, ActivityWhen, type Activity, type Run } from "./TripView.tsx";
+import { ActivityText, ActivityWhen, TravelRow, type Activity, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { togglePin } from "./edit.ts";
 import { ask } from "./Ask.tsx"; // UI-11
@@ -57,8 +57,8 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
           </div>
         );
         const a = r.a, i = ++n, miss = missing(a);
-        return (
-          <div key={a.id} className={`act drag ${a.pinned ? "pinned" : ""} ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
+        return (<Fragment key={a.id}><TravelRow travel={a.travel} />
+          <div className={`act drag ${a.pinned ? "pinned" : ""} ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
             draggable={!a.pinned} onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => { dragging = null; setOver(null); }}
             onDragOver={(e) => { accept(e); e.stopPropagation(); setOver(posFor(e, i)); }}
@@ -69,7 +69,7 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
             <span className="what-col"><ActivityText t={t} a={a} who={who.get(a.id)} eye={() => edit({ kind: "hidden", dayId: x.id, id: a.id })} onPlace={onPlace} />{miss && <small className="miss">{sv.missing.label}: {miss}</small>}</span>
             <IconButton icon="pin" look="bare" tip="left" label={`${a.pinned ? sv.pin.off : sv.pin.on}: ${a.text}`} pressed={!!a.pinned} onClick={async () => { if (a.pinned && !(await ask(sv.pin.ask(a.text), { ok: sv.pin.off }))) return; run((cur) => togglePin(cur, x.id, a.id), a.pinned ? "unpin" : "pin"); }} mut /> {/* ED-24: unpinning asks first */}
             <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />
-          </div>
+          </div></Fragment>
         );
       })}
       {!x.activities.length && <p className={`ro drop ${over === 0 ? "over-top" : ""}`}>{sv.dropHere}</p>}

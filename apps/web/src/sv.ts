@@ -64,6 +64,9 @@ export const sv = {
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
   payments: "Inbetalningar", addPayment: "Registrera inbetalning", newPayment: "Ny inbetalning", noPayments: "Inga inbetalningar ännu.",
   from: "Från", to: "Till", note: "Notering",
+  travelHere: "Resväg hit", noTravel: "Ingen", travelMin: "Restid (minuter)", // TR-20
+  travelVehicles: { walk: "Till fots", transit: "Kollektivt", car: "Bil", train: "Tåg", ferry: "Färja" } as Record<string, string>,
+  travelRow: (vehicle: string, time: string) => `${vehicle}, ${time}`,
   addPerson: "Lägg till person", newPerson: "Ny person", renamePerson: "Byt namn", renameTraveler: (n: string) => `Byt namn på ${n}`, name: "Namn", noPeople: "Lägg till personerna som delar på kostnaderna.",
   of: "av", badAmount: "Ange ett belopp större än noll, t.ex. 640,50.",
   budgetCategories: ["Boende", "Transport", "Mat", "Upplevelse", "Shopping", "Övrigt"], // MI-30
@@ -149,9 +152,15 @@ export const sv = {
     makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI", howTo: "Se filmen om hur det går till.", // UI-23
     working: "Skapar din resa…", busy: "AI-tjänsten gör ett utkast utifrån din beskrivning. Det tar upp till en minut.", seconds: (n: number) => `${n} s`, // AI-76
     steps: { draft: "Skapar resa och rutt", prep: "Letar upp bra att veta inför resan", wishes: "Föreslår aktiviteter som passar" } as Record<string, string>,
-    stepState: { run: "pågår", done: "klart", failed: "misslyckades" },
-    background: "Resan är klar att öppna. Förslagen blir klara medan du tittar, de hamnar i Nåla och Önska.", goTrip: "Gå till resan",
+    stepState: { wait: "väntar", run: "pågår", done: "klart", failed: "misslyckades" },
+    background: "Resan är klar att öppna. Resten läggs in medan du tittar, i Nåla och Önska.", goTrip: "Gå till resan",
     drafted: "Utkastet är inlagt", // AI-78: with Ångra
+    addedCount: (n: number) => (n ? `${n} inlagda` : "inget nytt"), // AI-80
+    done: { // AI-82
+      activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning att boka", "bokningar att boka"],
+      text: (list: string, one: boolean) => `AI är klar: ${list} är ${one ? "inlagd" : "inlagda"}. Ta bort det du inte vill ha.`,
+      nothing: "AI är klar men hittade inget mer att lägga in.",
+    },
     draftLater: "Utkastet ligger kvar under Förslag i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",
   },
   aiRun: { // AI-03, AI-64, AI-65
@@ -285,7 +294,7 @@ export const sv = {
     summary: "Skriv en kort sammanfattning av dagen.", icons: "Ange en eller två ikoner, t.ex. 🚗🏛️.",
     time: "Ange start- och sluttid.", endBeforeStart: "Sluttiden kan inte vara före starttiden.", day: "Dagen finns inte längre.",
     text: "Beskriv aktiviteten.", activityTime: "Ange tiden som TT:MM.", place: "Ange namn och adress för den nya platsen.",
-    name: "Ange ett namn.", person: "Personen finns inte längre.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
+    name: "Ange ett namn.", person: "Personen finns inte längre.", travel: "Ange restiden i hela minuter.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
     expenseText: "Beskriv utlägget.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
     taskText: "Beskriv uppgiften.", url: "Webbadressen ser inte ut att stämma, t.ex. www.exempel.se.", item: "Skriv vad som ska packas.",
     tooLong: "En resa kan vara högst 60 dagar.", activityDate: "Aktiviteten ligger inte på bokningens första datum.",

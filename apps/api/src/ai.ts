@@ -66,7 +66,7 @@ export function aiView(t: Trip) {
       legs: d.legs.map((l) => ({ vehicle: l.vehicle, origin: txt(l.origin), destination: txt(l.destination), departure: l.departure, durationMin: l.durationMin })),
       activities: d.activities.map((a) => ({
         id: a.id, text: txt(a.text), note: txt(a.note), start: a.start, end: a.end, durationMin: a.durationMin, category: a.category,
-        placeIds: a.placeIds, pinned: a.pinned, dreamId: a.dreamId,
+        placeIds: a.placeIds, pinned: a.pinned, dreamId: a.dreamId, travel: a.travel,
       })),
     })),
     places: t.places.map((p) => ({ id: p.id, name: txt(p.name), address: txt(p.address), website: p.website })),

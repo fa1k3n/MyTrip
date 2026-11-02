@@ -1,23 +1,24 @@
 // A new trip from "Beskriv din dröm" (AI-10): the description becomes the purpose as written. With AI the draft of the trip is
-// applied at once, since pressing "Skapa med AI" is the approval (AI-78), and the helpers then run once on it (AI-79).
+// applied at once, since pressing "Skapa med AI" is the approval (AI-78), and so is what the helpers then make on it (AI-80).
 // Without AI the trip is made with the purpose only.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Trip } from "@trip/schema";
-import { api } from "./api.ts";
+import { api, type AiAdded } from "./api.ts";
 import { aiErrorText } from "./format.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-/** The helpers run right after the draft, in this order in the checklist (AI-76, AI-79). */
+/** The helpers run right after the draft, in this order in the checklist (AI-76, AI-80). */
 export const DRAFT_HELPERS = ["prep", "wishes"] as const;
-type Step = { state: "run" | "done" | "failed"; since: number; note?: string };
+type Step = { state: "wait" | "run" | "done" | "failed"; since: number; note?: string }; // wait: shown greyed until it starts (AI-76)
 /** The trip before and after its draft, for Ångra (AI-78, ED-22). */
 export type Drafted = { before: Trip; after: Trip };
 
-export function NewTripDialog({ ai, created, helperDone, close }: {
+export function NewTripDialog({ ai, created, helperDone, allDone, close }: {
   ai: boolean;
   created: (id: string, notice?: string, drafted?: Drafted) => void; // closes the dialog and opens the trip
-  helperDone: (tripId: string, proposalIds: string[]) => void; // a helper's suggestions, also after the dialog has closed (AI-79)
+  helperDone: (tripId: string) => void; // what a helper added, also after the dialog has closed (AI-80)
+  allDone: (tripId: string, added: AiAdded) => void; // the notice of what the AI added (AI-82)
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -40,7 +41,9 @@ export function NewTripDialog({ ai, created, helperDone, close }: {
     try { await api.aiConsent(id); } catch { return created(id, sv.aiRun.errors.network); } // pressing "Skapa med AI" is the agreement (AI-64)
     const tripNow = async () => (await api.trips()).find((x) => x.id === id);
     const before = await tripNow().catch(() => undefined);
+    const offered = await api.aiStatus(id).then((s) => DRAFT_HELPERS.filter((n) => s.helpers[n]?.available), () => []);
     step("draft", { state: "run" });
+    offered.forEach((n) => step(n, { state: "wait" })); // all the steps from the start (AI-76)
     const r = await api.ai(id, "draft");
     if (!r.ok) return created(id, aiErrorText(r));
     if (!r.applied) return created(id, r.proposalIds.length ? sv.newTripAi.draftLater : sv.newTripAi.nothing);
@@ -49,15 +52,17 @@ export function NewTripDialog({ ai, created, helperDone, close }: {
     if (!before || !after) return created(id);
     const drafted = { before, after };
     setReady({ id, drafted });
-    const offered = await api.aiStatus(id).then((s) => DRAFT_HELPERS.filter((n) => s.helpers[n]?.available), () => []);
     if (!offered.length) return go(id, drafted);
     offered.forEach((n) => step(n, { state: "run", since: Date.now() }));
-    await Promise.all(offered.map(async (n) => { // at the same time; each one's suggestions come in as soon as it is done
-      const h = await api.ai(id, n);
-      if (h.ok) helperDone(id, h.proposalIds);
-      step(n, h.ok ? { state: "done", note: sv.aiRun.ran(h.proposalIds.length) } : { state: "failed", note: aiErrorText(h) });
+    const added: AiAdded = { activities: 0, tasks: 0, bookings: 0, wishes: 0 };
+    await Promise.all(offered.map(async (n) => { // at the same time; what each one makes is applied as soon as it is done (AI-80)
+      const h = await api.ai(id, n, { apply: true });
+      if (h.ok) { helperDone(id); for (const k of Object.keys(added) as (keyof AiAdded)[]) added[k] += h.added?.[k] ?? 0; }
+      const n2 = h.ok ? (h.added ? h.added.activities + h.added.tasks + h.added.bookings : h.proposalIds.length) : 0;
+      step(n, h.ok ? { state: "done", note: sv.newTripAi.addedCount(n2) } : { state: "failed", note: aiErrorText(h) });
     }));
     go(id, drafted); // all done: to the trip by itself
+    allDone(id, added);
   };
   const submit = (e: FormEvent) => { e.preventDefault(); void make(ai); };
   return (
@@ -89,7 +94,7 @@ function Working({ text, steps, goTrip }: { text: string; steps: Record<string, 
     <blockquote className="manifest">{text}</blockquote>
     <ol className="steps">{(["draft", ...DRAFT_HELPERS] as string[]).filter((n) => steps[n]).map((n) => { const s = steps[n]!; return (
       <li key={n} className={`step ${s.state}`}>
-        <span className="mark" aria-hidden="true">{s.state === "run" ? <span className="spinner" /> : <Icon name={s.state === "done" ? "check" : "close"} />}</span>
+        <span className="mark" aria-hidden="true">{s.state === "run" ? <span className="spinner" /> : s.state === "wait" ? null : <Icon name={s.state === "done" ? "check" : "close"} />}</span>
         <span>{sv.newTripAi.steps[n]}<span className="sr"> {sv.newTripAi.stepState[s.state]}</span>
           {s.state === "run" && <small className="ro" aria-hidden="true"> {sv.newTripAi.seconds(Math.round((Date.now() - s.since) / 1000))}</small>}
           {s.note && <small className="ro"> · {s.note}</small>}</span>

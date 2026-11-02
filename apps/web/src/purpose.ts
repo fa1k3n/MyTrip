@@ -44,3 +44,6 @@ export function suggestPurpose(t: TripLike): string | null {
   if (what) text += ` ${cap(what)}${highlights.length ? ` – bland annat ${list(highlights)}` : ""}.`;
   return text;
 }
+
+/** True when the field holds text someone wrote, which the proposal must not replace without asking (MT-14). */
+export const replaceNeedsAsk = (current: string, suggestion: string) => current.trim() !== "" && current.trim() !== suggestion.trim();

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { suggestPurpose } from "../src/purpose.ts";
+import { replaceNeedsAsk, suggestPurpose } from "../src/purpose.ts";
 
 const day = (date: string, location: string, legs: object[], activities: object[]) => ({ date, location, legs, activities });
 const act = (category?: string, placeIds: string[] = []) => ({ text: "x", category, placeIds });
@@ -29,4 +29,12 @@ test("MT-11 suggestPurpose with little planned", () => {
   assert.equal(suggestPurpose({ travelers: [], places: [], days: [day("2026-10-30", "Berlin", [], []), day("2026-11-02", "Rostock", [], [])] } as never),
     "4 dagar, 30 oktober–2 november. Via Berlin och Rostock.");
   assert.equal(suggestPurpose({ travelers: [], places: [], days: [] } as never), null);
+});
+
+// REQ: MT-14 the proposal asks before it replaces a purpose that someone wrote; an empty field or the same text is filled at once
+test("MT-14 replaceNeedsAsk only for own text", () => {
+  assert.equal(replaceNeedsAsk("", "6 dagar i Berlin."), false);
+  assert.equal(replaceNeedsAsk("  ", "6 dagar i Berlin."), false);
+  assert.equal(replaceNeedsAsk("6 dagar i Berlin. ", "6 dagar i Berlin."), false);
+  assert.equal(replaceNeedsAsk("Vi vill åka till Hamburg med barnen.", "6 dagar i Berlin."), true);
 });

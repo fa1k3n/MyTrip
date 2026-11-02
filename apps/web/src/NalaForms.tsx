@@ -9,7 +9,7 @@ import {
 import { lookupPlace } from "./weather.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
-import { suggestPurpose } from "./purpose.ts";
+import { replaceNeedsAsk, suggestPurpose } from "./purpose.ts";
 import { dayLabel, dayTitle, shortDate } from "./format.ts";
 import { activityMissing, planWish } from "./schedule.ts";
 import { pickedLabel } from "./hiddenView.ts";
@@ -84,7 +84,9 @@ function TripForm(p: Props) {
       <label>{sv.title}<input {...text("title")} autoFocus /></label>
       <div className="lblrow">
         <label htmlFor="purpose">{sv.purpose}</label>
-        {suggestion && <IconButton icon="sparkle" look="bare" tip="left" label={sv.suggestPurpose} onClick={() => set("purpose", suggestion)} />}
+        {suggestion && <IconButton icon="sparkle" look="bare" tip="left" label={sv.suggestPurpose} onClick={async () => { // MT-14: never replace own words without asking
+          if (!replaceNeedsAsk(f.purpose, suggestion) || await ask(sv.replacePurposeAsk, { ok: sv.replacePurpose })) set("purpose", suggestion);
+        }} />}
       </div>
       <textarea id="purpose" rows={4} {...text("purpose")} />
       <p className="ro note">{suggestion ? sv.purposeHint : sv.noPurposeYet}</p>

@@ -159,6 +159,7 @@ export const sv = {
   datesHint: "Nya datum får en tom dag. Dagar utanför datumen tas bort.", confirmRemoveDays: "Dessa dagar tas bort:",
   activityNote: "Anteckning (visas under rubriken)", editTrip: "Ändra namn och syfte", purpose: "Syfte",
   suggestPurpose: "Föreslå syfte utifrån planen", purposeHint: "Syftet hjälper till att ge bra förslag på aktiviteter. Förslaget bygger på dagarna i Nåla, ändra fritt innan du sparar.", noPurposeYet: "Lägg in dagar i Nåla först, så kan ett syfte föreslås.",
+  replacePurposeAsk: "Ersätta det som står i Syfte med förslaget?", replacePurpose: "Ersätt",
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
   login: {
     title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut",

@@ -1,0 +1,38 @@
+{
+  "voice": "kpTdKfohzvarfFPnwuHW",
+  "model": "eleven_v4",
+  "scenes": [
+    {
+      "file": "01.mp3",
+      "text": "Med AI i Basläger blir några rader om er dröm en plan med dagar, rutt och förslag. Så här går det till när Anna skapar familjens höstlovsresa."
+    },
+    {
+      "file": "02.mp3",
+      "text": "Anna trycker på Skapa ny resa och skriver med egna ord vad familjen drömmer om: Hamburg på höstlovet med barnen, som är sju och tio. De tar bilen, och barnen älskar djur och båtar. Sen trycker hon på Skapa med AI."
+    },
+    {
+      "file": "03.mp3",
+      "text": "På någon minut gör AI:n ett utkast: namn, datum, resenärer och en dag i taget med rutten. Utkastet läggs in direkt. Ångrar sig Anna räcker ett tryck på Ångra."
+    },
+    {
+      "file": "04.mp3",
+      "text": "Samtidigt letar AI:n på webben upp det som är lätt att missa längs vägen: miljödekalen till bilen i Tyskland och EU-kortet. Hotellet med pool hamnar under Bokningar, som att boka. Allt har en källa att kolla."
+    },
+    {
+      "file": "05.mp3",
+      "text": "Barnen älskar djur och båtar, så AI:n föreslår Tierpark Hagenbeck och en hamnrundtur, var och en på en dag där den passar. Erik tar med det han gillar med en bock, och det han avvisar föreslås inte igen."
+    },
+    {
+      "file": "06.mp3",
+      "text": "AI:n föreslår, ni bestämmer. Inget förslag läggs till förrän någon tar med det. Resenärernas namn byts mot ålder, och bokningsnummer, mejl och telefonnummer skickas aldrig till AI-tjänsten."
+    },
+    {
+      "file": "07.mp3",
+      "text": "Det som brukar ta flera kvällar med flikar, listor och regler att leta upp är klart på några minuter. Då blir det mer tid över till det roliga: att längta."
+    },
+    {
+      "file": "08.mp3",
+      "text": "AI-planeringen blir en del av Basläger Plus, som kommer snart. Vill du vara med från början? Säg till, så får du veta först."
+    }
+  ]
+}

@@ -1,6 +1,7 @@
-// UI-16: makes the narration of the film on Om Basläger with ElevenLabs, one MP3 per scene, into public/om-audio/.
+// UI-19, UI-23: makes the narration of a film with ElevenLabs, one MP3 per scene: Om Basläger (public/om.html) into public/om-audio/,
+// or with the argument "ai" the AI film (public/ai.html) into public/ai-audio/.
 // The key is read from the environment and never written anywhere; it lives in .env.local at the root of the private repo:
-//   node --env-file=../../../.env.local om-voice.mjs
+//   node --env-file=../../../.env.local om-voice.mjs [ai]
 // Without ELEVENLABS_VOICE it lists the voices of the account. A text already recorded with the same voice is reused, also when
 // the scene has moved, so only new or changed texts cost characters.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -20,10 +21,12 @@ if (!voice) {
   process.exit(0);
 }
 
-const page = readFileSync(new URL("./public/om.html", import.meta.url), "utf8");
+const film = process.argv[2] ?? "om";
+if (!/^[a-z]+$/.test(film)) { console.error("Filmens namn: om eller ai."); process.exit(1); }
+const page = readFileSync(new URL(`./public/${film}.html`, import.meta.url), "utf8");
 const texts = [...page.matchAll(/^ {4}text: "((?:[^"\\]|\\.)*)",$/gm)].map((m) => JSON.parse(`"${m[1]}"`));
-if (!texts.length) { console.error("Hittade inga scener i public/om.html."); process.exit(1); }
-const dir = new URL("./public/om-audio/", import.meta.url);
+if (!texts.length) { console.error(`Hittade inga scener i public/${film}.html.`); process.exit(1); }
+const dir = new URL(`./public/${film}-audio/`, import.meta.url);
 mkdirSync(dir, { recursive: true });
 const indexUrl = new URL("index.json", dir);
 const old = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { scenes: [] };
@@ -47,4 +50,4 @@ for (const [i, text] of texts.entries()) {
   console.log(`${file} klar (${text.length} tecken)`);
 }
 writeFileSync(indexUrl, JSON.stringify({ voice, model: MODEL, scenes }, null, 2) + "\n");
-console.log(`\nKlart: ${scenes.length} scener i public/om-audio/, ${chars} tecken använda nu.`);
+console.log(`\nKlart: ${scenes.length} scener i public/${film}-audio/, ${chars} tecken använda nu.`);

@@ -146,7 +146,7 @@ export const sv = {
     example: "Vi vill åka till Hamburg på höstlovet med barnen, som är 7 och 10 år. Vi tar bilen och vill inte köra mer än fyra timmar om dagen. Barnen älskar djur och båtar, och vi vuxna vill äta gott och hinna med något museum. Gärna ett hotell med pool.",
     aiNote: "Texten sparas som resans syfte. Den skickas som den är till AI-tjänsten Claude från Anthropic, som lägger in namn, datum, resenärer och dagar och sedan föreslår aktiviteter och sånt som är bra att veta. Utkastet kan ångras, och förslagen tar du med eller avvisar.",
     note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
-    makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI",
+    makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI", howTo: "Se filmen om hur det går till.", // UI-23
     working: "Skapar din resa…", busy: "AI-tjänsten gör ett utkast utifrån din beskrivning. Det tar upp till en minut.", seconds: (n: number) => `${n} s`, // AI-76
     steps: { draft: "Skapar resa och rutt", prep: "Letar upp bra att veta inför resan", wishes: "Föreslår aktiviteter som passar" } as Record<string, string>,
     stepState: { run: "pågår", done: "klart", failed: "misslyckades" },

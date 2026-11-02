@@ -68,7 +68,7 @@ export function NewTripDialog({ ai, created, helperDone, close }: {
       <h3>{sv.newTripAi.title}</h3>
       <form onSubmit={submit}>
         <label>{sv.newTripAi.label}<textarea rows={6} maxLength={2000} value={text} placeholder={sv.newTripAi.example} onChange={(e) => setText(e.target.value)} disabled={busy} autoFocus /></label>
-        <p className="ro note">{ai ? sv.newTripAi.aiNote : sv.newTripAi.note}</p>
+        <p className="ro note">{ai ? sv.newTripAi.aiNote : sv.newTripAi.note} {ai && <a className="place" href="/ai.html" target="_blank" rel="noopener noreferrer">{sv.newTripAi.howTo}</a> /* UI-23 */}</p>
         {err && <p className="err" role="alert">{err}</p>}
         <div className="dlgbar">
           <button className="btn" type="submit" disabled={busy || (ai && !text.trim())}>{ai ? sv.newTripAi.makeAi : sv.newTripAi.make}</button>

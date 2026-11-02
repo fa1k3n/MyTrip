@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<!-- UI-23: Skapa resan med AI, a film in the player and style of Om Basläger (UI-13) on making a trip with AI. Fictional family; loads nothing from other sites (SP-07). -->
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skapa resan med AI</title>
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#F5F2EB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1D1B" media="(prefers-color-scheme: dark)">
+<style>
+/* Layout: the film plays like an embedded video (UI-17): a 16:9 frame, controls over its lower edge, chapters in a drawer. */
+:root{
+  --bg:#F5F2EB; --card:#fff; --ink:#2C2A29; --mute:#6B6560; --acc:#C87A53; --acct:#9A4F2B; --sage:#7A9A82; --sageT:#3F6249; --line:#E4DED2; --sky:#EFE7D9;
+  --display:Fraunces,Georgia,serif; --body:"Instrument Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1F1D1B;--card:#2A2826;--ink:#F3EFE8;--mute:#B5ADA3;--acct:#E0A27F;--sageT:#A5C4AC;--line:#3E3A36;--sky:#26231F;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1F1D1B;--card:#2A2826;--ink:#F3EFE8;--mute:#B5ADA3;--acct:#E0A27F;--sageT:#A5C4AC;--line:#3E3A36;--sky:#26231F;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body)}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* UI-20: the landing page for visitors, with a small login icon at the top right */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font:700 1.5rem var(--display);color:var(--ink);text-decoration:none}
+.login{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.login svg{width:20px;height:20px}
+.login:hover{border-color:var(--acc);color:var(--acct)}
+.logo:focus-visible,.login:focus-visible{outline:3px solid var(--sage);outline-offset:2px;border-radius:12px}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:clamp(1.6rem,4vw,2.3rem)}
+.kick{color:var(--mute);font-size:.95rem;margin:0}
+.roles{display:flex;gap:14px;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.roles li{display:flex;align-items:center;gap:8px;font-size:.95rem}
+.mark{display:inline-flex;width:30px;height:30px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid var(--acc);color:var(--acct);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
+.mark.s{border-color:var(--sage);color:var(--sageT);background:color-mix(in srgb,var(--sage) 18%,var(--card))}
+.mark.f{border-color:var(--line);color:var(--mute);background:var(--card)}
+.mark svg{width:16px;height:16px}
+section h2{font-size:1.3rem;margin-bottom:6px}
+
+/* the player (UI-17) */
+.player{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:18px;overflow:hidden;background:var(--sky);box-shadow:0 2px 14px rgba(44,42,41,.08);
+  container-type:inline-size;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;--lift:62px}
+.player:focus-visible{outline:3px solid var(--sage);outline-offset:3px}
+.stage{position:absolute;inset:0;cursor:pointer}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.scene[hidden]{display:none}
+.player.paused .scene *{animation-play-state:paused!important}
+.player.idle,.player.idle .stage{cursor:none}
+/* UI-15: the player fills the screen, with the Fullscreen API where it exists, else (iPhone) the whole window */
+.player:fullscreen,.player.full{position:fixed;inset:0;z-index:20;width:100%;height:100%;max-width:none;aspect-ratio:auto;border-radius:0;box-shadow:none}
+.player:fullscreen .stage,.player.full .stage{inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.cap{position:absolute;left:50%;bottom:var(--lift);transform:translateX(-50%);width:max-content;max-width:min(92%,58ch);margin:0;padding:.28em .7em;border-radius:8px;
+  background:rgba(28,26,25,.78);color:#fff;font:500 clamp(12px,2.3cqi,22px)/1.38 var(--body);text-align:center;pointer-events:none;transition:bottom .2s}
+.cap:empty,.player.nocap .cap{display:none}
+.player.idle{--lift:14px}
+.bigplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:clamp(56px,11cqi,84px);height:clamp(56px,11cqi,84px);border-radius:50%;border:0;
+  background:var(--acc);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 24px rgba(44,42,41,.25)}
+.bigplay svg{width:42%;height:42%}
+.bigplay:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.flash{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(28,26,25,.55);color:#fff;display:grid;place-items:center;opacity:0;pointer-events:none}
+.flash svg{width:28px;height:28px}
+.flash.go{animation:flash .6s ease-out}
+@keyframes flash{from{opacity:1;transform:scale(.8)}to{opacity:0;transform:scale(1.25)}}
+.controls{position:absolute;left:0;right:0;bottom:0;padding:22px max(8px,env(safe-area-inset-right,0px)) max(4px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+  background:linear-gradient(transparent,rgba(28,26,25,.62));color:#fff;transition:opacity .25s}
+.player.idle .controls{opacity:0;pointer-events:none}
+.track{display:flex;gap:3px;padding:0 6px}
+.seg{position:relative;flex:1;height:18px;border:0;padding:0;background:transparent;cursor:pointer}
+.seg::before,.seg .fill{content:"";position:absolute;left:0;top:7px;height:4px;border-radius:2px}
+.seg::before{right:0;background:rgba(255,255,255,.38)}
+.seg .fill{background:var(--acc);width:0}
+.seg:hover::before,.seg:hover .fill{top:6px;height:6px}
+.seg:focus-visible{outline:2px solid #fff;outline-offset:1px;border-radius:3px}
+.row{display:flex;align-items:center;gap:2px}
+.cb{width:40px;height:40px;flex:none;border:0;border-radius:50%;background:transparent;color:#fff;display:grid;place-items:center;cursor:pointer}
+.cb svg{width:22px;height:22px}
+.cb:hover{background:rgba(255,255,255,.14)}
+.cb:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+#cc[aria-pressed="false"]{opacity:.55}
+.where{font:600 13px var(--body);margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+@container (max-width:520px){#prev,#next{display:none}.cb{width:36px;height:36px}.cb svg{width:20px;height:20px}}
+@container (max-width:360px){.where{visibility:hidden}}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:82%;overflow:auto;background:var(--card);color:var(--ink);border-radius:16px 16px 0 0;
+  padding:10px 12px max(12px,env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(0,0,0,.2);transform:translateY(100%);visibility:hidden;
+  transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s .28s}
+.drawer.open{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1)}
+.dhead{display:flex;align-items:center;justify-content:space-between;padding:0 4px 4px}
+.dhead h3{font-size:1.05rem}
+.dhead .cb{color:var(--ink)}.dhead .cb:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}.dhead .cb:focus-visible{outline-color:var(--sage)}
+.chaplist{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.chapbtn{display:grid;grid-template-columns:2rem 1fr;align-items:baseline;gap:4px 8px;width:100%;min-height:44px;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.chapbtn:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.chapbtn[aria-current="true"]{background:color-mix(in srgb,var(--sage) 22%,var(--card))}
+.chapbtn:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
+.chapbtn .n{font:700 1rem var(--display);color:var(--acct)}
+.chapbtn b{font-weight:700}.chapbtn small{grid-column:2;color:var(--mute);font-size:.85rem}
+
+/* the drawing */
+.ink{stroke:var(--ink);stroke-width:4;stroke-linecap:round;fill:none}
+.skin{fill:#EAD9C3}.eye{fill:#2C2A29}.smile{fill:none;stroke:#2C2A29;stroke-width:1.8;stroke-linecap:round}
+.leg{fill:var(--ink)}.arm{stroke-width:9;stroke-linecap:round;fill:none}
+.ground{stroke:var(--line);stroke-width:4}
+.lbl{font:600 15px var(--body);fill:var(--mute);text-anchor:middle}
+.big{font:700 64px var(--display);fill:var(--ink)}
+.mid{font:700 26px var(--display);fill:var(--ink)}
+.t{font:600 15px var(--body);fill:var(--ink)}
+.tm{font:600 13px var(--body);fill:var(--mute)}
+.card{fill:var(--card);filter:url(#soft)}
+.acc{fill:var(--acc)}.sage{fill:var(--sage)}
+.badge circle{stroke-width:2.5}
+.badge.o circle,.badge.p circle{fill:var(--card);stroke:var(--acc)}.badge.o path,.badge.p path,.badge.p circle.in{stroke:var(--acct)}
+.badge.r circle{fill:var(--card);stroke:var(--sage)}.badge.r path,.badge.r circle.in{stroke:var(--sageT)}
+.badge.f circle{fill:var(--card);stroke:var(--mute)}.badge.f path{stroke:var(--mute)}
+.badge path,.badge circle.in{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.heart{fill:var(--acc)}
+.dash{stroke:var(--mute);stroke-width:2.5;stroke-dasharray:6 7;fill:none}
+
+/* motion: every element rests in its final place; the animation only plays it in */
+@keyframes pop{from{transform:scale(0);opacity:0}70%{transform:scale(1.15);opacity:1}to{transform:scale(1)}}
+@keyframes drop{from{transform:translateY(-260px);opacity:0}to{transform:none;opacity:1}}
+@keyframes rise{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+@keyframes wave{0%,100%{transform:rotate(0)}50%{transform:rotate(-28deg)}}
+@keyframes fly{from{transform:translate(-330px,-120px) rotate(-20deg);opacity:0}20%{opacity:1}to{transform:none;opacity:1}}
+@keyframes move{0%,25%{transform:translate(-300px,0)}75%,100%{transform:none}}
+@keyframes ring{from{stroke-dashoffset:302}}
+@keyframes now{from{transform:translateY(-70px)}}
+@keyframes coin{0%{transform:translate(0,0) scale(.4);opacity:0}30%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+@keyframes orbit{to{transform:rotate(360deg)}}
+.on .pop{animation:pop .6s cubic-bezier(.3,1.4,.5,1) both;transform-box:fill-box;transform-origin:center}
+.on .drop{animation:drop .9s cubic-bezier(.22,1,.36,1) both}
+.on .rise{animation:rise .7s ease-out both}
+.on .wave{animation:wave 1.1s ease-in-out infinite;transform-box:view-box}
+.on .fly{animation:fly 1.6s cubic-bezier(.22,1,.36,1) both}
+.on .move{animation:move 3.4s ease-in-out both}
+.on .ring{animation:ring 2.2s ease-out both}
+.on .now{animation:now 6s linear both}
+.on .coin{animation:coin 1.4s ease-out both}
+.on .orbit{animation:orbit 8s linear infinite;transform-box:view-box;transform-origin:400px 230px}
+/* UI-18: the figures breathe, blink, swing their arms, tilt their heads, walk in, hop, cheer and use their phones */
+@keyframes breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-1.5px) scaleY(1.03)}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes sway{0%,100%{transform:rotate(5deg)}50%{transform:rotate(-7deg)}}
+@keyframes tilt{0%,70%,100%{transform:rotate(0)}80%{transform:rotate(-7deg)}90%{transform:rotate(5deg)}}
+@keyframes walkin{from{transform:translateX(var(--from))}to{transform:none}}
+@keyframes step{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.on .idle{animation:breathe 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.on .eye{animation:blink 4.4s infinite;transform-box:fill-box;transform-origin:center}
+.on .sway{animation:sway 2.8s ease-in-out infinite;transform-box:view-box}
+.on .headg{animation:tilt 6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.on .walk{animation:walkin 1.9s cubic-bezier(.3,.7,.4,1) both}
+.on .walk .l1{animation:step .32s ease-in-out 6}
+.on .walk .l2{animation:step .32s ease-in-out .16s 6}
+@keyframes out{to{opacity:0;transform:scale(.9)}}
+.on .pop.out{animation:pop .6s cubic-bezier(.3,1.4,.5,1) both,out .4s ease-in forwards}
+@keyframes hop{0%,55%,100%{transform:translateY(0)}72%{transform:translateY(-12px)}}
+@keyframes cheer{0%,100%{transform:rotate(0)}50%{transform:rotate(12deg)}}
+@keyframes glow{0%,100%{opacity:.45}50%{opacity:1}}
+.on .hop{animation:hop 1.5s ease-in-out infinite}
+.on .cheer{animation:cheer .7s ease-in-out infinite;transform-box:view-box}
+.on .screen{animation:glow 1.1s ease-in-out infinite}
+.on .spin{animation:orbit 1.1s linear infinite;transform-box:fill-box;transform-origin:center}
+.plus{border:1.5px dashed var(--acc);border-radius:16px;padding:14px 16px;background:color-mix(in srgb,var(--acc) 7%,var(--card))}
+.plus p{margin:4px 0 0}.does{margin:0;padding-left:20px}.does li{margin:2px 0}
+a.more{color:var(--acct);font-weight:600}
+@media (prefers-reduced-motion:reduce){.on *{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="topbar">
+    <a class="logo" href="/">Basläger</a>
+    <a class="login" href="/#login" aria-label="Logga in" title="Logga in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></a>
+  </nav>
+  <header>
+    <h1>Skapa resan med AI</h1>
+    <p class="kick">Från några rader till en plan</p>
+  </header>
+
+  <div class="player paused" id="player" tabindex="0" aria-label="Filmen om att skapa en resa med AI. Mellanslag spelar och pausar, pilarna byter kapitel.">
+    <div class="stage" id="stage" role="img" aria-label="Animerad film om hur AI hjälper till att skapa en resa"></div>
+    <p class="cap" id="cap" aria-hidden="true"></p>
+    <p class="sr" id="said" aria-live="polite"></p>
+    <div class="flash" id="flash" aria-hidden="true"></div>
+    <button class="bigplay" id="bigplay" type="button" aria-label="Spela filmen"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg></button>
+    <div class="controls" id="controls">
+      <div class="track" id="track"></div>
+      <div class="row">
+        <button class="cb" id="play" type="button" aria-label="Spela"></button>
+        <button class="cb" id="prev" type="button" aria-label="Föregående kapitel"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="cb" id="next" type="button" aria-label="Nästa kapitel"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+        <button class="cb" id="voice" type="button" aria-pressed="false" hidden aria-label="Berättarröst"></button>
+        <span class="where" id="where"></span>
+        <button class="cb" id="cc" type="button" aria-pressed="true" aria-label="Undertexter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.5 10.2a2.4 2.4 0 1 0 0 3.6M17 10.2a2.4 2.4 0 1 0 0 3.6" stroke-linecap="round"/></svg></button>
+        <button class="cb" id="chapbtn" type="button" aria-expanded="false" aria-controls="drawer" aria-label="Kapitel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.6" y2="6"/><line x1="3.5" y1="12" x2="3.6" y2="12"/><line x1="3.5" y1="18" x2="3.6" y2="18"/></svg></button>
+        <button class="cb" id="full" type="button" aria-pressed="false" aria-label="Helskärm"></button>
+      </div>
+    </div>
+    <div class="drawer" id="drawer" role="dialog" aria-label="Kapitel">
+      <div class="dhead"><h3>Kapitel</h3><button class="cb" id="dclose" type="button" aria-label="Stäng kapitlen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <ol class="chaplist" id="chaplist"></ol>
+    </div>
+  </div>
+
+  <section>
+    <h2>Det här gör AI:n</h2>
+    <ul class="does">
+      <li>Gör ett utkast av resan från er beskrivning: namn, datum, resenärer, dagar och rutt. Det läggs in direkt och kan ångras.</li>
+      <li>Letar upp det som är bra att veta inför resan, som miljödekaler, vägtullar och dokument, med en källa att kolla.</li>
+      <li>Föreslår det som ska bokas, och riktiga platser som passar er, var och en på en dag där den passar.</li>
+      <li>Föreslår bara. Ni tar med det ni vill ha, och resenärernas namn byts mot ålder innan något skickas.</li>
+    </ul>
+  </section>
+  <section class="plus">
+    <h2>Basläger Plus kommer snart</h2>
+    <p>AI-planeringen blir en del av Basläger Plus. Är du betatestare och vill vara med från början? Säg till via Tyck till i appen, så får du veta först.</p>
+  </section>
+  <p><a class="more" href="/om.html">Se också filmen Om Basläger</a></p>
+</div>
+
+<script>
+// Icons: Lucide (ISC) crown, compass, luggage, link, thumbs; "Igen" is two thumbs as in the app's Minnas.
+const THUMB = '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>';
+const ICON = {
+  crown: '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>',
+  compass: '<path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle class="in" cx="12" cy="12" r="10"/>',
+  luggage: '<path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"/><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14"/><path d="M10 20h4"/><circle class="in" cx="16" cy="20" r="2"/><circle class="in" cx="8" cy="20" r="2"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  ok: THUMB,
+  again: `<g transform="translate(8.2 -0.6) scale(.7)">${THUMB}</g><g transform="translate(-1 6.4) scale(.7)">${THUMB}</g>`,
+  never: '<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>',
+};
+const svgIcon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n].replace(' class="in"', "")}</svg>`;
+
+/** A role badge: a round mark with the role's icon, as on the trip cards. */
+const badge = (kind, x, y, delay = 0, r = 17) => {
+  const icon = { o: "crown", p: "compass", r: "luggage", f: "link" }[kind];
+  return `<g transform="translate(${x} ${y})"><g class="badge ${kind} pop" style="animation-delay:${delay}s"><circle r="${r}"/><g transform="translate(-10 -10) scale(.84)">${ICON[icon]}</g></g></g>`;
+};
+let figs = 0;
+/** A figure in soft shapes (style 1): a round body in the person's colour, a face, short legs; x on the ground y.
+ * o: scale, colour token, what the figure does (act: "wave", "reach", "point", "cheer" or "phone"), hopping, walking in from
+ * `walk` px, a name. Each figure moves a little out of step with the others (UI-18). */
+const fig = (x, y, o = {}) => {
+  const s = o.s ?? 1, c = `var(${o.c ?? "--acc"})`, d = ((figs++ * 0.71) % 2.6).toFixed(2);
+  const act = o.act ?? (o.wave ? "wave" : o.reach ? "reach" : "");
+  const arm = (side, cls, x2, y2, delay) => `<line class="arm ${cls}" style="stroke:${c};transform-origin:${side * 9}px -58px;animation-delay:-${delay}s" x1="${side * 9}" y1="-58" x2="${x2}" y2="${y2}"/>`;
+  const hang = (side, delay) => arm(side, "sway", side * 19, -36, delay);
+  const left = act === "cheer" ? arm(-1, "cheer", -21, -84, d) : act === "phone" ? arm(-1, "", 2, -48, 0) : hang(-1, d);
+  const right = act === "wave" ? arm(1, "wave", 22, -84, d) : act === "reach" ? arm(1, "", 30, -62, 0) : act === "point" ? arm(1, "", 30, -80, 0)
+    : act === "cheer" ? arm(1, "cheer", 21, -84, (d * 1.3 + .4).toFixed(2)) : act === "phone" ? arm(1, "", 12, -50, 0) : hang(1, (d * 1.3 + .5).toFixed(2));
+  const phone = act === "phone" ? `<rect x="2" y="-66" width="13" height="21" rx="3" style="fill:var(--ink)"/><rect class="screen" x="4" y="-63.5" width="9" height="15" rx="1.5" style="fill:var(--acc)"/>` : "";
+  let body = `<g class="idle" style="animation-delay:-${d}s">
+      <rect class="leg l1" x="-11" y="-28" width="9" height="28" rx="4.5"/><rect class="leg l2" x="2" y="-28" width="9" height="28" rx="4.5"/>${left}
+      <rect x="-17" y="-70" width="34" height="48" rx="17" style="fill:${c}"/>${right}${phone}
+      <g class="headg" style="animation-delay:-${(d * 2).toFixed(2)}s"><circle class="skin" cy="-84" r="15"/>
+        <circle class="eye" cx="-5" cy="-86" r="1.9" style="animation-delay:-${d}s"/><circle class="eye" cx="5" cy="-86" r="1.9" style="animation-delay:-${d}s"/>
+        <path class="smile" d="M-4.5 -79.5 q4.5 3.5 9 0"/></g>
+    </g>`;
+  if (o.hop || act === "cheer") body = `<g class="hop" style="animation-delay:-${d}s">${body}</g>`;
+  if (o.walk) body = `<g class="walk" style="--from:${o.walk}px">${body}</g>`;
+  const label = o.name ? `<text class="lbl${o.walk ? " rise" : ""}" style="animation-delay:1.7s" x="${x}" y="${y + 24}">${o.name}</text>` : "";
+  return `<g transform="translate(${x} ${y}) scale(${s})">${body}</g>${label}`;
+};
+const ground = '<line class="ground" x1="0" y1="392" x2="800" y2="392"/>';
+const card = (x, y, w, h, extra = "") => `<rect class="card" x="${x}" y="${y}" width="${w}" height="${h}" rx="16" ${extra}/>`;
+const tent = (x, y, k = 1) => `<g transform="translate(${x} ${y}) scale(${k})"><path d="M0 0 L60 -90 L120 0 Z" class="acc"/><path d="M60 -90 L44 0 L76 0 Z" style="fill:var(--acct)"/><line class="ink" x1="60" y1="-90" x2="60" y2="-104"/><path d="M60 -104 l18 6 l-18 6 z" class="sage"/></g>`;
+/** A Minnas verdict as in the app: two thumbs for Igen, one for Okej, thumb down for Inte igen. */
+const verdict = (kind, x, y, delay) => {
+  const fill = kind === "never" ? "var(--line)" : "var(--sage)", ink = kind === "never" ? "var(--mute)" : "#fff";
+  return `<g transform="translate(${x} ${y})"><g class="pop" style="animation-delay:${delay}s"><circle cx="20" cy="20" r="24" style="fill:${fill}"/>
+    <g transform="translate(8 8)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:${ink}">${ICON[kind]}</g></g></g>`;
+};
+
+ICON.sparkle = '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/>';
+/** The AI mark of the app: a Lucide sparkle in terracotta. */
+const spark = (x, y, s = 1, delay = 0) => `<g transform="translate(${x} ${y}) scale(${s})"><g class="pop" style="animation-delay:${delay}s"><g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--acc)">${ICON.sparkle}</g></g></g>`;
+/** A finished step: a sage circle with a tick. */
+const doneMark = (x, y, delay = 0, r = 11) => `<g transform="translate(${x} ${y})"><g class="pop" style="animation-delay:${delay}s"><circle r="${r}" class="sage"/><polyline points="${-r * .45} 0 ${-r * .1} ${r * .35} ${r * .5} ${-r * .35}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></g>`;
+/** A running step: a ring that turns, as the app's spinner. */
+const spin = (x, y) => `<g transform="translate(${x} ${y})"><circle r="9" fill="none" style="stroke:var(--line)" stroke-width="3.5"/><circle class="spin" r="9" fill="none" style="stroke:var(--acc)" stroke-width="3.5" stroke-dasharray="14 43"/></g>`;
+/** A suggested row as in the app: a light sage row with the sparkle, a time and a text. */
+const sug = (x, y, w, time, text, delay = 0) => `<g class="rise" style="animation-delay:${delay}s"><rect x="${x}" y="${y}" width="${w}" height="40" rx="10" class="sage" style="opacity:.22"/>
+  ${spark(x + 10, y + 9, .9)}<text class="tm" x="${x + 40}" y="${y + 25}">${time}</text><text class="t" x="${x + (time ? 92 : 40)}" y="${y + 25}">${text}</text></g>`;
+
+const SCENES = [
+  { chap: "Skapa med AI", title: "En dröm blir en plan",
+    text: "Med AI i Basläger blir några rader om er dröm en plan med dagar, rutt och förslag. Så här går det till när Anna skapar familjens höstlovsresa.",
+    svg: () => `${ground}<circle cx="680" cy="90" r="38" style="fill:var(--acc);opacity:.3"/>
+      <text class="big rise" x="400" y="118" text-anchor="middle">Skapa med AI</text>
+      <text class="lbl rise" style="animation-delay:.3s;font-size:18px" x="400" y="154">från några rader till en plan</text>
+      ${spark(120, 64, 2, .6)}${spark(560, 160, 1.4, 1)}${spark(150, 150, 1.1, 1.3)}
+      <g class="rise" style="animation-delay:.4s">${tent(340, 392)}</g>
+      ${fig(220, 392, { name: "Anna", act: "phone", walk: -260 })}
+      ${fig(280, 392, { name: "Erik", c: "--sage", walk: -300 })}
+      ${fig(520, 392, { name: "Olle", s: .72, c: "--acct", walk: 360 })}
+      ${fig(575, 392, { name: "Mia", s: .66, c: "--sage", hop: true, walk: 420 })}` },
+  { chap: "Beskriv din dröm", title: "Anna skriver med egna ord",
+    text: "Anna trycker på Skapa ny resa och skriver med egna ord vad familjen drömmer om: Hamburg på höstlovet med barnen, som är sju och tio. De tar bilen, och barnen älskar djur och båtar. Sen trycker hon på Skapa med AI.",
+    svg: () => `${ground}${fig(110, 392, { name: "Anna", act: "phone", walk: -200 })}
+      ${card(220, 40, 540, 330)}<text class="mid" x="246" y="84">Ny resa</text><text class="tm" x="246" y="112">Beskriv din dröm</text>
+      <rect x="246" y="124" width="488" height="150" rx="12" style="fill:var(--bg);stroke:var(--line);stroke-width:2"/>
+      ${["Vi vill åka till Hamburg på höstlovet med barnen,", "som är 7 och 10 år. Vi tar bilen. Barnen älskar", "djur och båtar, och vi vuxna vill äta gott."].map((l, i) => `<text class="t rise" style="animation-delay:${.6 + i * 1.1}s;font-family:var(--display);font-weight:400" x="264" y="${160 + i * 32}">${l}</text>`).join("")}
+      <g class="pop" style="animation-delay:4.2s"><rect x="246" y="296" width="178" height="48" rx="12" class="acc"/><text class="t" x="290" y="326" style="fill:#fff">Skapa med AI</text>${spark(258, 308, 1)}</g>
+      <rect x="440" y="296" width="150" height="48" rx="12" style="fill:none;stroke:var(--line);stroke-width:2"/><text class="tm" x="462" y="326">Skapa utan AI</text>` },
+  { chap: "Resa och rutt", title: "Utkastet läggs in direkt",
+    text: "På någon minut gör AI:n ett utkast: namn, datum, resenärer och en dag i taget med rutten. Utkastet läggs in direkt. Ångrar sig Anna räcker ett tryck på Ångra.",
+    svg: () => `${ground}${fig(66, 392, { name: "Anna", act: "phone" })}
+      <g class="rise">${card(120, 50, 290, 196)}<text class="t" x="142" y="84">Skapar din resa…</text>
+        ${doneMark(152, 122, 1.4)}<text class="t" x="174" y="127">Skapar resa och rutt</text>
+        ${spin(152, 168)}<text class="t" x="174" y="173">Letar upp bra att veta</text>
+        ${spin(152, 212)}<text class="t" x="174" y="217">Föreslår aktiviteter</text></g>
+      ${[["Mån 25 okt", "Malmö–Hamburg · bil 4 h"], ["Tis 26 okt", "Hamburg"], ["Ons 27 okt", "Hamburg–Malmö · bil 4 h"]].map(([d, w], i) => `
+        <g class="drop" style="animation-delay:${1.6 + i * .35}s">${card(450, 50 + i * 74, 310, 62)}<text class="t" x="470" y="${76 + i * 74}">${d}</text><text class="tm" x="470" y="${98 + i * 74}">${w}</text></g>`).join("")}
+      <g class="pop" style="animation-delay:3.4s"><rect x="300" y="300" width="300" height="52" rx="14" style="fill:var(--ink)"/>
+        <text class="t" x="322" y="332" style="fill:#fff">Utkastet är inlagt</text>
+        <rect x="502" y="310" width="82" height="32" rx="10" style="fill:none;stroke:#fff;stroke-width:1.5;opacity:.7"/><text class="t" x="520" y="331" style="fill:#fff">Ångra</text></g>` },
+  { chap: "Bra att veta", title: "Det som är lätt att missa",
+    text: "Samtidigt letar AI:n på webben upp det som är lätt att missa längs vägen: miljödekalen till bilen i Tyskland och EU-kortet. Hotellet med pool hamnar under Bokningar, som att boka. Allt har en källa att kolla.",
+    svg: () => `${ground}
+      <g class="rise">${card(40, 40, 360, 250)}<text class="mid" x="62" y="80">Att göra</text>${spark(352, 60, 1)}
+        ${sug(60, 100, 320, "", "Beställ miljödekal till bilen", .5)}${sug(60, 150, 320, "", "Beställ EU-kort för alla", .9)}${sug(60, 200, 320, "", "Ta med lite euro i kontanter", 1.3)}
+        <text class="tm rise" style="animation-delay:1.7s;fill:var(--acct)" x="62" y="268">Kolla källan</text></g>
+      <g class="rise" style="animation-delay:1.9s">${card(430, 40, 330, 170)}<text class="mid" x="452" y="80">Bokningar</text>
+        ${sug(450, 100, 290, "", "Hotell med pool", 2.3)}
+        <g class="pop" style="animation-delay:2.8s"><rect x="452" y="152" width="82" height="26" rx="8" style="fill:var(--acc);opacity:.22"/><text class="tm" x="464" y="170" style="fill:var(--acct)">att boka</text></g>
+        <text class="tm" x="548" y="170" style="fill:var(--acct)">Boka</text></g>
+      ${fig(560, 392, { name: "Erik", c: "--sage", act: "phone" })}${fig(650, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+  { chap: "Aktiviteter", title: "Förslag som passar er",
+    text: "Barnen älskar djur och båtar, så AI:n föreslår Tierpark Hagenbeck och en hamnrundtur, var och en på en dag där den passar. Erik tar med det han gillar med en bock, och det han avvisar föreslås inte igen.",
+    svg: () => `${ground}${fig(130, 392, { name: "Erik", c: "--sage", act: "phone" })}
+      ${card(230, 40, 380, 270)}<text class="t" x="254" y="76">Tis 26 okt</text><text class="mid" x="254" y="106">Hamburg</text>
+      ${sug(250, 128, 340, "10.00", "Tierpark Hagenbeck", .5)}${sug(250, 180, 340, "15.30", "Hamnrundtur med båt", 1)}
+      ${doneMark(566, 148, 2.4, 13)}${doneMark(566, 200, 3.6, 13)}
+      <g class="pop" style="animation-delay:4.4s"><rect x="250" y="240" width="340" height="40" rx="10" style="fill:var(--card);stroke:var(--line);stroke-width:2"/>
+        <text class="tm" x="262" y="265">Nu i planen och i Önska</text></g>
+      ${fig(680, 392, { name: "Olle", s: .72, c: "--acct", act: "cheer" })}${fig(745, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+  { chap: "Ni bestämmer", title: "AI:n föreslår, ni bestämmer",
+    text: "AI:n föreslår, ni bestämmer. Inget förslag läggs till förrän någon tar med det. Resenärernas namn byts mot ålder, och bokningsnummer, mejl och telefonnummer skickas aldrig till AI-tjänsten.",
+    svg: () => `${ground}${fig(110, 392, { name: "Anna", act: "point" })}${fig(700, 392, { name: "Erik", c: "--sage", wave: true })}
+      ${doneMark(300, 120, .5, 40)}<text class="t rise" style="animation-delay:.8s" x="300" y="190" text-anchor="middle">Ta med</text>
+      <g transform="translate(500 120)"><g class="pop" style="animation-delay:1s"><circle r="40" style="fill:var(--card);stroke:var(--line);stroke-width:2.5"/>
+        <path d="M-14 -14 L14 14 M14 -14 L-14 14" style="stroke:var(--mute)" stroke-width="4" stroke-linecap="round"/></g></g>
+      <text class="t rise" style="animation-delay:1.3s" x="500" y="190" text-anchor="middle">Avvisa</text>
+      <g class="rise" style="animation-delay:2s">${card(230, 240, 340, 96)}
+        <rect x="252" y="270" width="96" height="36" rx="18" style="fill:var(--acc);opacity:.22"/><text class="t" x="300" y="294" text-anchor="middle">Olle</text>
+        <path class="dash" d="M362 288 h50"/><path d="M412 280 l12 8 l-12 8" fill="none" style="stroke:var(--mute)" stroke-width="2.5"/>
+        <rect x="436" y="270" width="112" height="36" rx="18" class="sage" style="opacity:.3"/><text class="t" x="492" y="294" text-anchor="middle">barn, 7 år</text></g>` },
+  { chap: "Minuter", title: "Från kvällar till minuter",
+    text: "Det som brukar ta flera kvällar med flikar, listor och regler att leta upp är klart på några minuter. Då blir det mer tid över till det roliga: att längta.",
+    svg: () => `${ground}
+      <g class="rise">${Array.from({ length: 6 }, (_, i) => `<rect x="${60 + i * 16}" y="${60 + i * 22}" width="220" height="130" rx="10" style="fill:var(--card);stroke:var(--line);stroke-width:2;filter:url(#soft)"/>`).join("")}
+        <text class="tm" x="${60 + 80 + 18}" y="${60 + 110 + 30}">flikar, listor, regler…</text>
+        <text class="mid" x="64" y="340" style="fill:var(--mute)">3 kvällar</text><line x1="64" y1="331" x2="192" y2="331" style="stroke:var(--acc)" stroke-width="4" class="rise"/></g>
+      <path class="dash rise" style="animation-delay:1s" d="M350 200 C 400 160, 440 160, 480 200"/>
+      <g class="pop" style="animation-delay:1.6s">${card(500, 70, 250, 200, 'style="stroke:var(--acc);stroke-width:3"')}<text class="t" x="522" y="104">Höstlov i Hamburg</text>
+        ${[0, 1, 2].map((i) => `<rect x="522" y="${120 + i * 38}" width="206" height="28" rx="8" class="sage" style="opacity:.3"/>`).join("")}${doneMark(712, 104, 2.2)}</g>
+      <text class="mid rise" style="animation-delay:2.4s" x="625" y="320" text-anchor="middle">några minuter</text>
+      ${fig(300, 392, { name: "Anna", act: "cheer" })}${fig(380, 392, { name: "Erik", c: "--sage", act: "cheer" })}` },
+  { chap: "Basläger Plus", title: "Basläger Plus kommer snart",
+    text: "AI-planeringen blir en del av Basläger Plus, som kommer snart. Vill du vara med från början? Säg till, så får du veta först.",
+    svg: () => `${ground}<circle cx="400" cy="210" r="140" style="fill:var(--acc);opacity:.12"/>
+      <g class="rise">${tent(340, 300)}</g>${spark(318, 150, 1.6, .8)}${spark(470, 176, 1.2, 1.2)}${spark(420, 120, .9, 1.5)}
+      <text class="big rise" style="animation-delay:.4s" x="400" y="96" text-anchor="middle">Basläger Plus</text>
+      <text class="lbl rise" style="animation-delay:.9s;font-size:20px;fill:var(--acct)" x="400" y="340" text-anchor="middle">kommer snart</text>
+      ${fig(140, 392, { name: "Anna", wave: true })}${fig(210, 392, { name: "Erik", c: "--sage", act: "cheer" })}
+      ${fig(600, 392, { name: "Olle", s: .72, c: "--acct", act: "cheer" })}${fig(660, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+];
+
+// ---- the player (UI-17): starts paused on a still frame; a tap on the film plays or pauses it
+const $ = (id) => document.getElementById(id);
+const player = $("player"), stage = $("stage"), cap = $("cap"), said = $("said"), flash = $("flash"), bigplay = $("bigplay");
+const playBtn = $("play"), voiceBtn = $("voice"), ccBtn = $("cc"), chapBtn = $("chapbtn"), fullBtn = $("full"), drawer = $("drawer"), where = $("where");
+const I = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  again: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+  mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>',
+  full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>',
+  leave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>',
+};
+stage.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#2C2A29" flood-opacity=".12"/></filter></defs></svg>` + SCENES.map((s, i) => `<svg class="scene" viewBox="0 0 800 450" aria-hidden="true" ${i ? "hidden" : ""}>${s.svg()}</svg>`).join("");
+const scenes = [...stage.querySelectorAll(".scene")];
+$("track").innerHTML = SCENES.map((s, i) => `<button class="seg" type="button" aria-label="Kapitel ${i + 1}: ${s.chap}"><span class="fill"></span></button>`).join("");
+const segs = [...document.querySelectorAll(".seg")], fills = segs.map((b) => b.querySelector(".fill"));
+$("chaplist").innerHTML = SCENES.map((s, i) => `<li><button class="chapbtn" type="button"><span class="n">${i + 1}</span><b>${s.chap}</b><small>${s.title}</small></button></li>`).join("");
+const chapBtns = [...document.querySelectorAll(".chapbtn")];
+const sentences = SCENES.map((s) => s.text.match(/[^.!?]+[.!?]*/g).map((t) => t.trim()));
+
+let at = 0, playing = false, begun = false, ended = false, started = 0, elapsed = 0, capOn = true;
+const SILENT_MS = (i) => Math.max(8000, SCENES[i].text.length * 65); // without a voice: time to read the subtitles
+
+// ---- the narration (UI-14, UI-17): recorded files from /ai-audio/ when made from the scene's current text, else the device's Swedish voice
+const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+const audio = new Audio(); // one element, so the iPhone lets it play on after the first tap
+let voice = null, voiceOn = true, spoken = false, turn = 0, recorded = SCENES.map(() => null);
+const hasVoice = () => !!voice || recorded.some(Boolean);
+const showVoice = () => {
+  voiceBtn.hidden = !hasVoice(); // neither: the subtitles remain
+  const on = voiceOn && hasVoice();
+  voiceBtn.setAttribute("aria-pressed", String(on));
+  voiceBtn.setAttribute("aria-label", on ? "Berättarröst på" : "Berättarröst av");
+  voiceBtn.innerHTML = on ? I.sound : I.mute;
+};
+function pickVoice() {
+  const all = speech ? speech.getVoices() : [];
+  voice = all.find((v) => /^sv([-_]|$)/i.test(v.lang) && v.localService) ?? all.find((v) => /^sv([-_]|$)/i.test(v.lang)) ?? null;
+  showVoice();
+}
+fetch("/ai-audio/index.json").then((r) => (r.ok ? r.json() : null)).then((ix) => {
+  recorded = SCENES.map((s, i) => (ix?.scenes?.[i]?.text === s.text ? `/ai-audio/${ix.scenes[i].file}` : null)); // a changed text is read by the device
+  showVoice();
+}).catch(() => {});
+function synth(i, mine) {
+  if (!speech || !voice) { spoken = true; return; }
+  sentences[i].forEach((t, n) => { // sentence by sentence: one long utterance is cut short in some browsers
+    const u = new SpeechSynthesisUtterance(t);
+    u.voice = voice; u.lang = voice.lang; u.rate = .95;
+    if (n === sentences[i].length - 1) u.onend = () => { if (mine === turn) spoken = true; };
+    speech.speak(u);
+  });
+}
+/** Narrates a scene from its start; spoken turns true when it is done. */
+function speak(i) {
+  hush();
+  spoken = false;
+  const mine = turn;
+  if (!recorded[i]) return synth(i, mine);
+  audio.src = recorded[i];
+  audio.onended = () => { if (mine === turn) spoken = true; };
+  audio.onerror = () => { if (mine === turn) synth(i, mine); };
+  audio.play().catch(() => { if (mine === turn) synth(i, mine); });
+}
+const hush = () => { turn++; if (speech) speech.cancel(); audio.pause(); };
+const narrating = () => voiceOn && hasVoice();
+const usesFile = () => narrating() && recorded[at] && audio.src.endsWith(recorded[at]);
+/** How far into the scene we are, 0..1: by the recording when there is one, else by time. */
+function progress() {
+  if (usesFile() && audio.duration > 0) return Math.min(1, audio.currentTime / audio.duration);
+  const length = narrating() ? SCENES[at].text.length * 70 : SILENT_MS(at);
+  return Math.min(1, elapsed / length);
+}
+
+function show(i, animate = true) {
+  at = Math.max(0, Math.min(SCENES.length - 1, i));
+  scenes.forEach((s, n) => { s.toggleAttribute("hidden", n !== at); s.classList.remove("on"); }); // an SVG element has no hidden property
+  void scenes[at].getBoundingClientRect(); // restart the scene's animations
+  if (animate) scenes[at].classList.add("on"); // without: the scene rests in its final state, a still frame
+  stage.setAttribute("aria-label", `Kapitel ${at + 1} av ${SCENES.length}: ${SCENES[at].title}`);
+  where.textContent = `${at + 1}/${SCENES.length} · ${SCENES[at].chap}`;
+  chapBtns.forEach((b, n) => b.setAttribute("aria-current", String(n === at)));
+  fills.forEach((f, n) => { f.style.width = n < at ? "100%" : "0"; });
+  elapsed = 0; started = performance.now(); ended = false;
+  cap.textContent = capOn && begun ? sentences[at][0] : "";
+  if (begun) said.textContent = `${SCENES[at].title}. ${SCENES[at].text}`;
+  if (playing && narrating()) speak(at); else hush();
+}
+function setPlaying(p) {
+  if (p && !begun) { begun = true; show(at); }
+  if (p && ended) show(0);
+  playing = p;
+  player.classList.toggle("paused", !p);
+  bigplay.hidden = p || begun && !ended;
+  playBtn.innerHTML = p ? I.pause : ended ? I.again : I.play;
+  playBtn.setAttribute("aria-label", p ? "Pausa" : ended ? "Spela igen" : "Spela");
+  if (p) {
+    started = performance.now() - elapsed;
+    if (narrating()) { if (usesFile() && audio.currentTime > 0 && !audio.ended) audio.play().catch(() => speak(at)); else { elapsed = 0; started = performance.now(); speak(at); } }
+  } else { if (speech) speech.cancel(); audio.pause(); } // a recording resumes where it stopped; the device's voice reads the scene again
+  wake();
+}
+function toggle() {
+  setPlaying(!playing);
+  flash.innerHTML = playing ? I.play : I.pause;
+  flash.classList.remove("go"); void flash.offsetWidth; flash.classList.add("go");
+}
+function finish() {
+  fills[at].style.width = "100%";
+  ended = true; playing = false;
+  player.classList.add("paused");
+  bigplay.hidden = false; bigplay.innerHTML = I.again; bigplay.setAttribute("aria-label", "Spela igen");
+  playBtn.innerHTML = I.again; playBtn.setAttribute("aria-label", "Spela igen");
+  hush(); wake();
+}
+
+// the controls hide while the film plays and come back on any movement, tap or key
+let idleTimer = 0;
+function wake() {
+  player.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (playing && !drawer.classList.contains("open")) player.classList.add("idle"); }, 2600);
+}
+["pointermove", "pointerdown", "keydown", "focusin"].forEach((e) => player.addEventListener(e, wake));
+
+// chapters: in a drawer from below, closed until asked for
+function setDrawer(open) {
+  drawer.classList.toggle("open", open);
+  chapBtn.setAttribute("aria-expanded", String(open));
+  if (open) (chapBtns[at] ?? chapBtns[0]).focus(); else if (drawer.contains(document.activeElement)) chapBtn.focus();
+  wake();
+}
+const jump = (i) => { if (!begun) { begun = true; show(i); setPlaying(true); } else { if (ended) { ended = false; } show(i); if (!playing) setPlaying(true); } };
+
+stage.addEventListener("click", () => (drawer.classList.contains("open") ? setDrawer(false) : toggle()));
+bigplay.addEventListener("click", () => { setPlaying(true); stage.focus?.(); });
+playBtn.addEventListener("click", () => setPlaying(!playing));
+$("prev").addEventListener("click", () => jump(at - 1));
+$("next").addEventListener("click", () => (at < SCENES.length - 1 ? jump(at + 1) : finish()));
+segs.forEach((b, i) => b.addEventListener("click", () => jump(i)));
+chapBtns.forEach((b, i) => b.addEventListener("click", () => { setDrawer(false); jump(i); }));
+chapBtn.addEventListener("click", () => setDrawer(!drawer.classList.contains("open")));
+$("dclose").addEventListener("click", () => setDrawer(false));
+voiceBtn.addEventListener("click", () => { // started by a tap, which iPhone needs before it speaks
+  voiceOn = !voiceOn; showVoice();
+  if (!playing) return;
+  if (narrating()) { elapsed = 0; started = performance.now(); speak(at); } else hush();
+});
+ccBtn.addEventListener("click", () => {
+  capOn = !capOn;
+  ccBtn.setAttribute("aria-pressed", String(capOn));
+  player.classList.toggle("nocap", !capOn);
+});
+
+// UI-15: full screen, or the whole window where the browser cannot (iPhone); Esc or the button leaves it.
+const isFull = () => document.fullscreenElement === player || player.classList.contains("full");
+const showFull = () => {
+  const on = isFull();
+  fullBtn.setAttribute("aria-pressed", String(on));
+  fullBtn.setAttribute("aria-label", on ? "Lämna helskärm" : "Helskärm");
+  fullBtn.innerHTML = on ? I.leave : I.full;
+  document.body.style.overflow = player.classList.contains("full") ? "hidden" : "";
+};
+fullBtn.addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (player.classList.contains("full")) player.classList.remove("full");
+  else if (player.requestFullscreen) player.requestFullscreen().catch(() => player.classList.add("full")).finally(showFull);
+  else player.classList.add("full");
+  showFull();
+});
+document.addEventListener("fullscreenchange", showFull);
+
+// keys as in a video player, while the player has focus
+player.addEventListener("keydown", (e) => {
+  const onButton = e.target instanceof HTMLButtonElement;
+  if (e.key === "Escape") {
+    if (drawer.classList.contains("open")) setDrawer(false);
+    else if (player.classList.contains("full")) { player.classList.remove("full"); showFull(); }
+    return;
+  }
+  if ((e.key === " " || e.key === "k") && !onButton) { e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowRight" && !drawer.classList.contains("open")) { e.preventDefault(); $("next").click(); }
+  else if (e.key === "ArrowLeft" && !drawer.classList.contains("open")) { e.preventDefault(); jump(at - 1); }
+  else if (e.key === "f") fullBtn.click();
+  else if (e.key === "m" && !voiceBtn.hidden) voiceBtn.click();
+  else if (e.key === "c") ccBtn.click();
+});
+
+function tick(now) {
+  if (playing) {
+    elapsed = now - started;
+    const f = progress();
+    fills[at].style.width = `${f * 100}%`;
+    if (capOn) { // one sentence at a time, as subtitles: by the share of the scene's characters read so far
+      const parts = sentences[at], total = SCENES[at].text.length;
+      let sum = 0, n = 0;
+      for (; n < parts.length - 1; n++) { sum += parts[n].length; if (f * total < sum) break; }
+      if (cap.textContent !== parts[n]) cap.textContent = parts[n];
+    }
+    const done = narrating() ? spoken && elapsed > 2500 : elapsed >= SILENT_MS(at);
+    if (done) { if (at < SCENES.length - 1) show(at + 1); else finish(); }
+  }
+  requestAnimationFrame(tick);
+}
+if (speech) { pickVoice(); speech.addEventListener?.("voiceschanged", pickVoice); }
+show(0, false); setPlaying(false); bigplay.hidden = false; showVoice(); showFull(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

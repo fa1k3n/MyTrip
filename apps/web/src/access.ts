@@ -53,6 +53,10 @@ export function roleIn(me: Me, tripId: string | undefined): { role: Role; travel
 }
 /** Who is logged in, in the chip on Drömmar: the user's name, or the admin password's holder (US-25). */
 export const whoChip = (me: Me) => ("user" in me ? me.user.name : sv.admin);
+/** UI-20: a visitor without a session and without a link lands on Om Basläger. Any fragment keeps the login page: #login (the
+ * landing page's login icon), a password link (#u=), Google's answer (#login=…), #admin; so does a link that no longer works. */
+export const landsOnAbout = (hash: string, hadLink: boolean, admin: boolean) => !hadLink && !admin && (hash === "" || hash === "#");
+export const ABOUT_PAGE = "/om.html";
 /** The user's roles on a trip, as icons on its card on Drömmar (US-23). */
 export const roleIcons = (me: Me, tripId: string) => ("user" in me ? me.trips[tripId]?.roles ?? [] : []);
 /** The password link of an account (US-04): the secret after #, as for the share links. */

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { forInstalled, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint, whoChip } from "./access.ts";
+import { ABOUT_PAGE, forInstalled, landsOnAbout, parseSetupHash, permsFor, roleIn, safariUrl, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -118,6 +118,8 @@ export function App() {
       const had = !askedForAdmin && linkKey() !== null; // a link that no longer works (AU-07)
       forgetLink(); // it leaves the phone (PW-17)
       if (had && deviceLinks().length) { setNotice(sv.choose.gone); return go(); }
+      if (landsOnAbout(location.hash, had, askedForAdmin)) { location.replace(ABOUT_PAGE); return; } // UI-20
+      if (location.hash === "#login") history.replaceState(null, "", location.pathname + location.search);
       setExpired(had);
       setMe(null);
     });

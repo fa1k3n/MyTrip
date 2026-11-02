@@ -1,0 +1,46 @@
+{
+  "voice": "kpTdKfohzvarfFPnwuHW",
+  "model": "eleven_v4",
+  "scenes": [
+    {
+      "file": "01.mp3",
+      "text": "Basläger är platsen där en resa, stor som liten, börjar som en dröm och slutar som ett minne. Alla som ska med är med hela vägen, inte bara den som bokar."
+    },
+    {
+      "file": "02.mp3",
+      "text": "Basläger passar lika bra för en dagstur till sjön som för två veckor i Italien. Dagsturen blir en dag med några önskningar och en matsäck. Den långa resan får många dagar, bokningar och en budget. Det är samma app och samma steg."
+    },
+    {
+      "file": "03.mp3",
+      "text": "Varje kort på startsidan Drömmar är en resa ni drömmer om. Anna trycker på Skapa ny resa och döper den till Höstlov i Berlin. Hon har skapat resan och får kronan: hon är Skapare."
+    },
+    {
+      "file": "04.mp3",
+      "text": "Anna kopplar de andra till resan. Erik blir Planerare och får ändra allt. Olle och Mia är Resenärer: de tycker till, bockar av och lägger in egna utlägg. Mormor Astrid får en följarlänk och kan titta på resan hemifrån."
+    },
+    {
+      "file": "05.mp3",
+      "text": "I Önska lägger alla in det de drömmer om: ett museum, en badplats, världens bästa glass. Den som hittar något på nätet kan mejla in länken, så blir den en önskan. Hjärtana visar vad flest vill."
+    },
+    {
+      "file": "06.mp3",
+      "text": "I Nåla blir önskningarna en plan. Erik drar Museiön till måndagen direkt i telefonen, så hamnar den i schemat. Budgeten räknar med det som är bokat och betalt, och appen säger till om något krockar."
+    },
+    {
+      "file": "07.mp3",
+      "text": "Under resan visar Uppleva dagen ni är på, med vädret och vägen dit. Klockan tio promenerar familjen till Museiön, och det är enkelt, för alla biljetter finns samlade i appen. Vid entrén visar Erik dem i telefonen, och ingen behöver leta i mejlen."
+    },
+    {
+      "file": "08.mp3",
+      "text": "Efter museet visar Uppleva vad som händer nu: glass vid Spree klockan ett. Mia köper glass och lägger in utlägget direkt i telefonen, också utan nät. Det skickas när telefonen hittar nätet igen."
+    },
+    {
+      "file": "09.mp3",
+      "text": "Efteråt ger alla sina betyg i Minnas på önskningarna som blev av: två tummar upp för Igen, en tumme upp för Okej och tummen ner för Inte igen. Under Pengar visar Saldo vem som får tillbaka och vem som ska betala."
+    },
+    {
+      "file": "10.mp3",
+      "text": "Det ni tyckte bäst om blir grunden för nästa dröm. Önska, Nåla, Uppleva och Minnas, varv på varv. Basläger är där ni samlas mellan resorna."
+    }
+  ]
+}

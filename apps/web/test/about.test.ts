@@ -58,3 +58,57 @@ test("UI-15 the film has a full screen button with a fallback for the iPhone", (
   assert.match(page, /Lämna helskärm/);
   assert.ok(!page.includes("Hela manuset"), "the script is gone");
 });
+
+// REQ: UI-19 recorded narration from /om-audio/, used only when made from the scene's current text, without a credit line
+test("UI-19 the film plays recorded narration made from the current text, else the device's voice", () => {
+  assert.match(page, /fetch\("\/om-audio\/index\.json"\)/);
+  assert.match(page, /ix\?\.scenes\?\.\[i\]\?\.text === s\.text/, "a changed text falls back to the device's voice");
+  assert.match(page, /voiceOn = true/, "the narration is on when the film starts");
+  assert.ok(!page.includes("gjord med ElevenLabs"), "no credit line on a paid plan");
+  const script = readFileSync(new URL("../om-voice.mjs", import.meta.url), "utf8");
+  assert.match(script, /process\.env\.ELEVENLABS_API_KEY/, "the key comes from the environment");
+  assert.ok(!/sk_[A-Za-z0-9]{20,}/.test(script), "no key in the script");
+  const texts = [...page.matchAll(/^ {4}text: "((?:[^"\\]|\\.)*)",$/gm)];
+  assert.equal(texts.length, (page.match(/chap: "/g) ?? []).length, "the script finds every scene's text");
+});
+
+// REQ: UI-17 the film works like an embedded video
+test("UI-17 the film starts on a still frame and is played, paused and navigated like an embedded video", () => {
+  assert.match(page, /class="player paused"/, "paused until asked");
+  assert.match(page, /id="bigplay"[^>]*aria-label="Spela filmen"/);
+  assert.match(page, /stage\.addEventListener\("click"/, "a tap on the picture plays or pauses");
+  assert.match(page, /\.player\.idle \.controls\{opacity:0/, "the controls hide while playing");
+  assert.match(page, /class="seg"/, "a progress bar with one part per chapter");
+  assert.match(page, /id="chapbtn"[^>]*aria-expanded="false"[^>]*aria-controls="drawer"/, "chapters in a drawer, closed at first");
+  assert.match(page, /\.drawer\{[^}]*transform:translateY\(100%\)/, "the drawer slides up from below");
+  const row = page.slice(page.indexOf('<div class="row">'), page.indexOf("</div>", page.indexOf('<div class="row">')));
+  assert.ok(row.trim().endsWith('</button>') && /id="full"[^]*$/.test(row) && row.lastIndexOf('id="full"') > row.lastIndexOf('id="chapbtn"'), "full screen is the last control, bottom right");
+  assert.match(page, /e\.key === " " \|\| e\.key === "k"/);
+  assert.match(page, /\.player\.paused \.scene \*\{animation-play-state:paused/, "a paused film stands still");
+});
+
+// REQ: UI-18 the figures move, out of step, and stand still with reduced motion
+test("UI-18 the figures breathe, blink, swing their arms and walk in", () => {
+  for (const k of ["breathe", "blink", "sway", "tilt", "walkin"]) assert.match(page, new RegExp(`@keyframes ${k}\\{`), k);
+  assert.match(page, /walk: -?\d+/, "someone walks in");
+  assert.match(page, /animation-delay:-\$\{d\}s/, "each figure out of step");
+  assert.match(page, /prefers-reduced-motion:reduce\)\{\.on \*\{animation:none/);
+});
+
+// REQ: UI-13 the film says what the app says: the Minnas verdicts and the words of Saldo
+test("UI-13 the film uses the app's words for the verdicts and Saldo", () => {
+  for (const w of ["Igen", "Okej", "Inte igen", "får tillbaka", "ska betala", "Förslag på betalningar"]) assert.ok(page.includes(w), w);
+  assert.ok(!page.includes("göra igen"));
+});
+
+// REQ: UI-20 the landing page for visitors, with a small login icon at the top right
+test("UI-20 a visitor without a session or link lands on Om Basläger, which links to the login", async () => {
+  const { landsOnAbout, ABOUT_PAGE } = await import("../src/access.ts");
+  assert.equal(ABOUT_PAGE, "/om.html");
+  assert.equal(landsOnAbout("", false, false), true);
+  for (const hash of ["#login", "#u=eva.AbC", "#login=nokonto", "#login=fel"]) assert.equal(landsOnAbout(hash, false, false), false, hash);
+  assert.equal(landsOnAbout("", true, false), false, "a link that no longer works shows the login page (AU-07)");
+  assert.equal(landsOnAbout("", false, true), false, "#admin shows the login page");
+  assert.match(page, /<a class="login" href="\/#login" aria-label="Logga in"/);
+  assert.match(page, /\.login\{[^}]*width:44px;height:44px/, "a 44 px touch target (AC-05)");
+});

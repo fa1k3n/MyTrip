@@ -24,6 +24,7 @@ export type AiFeature = {
   instructions: string; // fixed, written by us
   task: string; // fixed, written by us
   allows(op: Op): boolean; // the kinds of change the feature may propose
+  tidy?(op: Op): Op; // puts a change into the form the app needs before it is checked, e.g. a day's icons
   helper?: AiHelper; // runs by itself behind a switch, with one proposal per suggestion (AI-68..AI-70)
 };
 /** What a helper needs beyond a feature (AI-69, AI-70). */
@@ -162,7 +163,7 @@ export async function runAi(call: AiCall, f: AiFeature, t: Trip, avoid: string[]
     const uses = m.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === PROPOSE.name);
     if (!uses.length) return { error: "no proposal", cost };
     const inputs = uses.map((u) => u.input as { ops?: unknown; reason?: unknown });
-    const ops = inputs.every((x) => isOps(x.ops)) ? fromAi(inputs.flatMap((x) => x.ops as Op[]), refs) : undefined;
+    const ops = inputs.every((x) => isOps(x.ops)) ? fromAi(inputs.flatMap((x) => x.ops as Op[]), refs).map((o) => f.tidy?.(o) ?? o) : undefined;
     const problems = ops ? problemsOf(f, t, ops) : ["ops must be a list of { op, path, value }"];
     const reason = inputs.map((x) => (typeof x.reason === "string" ? x.reason : "")).filter(Boolean).join(" ").slice(0, 500);
     if (ops && !problems.length) return { ops, reason, cost };

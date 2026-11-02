@@ -28,6 +28,17 @@ when it must be ordered or booked ahead, counted back from the trip's first day;
   },
 };
 
+/** The icon ids a day may have: the categories and the means of transport the app draws (ICONS in apps/web/src/CatIcon.tsx, UI-08). */
+const DAY_ICONS = ["Mat", "Utsikt", "Aktivitet", "Avkoppling", "Museum", "Bad", "Shopping", "Natur", "Resa", "car", "ferry", "train", "transit", "walk"];
+/** A day's icons as the app can draw them: others, such as emoji, become the day's means of transport, or Resa (AI-10). */
+const tidyDay = (o: Op): Op => {
+  if (o.op !== "add" || o.path !== "days/-") return o;
+  const v = valueOf(o), legs = Array.isArray(v.legs) ? (v.legs as { vehicle?: unknown }[]) : [];
+  const icons = (Array.isArray(v.icons) ? v.icons : []).map(String).filter((x) => DAY_ICONS.includes(x)).slice(0, 2);
+  const fallback = legs.map((l) => String(l.vehicle)).find((x) => DAY_ICONS.includes(x)) ?? "Resa";
+  return { ...o, value: { ...v, icons: icons.length ? icons : [fallback] } };
+};
+
 /** A draft of a new trip from "Beskriv din dröm", the trip's purpose: title, travelers and days, as one proposal (AI-10). */
 const draft: AiFeature = {
   area: "changes",
@@ -39,10 +50,12 @@ Add one day per date with where it is spent, and the legs between places with th
 Respect limits the description gives, such as hours of driving per day, and mention them in the day's summary.
 Do not add activities, bookings or wishes: the family adds those themselves.`,
   task: `Propose the draft: set title; add travelers/- for each traveler as { id, name, age?, packing: [] };
-add days/- for each day as { id, date: "YYYY-MM-DD", title, summary (one Swedish sentence without clock times), icons (one or two emoji),
+add days/- for each day as { id, date: "YYYY-MM-DD", title, summary (one Swedish sentence without clock times),
+icons (one or two of exactly these ids, never emoji: ${DAY_ICONS.join(", ")}; the means of transport on travel days, otherwise what the day is mostly about, or Resa),
 start: "09:00", end: "18:00", location (the town), legs: [{ vehicle: car|ferry|train|transit|walk, origin, destination, durationMin? }], activities: [] };
 and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place.`,
   allows: (o) => (o.op === "set" && o.path === "title") || (o.op === "add" && ["travelers/-", "days/-", "stops/-"].includes(o.path)),
+  tidy: tidyDay,
 };
 
 export const FEATURES: Record<string, AiFeature> = { prep, draft };

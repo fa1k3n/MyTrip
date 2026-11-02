@@ -225,3 +225,14 @@ test("AI-10 what the draft may change", () => {
   assert.equal(f.allows({ op: "remove", path: "days/0" }), false);
   assert.equal(f.helper, undefined);
 });
+
+// REQ: AI-10 a draft day's icons are ids the app draws (UI-08): emoji become the day's means of transport, or Resa
+test("AI-10 the draft's day icons", () => {
+  const f = FEATURES.draft!;
+  const day = (icons: string[], legs: object[] = []) => ({ op: "add" as const, path: "days/-", value: { id: "d0", date: "2027-10-25", title: "Hamburg", summary: "S.", icons, start: "09:00", end: "18:00", legs, activities: [] } });
+  const icons = (o: ReturnType<typeof day>) => (f.tidy!(o).value as { icons: string[] }).icons;
+  assert.deepEqual(icons(day(["Museum", "car"])), ["Museum", "car"]);
+  assert.deepEqual(icons(day(["🏙️"])), ["Resa"]);
+  assert.deepEqual(icons(day(["🚗"], [{ vehicle: "car", origin: "Malmö", destination: "Hamburg" }])), ["car"]);
+  assert.deepEqual(icons(day(["Stad", "Museum"])), ["Museum"]);
+});

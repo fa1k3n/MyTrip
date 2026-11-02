@@ -15,7 +15,8 @@ road tolls, vignettes, bridge and tunnel fees, mandatory car equipment, ferry ru
 consent for travelling with only one parent, the European health insurance card); things that must be booked or ordered in advance;
 and practical matters such as power plugs, currency and cash. Use web search to check current rules and give each one its official or best source.
 Leave out what does not apply to this trip, its means of transport or its travelers' ages. At most 10 tasks, the most important first.
-What must be booked ahead and is not among the trip's bookings yet (a hotel the description asks for, tickets, a ferry crossing, a table)
+What must be booked ahead and is not among the trip's bookings yet (a hotel the description asks for, tickets, a ferry crossing, a table),
+including tickets for the planned activities that should be bought ahead because they sell out or cost less in advance,
 is a booking to book, not a task: at most 4, only what the trip clearly needs.
 Also give at most 6 cards of practical information: when the trip goes by car, where to park near the stays and the planned activities
 (name, height limit, price and opening hours when found); and where the travelers will use public transport, how to buy tickets in that town
@@ -31,7 +32,8 @@ or "Bussbiljett i Hamburg"), text (the facts in one to three Swedish sentences) 
   helper: {
     fingerprint: (t: Trip) => JSON.stringify({
       purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null),
-      days: t.days.map((d) => [d.date, d.location ?? "", d.country ?? "", d.legs.map((l) => [l.vehicle, l.origin, l.destination])]),
+      days: t.days.map((d) => [d.date, d.location ?? "", d.country ?? "", d.legs.map((l) => [l.vehicle, l.origin, l.destination]),
+        d.activities.map((a) => [a.text, a.placeIds.map((id) => t.places.find((p) => p.id === id)?.name ?? id)])]), // AI-88: also an activity added by hand
     }),
     known: (t: Trip) => [...t.tasks.map((k) => k.text), ...t.bookings.map((b) => b.name), ...t.info.map((i) => i.title)],
     textOf: (o) => String((isInfo(o) ? valueOf(o).title : undefined) ?? valueOf(o).text ?? valueOf(o).name ?? ""),
@@ -97,7 +99,7 @@ the day's activities and travel, for example "Hagenbeck och hamnrundtur"; never 
     : ON_DAY.test(o.path) ? { ...o, value: { estimated: true, ...valueOf(o) } } : o),
   helper: {
     fingerprint: (t: Trip) => JSON.stringify({
-      purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null), places: t.places.map((p) => p.name),
+      purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null), // AI-88: not the trip's places, which activities and the helper itself add
       days: t.days.map((d) => [d.date, d.location ?? ""]),
     }),
     known: (t: Trip) => t.dreams.map((w) => w.title),

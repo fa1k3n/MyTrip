@@ -12,6 +12,7 @@ import { atLeast } from "@trip/schema/src/rules.ts";
 import { emergencyFor } from "./emergency.ts";
 import { wayUrl } from "./transport.ts";
 import { ActivityText, TravelRow, Emergency, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
+import { PracticalInfo } from "./Side.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 import { ticketFor } from "./tickets.ts";
@@ -27,7 +28,8 @@ export function Uppleva(p: TripViewProps) {
   const bookings = bookingsOn(t.bookings, day.date);
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
   const parts = p.perms.view.up, info = p.perms.parts.info !== "hidden" && (t.info.length > 0 || emergencyFor(t).length > 0); // practical information as in Nåla (UP-15, PI-06)
-  const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info; // Uppleva's components (AU-20)
+  const infoEdit = p.perms.parts.info === "write"; // PI-07: Praktiskt is edited in Uppleva, also while it is empty
+  const side = parts.budget !== "hidden" || parts.bookings !== "hidden" || info || infoEdit; // Uppleva's components (AU-20)
   const canAdd = atLeast(parts.expenses, "add") && (p.perms.manager || !!p.self); // the superuser, the owner and personal links (UP-12, AU-22, US-14)
   const vehicles = [...new Set(day.legs.map((l) => l.vehicle))]; // UP-14
   const titleWho = titleHiddenFrom(day, t); // AU-29, AU-30
@@ -92,7 +94,9 @@ export function Uppleva(p: TripViewProps) {
             );
           }) : <p className="ro">{sv.noBookingsToday}</p>}
         </section>}
-        {info && <details className="card sec lock">{/* closed at first, read-only (UP-15) */}
+        {infoEdit ? <PracticalInfo t={t} edit={p.edit} onPlace={p.place} run={p.run} part={(id) => p.perms.parts[id as keyof typeof p.perms.parts] === "write"}
+          review={p.review && (p.perms.manager || p.who?.role === "planner") ? p.review : undefined} /> /* edited here, not in Nåla (PI-07) */
+          : info && <details className="card sec lock">{/* closed at first, read-only (UP-15) */}
           <summary><h3>{sv.info}</h3></summary>
           <Emergency t={t} />
           {t.info.map((x) => <div className="row mid" key={x.id}><InfoText t={t} x={x} onPlace={p.place} /></div>)}

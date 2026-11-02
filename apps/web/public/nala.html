@@ -222,7 +222,7 @@ a.film:hover{border-color:var(--acc)}a.film:focus-visible{outline:3px solid var(
       <li>Tidslinjen och ett kort för varje dag, med aktiviteter som har tid, ungefärlig längd och kategori, och vägen mellan dem.</li>
       <li>Flytta med handtaget, se luckor och krockar, och nåla fast det som inte får flytta sig. Ångra finns efter en flytt eller borttagning.</li>
       <li>Önskningar från Önska som dras till en dag, bokningar med biljetter och mejlade bekräftelser att granska.</li>
-      <li>Budget, att göra, packlistor och Praktiskt med parkering och nödnummer.</li>
+      <li>Budget, att göra och packlistor. Vädret och Praktiskt med parkering och nödnummer finns i Uppleva, där de behövs på resan.</li>
       <li>Aktiviteter som döljs för några, till exempel en överraskning för barnen.</li>
     </ul>
   </section>
@@ -354,14 +354,13 @@ const SCENES = [
       ${fig(170, 392, { name: "Anna", act: "point", walk: -260 })}${fig(240, 392, { name: "Erik", c: "--sage", walk: -300 })}
       ${fig(600, 392, { name: "Olle", s: .72, c: "--acct", walk: 360 })}${fig(655, 392, { name: "Mia", s: .66, c: "--sage", hop: true, walk: 420 })}` },
   { chap: "Dagarna", title: "Tidslinjen och dagkorten",
-    text: "Överst går tidslinjen med ett stopp per dag, och ett tryck på ett stopp öppnar dagen. Varje dag är ett kort med datum, rubrik, en mening om dagen, tiderna och ikoner för det som händer. Vädret står under datumet.",
+    text: "Överst går tidslinjen med ett stopp per dag, och ett tryck på ett stopp öppnar dagen. Varje dag är ett kort med datum, rubrik, en mening om dagen, tiderna och ikoner för det som händer.",
     svg: () => `${ground}
       <line x1="150" y1="58" x2="650" y2="58" style="stroke:var(--acc)" stroke-width="2.5"/>
       ${[["Malmö", "25 mån", 150], ["Hamburg", "26 tis", 400], ["Hamburg", "27 ons", 650]].map(([n, d, x], i) => `<circle cx="${x}" cy="58" r="11" style="fill:${i === 1 ? "var(--sage)" : "var(--card)"};stroke:${i === 1 ? "var(--sageT)" : "var(--acc)"}" stroke-width="3"/>
         <text class="t" x="${x}" y="92" text-anchor="middle">${n}</text><text class="tm" x="${x}" y="110" text-anchor="middle">${d}</text>`).join("")}
       <g class="drop" style="animation-delay:.8s">${card(150, 130, 500, 170)}${date(172, 152, "26", "tis")}
-        ${li("cloud", 176, 220, .7)}<text class="tm" x="196" y="235">9°</text><text class="tm" x="176" y="258">4 m/s</text>
-        <text class="mid" x="250" y="182" style="font-size:22px">Hagenbeck och hamnrundtur</text>
+                <text class="mid" x="250" y="182" style="font-size:22px">Hagenbeck och hamnrundtur</text>
         <text class="tm" x="250" y="210" style="font-size:14px">Djur på förmiddagen, båt i hamnen på eftermiddagen.</text>
         ${li("clock", 250, 226, .7, "var(--sageT)")}<text class="t" x="272" y="242" style="fill:var(--sageT)">09.30–20.00</text>
         ${cat("landmark", 572, 168, "#8C7F73")}${cat("utensils", 608, 168, "#D9B26F")}
@@ -428,25 +427,23 @@ const SCENES = [
     text: "Under Bokningar står hotell, biljetter och det som ska bokas. Det som ska bokas är terrakotta, det som är klart eller betalt är grönt. Bekräftelser som mejlas till resans inkorg blir förslag att granska, och biljetterna går att öppna på resan, även utan nät.",
     svg: () => `${ground}
       ${card(150, 40, 500, 290)}<text class="mid" x="172" y="78" style="font-size:22px">Bokningar</text>
-      <g class="fly" style="animation-delay:.6s"><rect x="170" y="94" width="460" height="52" rx="10" style="fill:var(--bg);stroke:var(--acc);stroke-width:1.5"/>${li("mail", 182, 108, 1, "var(--acct)")}
+      <g class="fly" style="animation-delay:.2s"><rect x="170" y="94" width="460" height="52" rx="10" style="fill:var(--bg);stroke:var(--acc);stroke-width:1.5"/>${li("mail", 182, 108, 1, "var(--acct)")}
         <text class="t" x="216" y="116">Bokning från mejl att granska</text><text class="tm" x="216" y="135">Hotell Elbblick · 25–27 okt</text></g>
-      ${[["Hotell med pool", "att boka", "acc"], ["Färja Rostock–Trelleborg", "betald", "sage"], ["Miniatur Wunderland", "klar", "sage"]].map(([n, b, k], i) => `<g class="rise" style="animation-delay:${1.6 + i * .4}s">
+      ${[["Hotell med pool", "att boka", "acc"], ["Färja Rostock–Trelleborg", "betald", "sage"], ["Miniatur Wunderland", "klar", "sage"]].map(([n, b, k], i) => `<g class="rise" style="animation-delay:${.5 + i * .3}s">
         ${li(i === 0 ? "clock" : "ticket", 176, 172 + i * 50, .9, "var(--mute)")}<text class="t" x="208" y="${188 + i * 50}">${n}</text>${tag(520, 172 + i * 50, b, k)}</g>`).join("")}
       <g transform="translate(700 150)"><g class="pop" style="animation-delay:3.4s"><rect width="80" height="130" rx="14" style="fill:var(--ink)"/><rect x="7" y="12" width="66" height="104" rx="6" style="fill:var(--card)"/>
         ${li("ticket", 28, 42, 1, "var(--acc)")}<rect x="18" y="78" width="44" height="8" rx="4" style="fill:var(--line)"/><rect x="18" y="92" width="30" height="8" rx="4" style="fill:var(--line)"/></g></g>
       ${fig(80, 392, { name: "Anna", act: "phone" })}` },
   { chap: "Runt omkring", title: "Budget, att göra och packlista",
-    text: "Längre ner finns resten: budgeten per kategori med plan, utfall och prognos, att göra som alla kan bocka av, en packlista för varje resenär, och Praktiskt med parkering och nödnummer för varje land ni passerar.",
+    text: "Längre ner finns resten: budgeten per kategori med plan, utfall och prognos, att göra som alla kan bocka av, och en packlista för varje resenär med vad som redan är packat.",
     svg: () => `${ground}
-      <g class="rise">${card(30, 40, 175, 230)}<text class="t" x="48" y="70">Budget</text>
-        ${[["var(--acc)", 0, 90], ["var(--sage)", 90, 200], ["#D9B26F", 200, 290], ["#8C7F73", 290, 360]].map(([c, a, b]) => { const r = 44, p = (d) => [118 + r * Math.cos((d - 90) * Math.PI / 180), 160 + r * Math.sin((d - 90) * Math.PI / 180)]; const [x1, y1] = p(a), [x2, y2] = p(b); return `<path d="M${x1} ${y1} A${r} ${r} 0 ${b - a > 180 ? 1 : 0} 1 ${x2} ${y2}" fill="none" style="stroke:${c}" stroke-width="16"/>`; }).join("")}
-        <text class="tm" x="118" y="164" text-anchor="middle">plan</text><text class="tm" x="48" y="240">utfall · prognos</text></g>
-      <g class="rise" style="animation-delay:.6s">${card(220, 40, 175, 230)}<text class="t" x="238" y="70">Att göra</text>
-        ${["Miljödekal", "EU-kort", "Ladda ner biljetter"].map((t, i) => `<rect x="238" y="${90 + i * 44}" width="22" height="22" rx="5" style="fill:${i < 2 ? "var(--sage)" : "none"};stroke:var(--sage);stroke-width:2"/>${i < 2 ? li("check", 240, 92 + i * 44, .75, "#fff") : ""}<text class="tm" x="268" y="${106 + i * 44}" style="${i < 2 ? "text-decoration:line-through" : ""}">${t}</text>`).join("")}</g>
-      <g class="rise" style="animation-delay:1.2s">${card(410, 40, 175, 230)}<text class="t" x="428" y="70">Packlista</text>
-        ${["Gemensamt", "Anna", "Erik", "Olle", "Mia"].map((n, i) => `<text class="tm" x="428" y="${102 + i * 30}">${n}</text><text class="tm" x="566" y="${102 + i * 30}" text-anchor="end">${[4, 6, 5, 3, 2][i]}/${[6, 8, 7, 9, 8][i]}</text>`).join("")}</g>
-      <g class="rise" style="animation-delay:1.8s">${card(600, 40, 175, 230)}<text class="t" x="618" y="70">Praktiskt</text><text class="tm" x="618" y="98">Parkering vid hotellet</text><text class="tm" x="618" y="126">Tyskland</text>
-        ${[["112", "Larm"], ["110", "Polis"]].map(([n, l], i) => `<rect x="618" y="${138 + i * 52}" width="140" height="42" rx="12" style="fill:none;stroke:var(--line);stroke-width:1.5"/>${li("phone", 628, 147 + i * 52, .8, "var(--acct)")}<text class="t" x="656" y="${165 + i * 52}">${n}</text><text class="tm" x="690" y="${165 + i * 52}">${l}</text>`).join("")}</g>
+      <g class="rise">${card(60, 40, 200, 230)}<text class="t" x="80" y="70">Budget</text>
+        ${[["var(--acc)", 0, 90], ["var(--sage)", 90, 200], ["#D9B26F", 200, 290], ["#8C7F73", 290, 360]].map(([c, a, b]) => { const r = 44, p = (d) => [160 + r * Math.cos((d - 90) * Math.PI / 180), 160 + r * Math.sin((d - 90) * Math.PI / 180)]; const [x1, y1] = p(a), [x2, y2] = p(b); return `<path d="M${x1} ${y1} A${r} ${r} 0 ${b - a > 180 ? 1 : 0} 1 ${x2} ${y2}" fill="none" style="stroke:${c}" stroke-width="16"/>`; }).join("")}
+        <text class="tm" x="160" y="164" text-anchor="middle">plan</text><text class="tm" x="80" y="240">utfall · prognos</text></g>
+      <g class="rise" style="animation-delay:.6s">${card(300, 40, 200, 230)}<text class="t" x="320" y="70">Att göra</text>
+        ${["Miljödekal", "EU-kort", "Ladda ner biljetter"].map((t, i) => `<rect x="320" y="${90 + i * 44}" width="22" height="22" rx="5" style="fill:${i < 2 ? "var(--sage)" : "none"};stroke:var(--sage);stroke-width:2"/>${i < 2 ? li("check", 322, 92 + i * 44, .75, "#fff") : ""}<text class="tm" x="350" y="${106 + i * 44}" style="${i < 2 ? "text-decoration:line-through" : ""}">${t}</text>`).join("")}</g>
+      <g class="rise" style="animation-delay:1.2s">${card(540, 40, 200, 230)}<text class="t" x="560" y="70">Packlista</text>
+        ${["Gemensamt", "Anna", "Erik", "Olle", "Mia"].map((n, i) => `<text class="tm" x="560" y="${102 + i * 30}">${n}</text><text class="tm" x="720" y="${102 + i * 30}" text-anchor="end">${[4, 6, 5, 3, 2][i]}/${[6, 8, 7, 9, 8][i]}</text>`).join("")}</g>
       ${fig(330, 392, { name: "Erik", c: "--sage", act: "phone" })}${fig(470, 392, { name: "Olle", s: .72, c: "--acct", act: "wave" })}` },
   { chap: "Överraskningar", title: "Hemligt för några",
     text: "Ska barnen överraskas? Anna döljer aktiviteten för Olle och Mia. De ser bara Dold aktivitet, och rubriker som liknar den döljs också. Anna ser ett överstruket öga, och där står vem den är dold för.",
@@ -459,13 +456,13 @@ const SCENES = [
         <rect x="506" y="96" width="248" height="52" rx="10" style="fill:var(--bg)"/>${li("eyeoff", 520, 110, 1, "var(--mute)")}<text class="t" x="554" y="128" style="fill:var(--mute)">Dold aktivitet</text></g>
       ${fig(600, 392, { name: "Olle", s: .72, c: "--acct" })}${fig(660, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
   { chap: "Uppleva", title: "Allt finns med på resan",
-    text: "Allt ni nålar fast följer med till Uppleva, där resan visas dag för dag när ni är på väg. Planera i lugn och ro hemma, så har ni hela Hamburg i fickan.",
+    text: "Allt ni nålar fast följer med till Uppleva, där resan visas dag för dag när ni är på väg, med dagens väder och Praktiskt med parkering och nödnummer. Planera i lugn och ro hemma, så har ni hela Hamburg i fickan.",
     svg: () => `${ground}
       <g class="rise">${card(90, 60, 260, 220)}<text class="mid" x="112" y="98" style="font-size:22px">Nåla</text>
         ${[0, 1, 2, 3].map((i) => `<rect x="112" y="${116 + i * 36}" width="216" height="26" rx="8" style="fill:var(--bg)"/>`).join("")}</g>
       <path class="dash rise" style="animation-delay:.8s" d="M370 170 C 420 130, 460 130, 510 170"/><path d="M502 160 l10 10 l-14 4" fill="none" style="stroke:var(--mute)" stroke-width="2.5" class="rise"/>
       <g class="pop" style="animation-delay:1.4s"><rect x="530" y="40" width="160" height="290" rx="22" style="fill:var(--ink)"/><rect x="542" y="56" width="136" height="258" rx="12" style="fill:var(--bg)"/>
-        ${date(554, 70, "26", "tis")}<text class="t" x="620" y="96" style="font-size:13px">Idag</text>
+        ${date(554, 70, "26", "tis")}<text class="t" x="620" y="92" style="font-size:13px">Idag</text>${li("cloud", 618, 102, .6)}<text class="tm" x="636" y="115">9°</text>
         ${[0, 1, 2].map((i) => `<rect x="554" y="${142 + i * 50}" width="112" height="40" rx="8" style="fill:var(--card)"/><text class="tm" x="562" y="${166 + i * 50}">${["10.00", "13.30", "19.00"][i]}</text>`).join("")}</g>
       ${fig(170, 392, { name: "Anna", act: "cheer" })}${fig(240, 392, { name: "Erik", c: "--sage", act: "cheer" })}
       ${fig(400, 392, { name: "Olle", s: .72, c: "--acct", hop: true })}${fig(455, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
@@ -550,7 +547,7 @@ function show(i, animate = true) {
   at = Math.max(0, Math.min(SCENES.length - 1, i));
   scenes.forEach((s, n) => { s.toggleAttribute("hidden", n !== at); s.classList.remove("on"); }); // an SVG element has no hidden property
   void scenes[at].getBoundingClientRect(); // restart the scene's animations
-  if (animate) scenes[at].classList.add("on"); // without: the scene rests in its final state, a still frame
+  if (animate && playing) scenes[at].classList.add("on"); // paused or without: the scene rests in its final state, a still frame, never half drawn
   stage.setAttribute("aria-label", `Kapitel ${at + 1} av ${SCENES.length}: ${SCENES[at].title}`);
   where.textContent = `${at + 1}/${SCENES.length} · ${SCENES[at].chap}`;
   chapBtns.forEach((b, n) => b.setAttribute("aria-current", String(n === at)));
@@ -564,6 +561,7 @@ function setPlaying(p) {
   if (p && !begun) { begun = true; show(at); }
   if (p && ended) show(0);
   playing = p;
+  if (p && !scenes[at].classList.contains("on")) { void scenes[at].getBoundingClientRect(); scenes[at].classList.add("on"); } // a scene chosen while paused plays from its start
   player.classList.toggle("paused", !p);
   bigplay.hidden = p || begun && !ended;
   playBtn.innerHTML = p ? I.pause : ended ? I.again : I.play;

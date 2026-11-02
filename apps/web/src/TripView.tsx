@@ -114,13 +114,14 @@ export function AiKeep({ item, text, run }: { item: AiItem; text: string; run: R
 function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (ids: string[]) => void; setTab: (t: Tab) => void }) {
   const n = aiCounts(t), r = sv.aiReview;
   if (!n.activities && !n.tasks && !n.bookings && !n.wishes && !n.info) return null;
-  const section = (id: string) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+  const section = (id: string) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } return !!d; };
+  const later = (id: string, tries = 20) => { if (!section(id) && tries > 0) setTimeout(() => later(id, tries - 1), 100); }; // once the other tab has loaded
   const count = (k: keyof typeof r.kinds, v: number, go: () => void) => v > 0 && <button type="button" className="aicount" onClick={go}>{v} {v === 1 ? r.kinds[k][0] : r.kinds[k][1]}</button>;
   return <div className="ainew" role="region" aria-label={r.title}>
     <span className="ainew-h"><AiMark label={r.title} />{r.title}</span>
     {count("activities", n.activities, () => openDays(n.days))}{count("tasks", n.tasks, () => section("sec-tasks"))}
     {count("bookings", n.bookings, () => section("sec-bookings"))}{count("wishes", n.wishes, () => setTab("dr"))}
-    {count("info", n.info ?? 0, () => section("sec-info"))}
+    {count("info", n.info ?? 0, () => { setTab("up"); later("sec-info"); }) /* Praktiskt is in Uppleva (PI-07) */}
     <button type="button" className="btn ghost aikeepall" onClick={() => run((x) => keepAllAi(x), "keep ai")}><Icon name="check" />{r.keepAll}</button>
   </div>;
 }
@@ -159,7 +160,7 @@ export function Activities({ t, x, onPlace, edit, run }: { t: Trip; x: Day; onPl
   ))}</>;
 }
 
-/** Forecast under the date badge: symbols in one column, values in the next (WX-02..WX-09, WX-13). */
+/** The day's weather in Uppleva: symbols in one column, values in the next (WX-03..WX-09, WX-13, WX-17). */
 /** `big`: one larger row, as at the top of Uppleva (UP-11). */
 export function Weather({ forecast, big }: { forecast?: Forecast; big?: boolean }) {
   if (!forecast) return null;
@@ -193,10 +194,10 @@ function DaySuggestions({ list, review }: { list: WishSuggestion[]; review: Revi
 }
 
 type Review = NonNullable<TripViewProps["review"]>;
-function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, run, marks, suggested = [], review }: {
+function DayCard({ t, x, today, open, onToggle, onPlace, onTransport, edit, editing, run, marks, suggested = [], review }: {
   suggested?: WishSuggestion[]; review?: Review; // AI-77: the wish helper's activities for the day
   marks?: DayMarks | null; // set: the day as a proposal would leave it, read only; null: unchanged by it (MC-17)
-  t: Trip; x: Day; today: boolean; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
+  t: Trip; x: Day; today: boolean; open: boolean; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
   editing: boolean; run: Run; // editing: the role may change the plan, with no lock (ED-21, AU-21)
 }) {
   const badge = dateBadge(x.date), vehicles = [...new Set(x.legs.map((l) => l.vehicle))];
@@ -218,7 +219,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
       }}>
       {/* The whole header toggles on click; the title is the keyboard control (DC-09). The clock opens transport and does not toggle (TM-04). */}
       <div className="hd" onClick={onToggle}>
-        <div className="dcol"><div className="date"><b>{badge.d}</b><span>{badge.w}</span></div><Weather forecast={forecast} /></div>
+        <div className="dcol"><div className="date"><b>{badge.d}</b><span>{badge.w}</span></div></div> {/* the weather is for Uppleva (WX-17) */}
         <div className="txt">
           {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
           <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button>
@@ -307,7 +308,7 @@ export function TripView(p: TripViewProps) {
     {reviews && <Suspense fallback={null}><Proposals t={t} approve={p.review!.approve} reject={p.review!.reject} preview={preview} setPreview={setPreview} /></Suspense>}
     <div className="cols">
       <div>{days.map((x) => (
-        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
+        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} onToggle={() => p.toggleDay(x.id)}
           onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run} marks={preview ? preview.marks.get(x.id) ?? null : undefined}
           editing={!preview && perms.view.nala.plan === "write"} suggested={wishSugs.filter((s) => s.day === x.id && s.activity)} review={reviews ? p.review : undefined} />
       ))}</div>
@@ -340,7 +341,7 @@ export function TripView(p: TripViewProps) {
       <button key={k} className="tab" role="tab" aria-selected={tab === k} onClick={() => p.setTab(k)}>{sv.tabs[k]}</button>
     ))}</div>}
     <div className={`${lock ? "lock" : ""} ${writes ? "" : "guest"}`}>{main}</div>
-    {(tab === "nala" || tab === "up") && Object.keys(p.forecast).length > 0 && (
+    {tab === "up" && Object.keys(p.forecast).length > 0 && ( /* WX-15: where the weather is shown (WX-17) */
       <p className="credit">{sv.weatherCredit} <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>{p.forecastAt && <> · {sv.offline.weatherFrom(stampText(p.forecastAt, new Date(), t.timezone))}</>}</p>
     )}
   </>;

@@ -466,7 +466,7 @@ function show(i, animate = true) {
   at = Math.max(0, Math.min(SCENES.length - 1, i));
   scenes.forEach((s, n) => { s.toggleAttribute("hidden", n !== at); s.classList.remove("on"); }); // an SVG element has no hidden property
   void scenes[at].getBoundingClientRect(); // restart the scene's animations
-  if (animate) scenes[at].classList.add("on"); // without: the scene rests in its final state, a still frame
+  if (animate && playing) scenes[at].classList.add("on"); // paused or without: the scene rests in its final state, a still frame, never half drawn
   stage.setAttribute("aria-label", `Kapitel ${at + 1} av ${SCENES.length}: ${SCENES[at].title}`);
   where.textContent = `${at + 1}/${SCENES.length} · ${SCENES[at].chap}`;
   chapBtns.forEach((b, n) => b.setAttribute("aria-current", String(n === at)));
@@ -480,6 +480,7 @@ function setPlaying(p) {
   if (p && !begun) { begun = true; show(at); }
   if (p && ended) show(0);
   playing = p;
+  if (p && !scenes[at].classList.contains("on")) { void scenes[at].getBoundingClientRect(); scenes[at].classList.add("on"); } // a scene chosen while paused plays from its start
   player.classList.toggle("paused", !p);
   bigplay.hidden = p || begun && !ended;
   playBtn.innerHTML = p ? I.pause : ended ? I.again : I.play;

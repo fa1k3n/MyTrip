@@ -39,3 +39,12 @@ test("UI-30 in Lär dig Basläger", () => {
     assert.match(list, /Den här filmen/, self);
   }
 });
+
+// REQ: UI-17 a scene shown while the film is paused rests in its final state, so no card stands empty; it plays its animations when the film plays
+test("UI-17 a paused scene is complete", () => {
+  for (const f of ["om.html", "ai.html", "nala.html"]) {
+    const s = read(f);
+    assert.match(s, /if \(animate && playing\) scenes\[at\]\.classList\.add\("on"\);/, f);
+    assert.match(s, /if \(p && !scenes\[at\]\.classList\.contains\("on"\)\) \{ void scenes\[at\]\.getBoundingClientRect\(\); scenes\[at\]\.classList\.add\("on"\); \}/, f);
+  }
+});

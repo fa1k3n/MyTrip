@@ -32,7 +32,7 @@ const CountMark = ({ icon, n, label }: { icon: "sparkle" | "ticket"; n: number; 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02). It has no lock: its editing controls show
  * when the role may change it, and a section it may only read shows none (ED-21, AU-21). */
 const Section = ({ title, may, flag, tint = "", id, children }: { title: string; may: boolean; flag?: ReactNode; tint?: string; id?: string; children: ReactNode }) => (
-  <details className={`card sec ${may ? "" : "lock"} ${tint}`} id={id}>{/* id: opened from Nytt från AI (AI-84) */}
+  <details className={`card sec ${may ? "unlock" : "lock"} ${tint}`} id={id}>{/* id: opened from Nytt från AI (AI-84) */}
     <summary><h3>{title}</h3>{flag}</summary>
     {children}
   </details>
@@ -188,7 +188,8 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
   );
 }
 
-function Info({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review; run: Run }) {
+/** Praktiskt, shown in Uppleva only, where a role that may change it also edits it and reviews the AI's suggestions (PI-07). */
+export function PracticalInfo({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review; run: Run }) {
   const suggested = useAiSuggestions(t, !!review && part("info"), "prep", "info/-"); // AI-87
   const [err, setErr] = useState<string | null>(null);
   return (
@@ -259,7 +260,6 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
-    {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}
   </>;
 }

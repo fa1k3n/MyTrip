@@ -68,8 +68,8 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
             <ActivityWhen a={a} />
             <span className="what-col"><ActivityText t={t} a={a} who={who.get(a.id)} eye={() => edit({ kind: "hidden", dayId: x.id, id: a.id })} onPlace={onPlace} />{miss && <small className="miss">{sv.missing.label}: {miss}</small>}</span>
             {a.ai && <AiKeep item={{ kind: "activity", dayId: x.id, id: a.id }} text={a.text} run={run} /> /* AI-83 */}
-            <IconButton icon="pin" look="bare" tip="left" label={`${a.pinned ? sv.pin.off : sv.pin.on}: ${a.text}`} pressed={!!a.pinned} onClick={async () => { if (a.pinned && !(await ask(sv.pin.ask(a.text), { ok: sv.pin.off }))) return; run((cur) => togglePin(cur, x.id, a.id), a.pinned ? "unpin" : "pin"); }} mut /> {/* ED-24: unpinning asks first */}
-            <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />
+            <span className="actbtns"><IconButton icon="pin" look="bare" tip="left" label={`${a.pinned ? sv.pin.off : sv.pin.on}: ${a.text}`} pressed={!!a.pinned} onClick={async () => { if (a.pinned && !(await ask(sv.pin.ask(a.text), { ok: sv.pin.off }))) return; run((cur) => togglePin(cur, x.id, a.id), a.pinned ? "unpin" : "pin"); }} mut /> {/* ED-24: unpinning asks first */}
+            <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut /></span>
           </div></Fragment>
         );
       })}

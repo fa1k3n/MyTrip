@@ -82,3 +82,11 @@ test("AC-05 place links and emergency numbers", () => {
   assert.match(view, /<a className="btn ghost tel" href=\{telHref\(n\.number\)\} aria-label=\{`\$\{c\.name\}, \$\{sv\.emergency\.call\(n\.label, n\.number\)\}`\} key=\{i\}><Icon name="phone" \/>/);
   assert.doesNotMatch(view, /<a className="place" href=\{telHref/);
 });
+
+// REQ: RS-11 a long word in an activity breaks or is hyphenated instead of running under the buttons; on a phone the pin and edit buttons stack
+test("RS-11 the activity text keeps clear of the buttons", () => {
+  assert.match(css, /\.act \.what,\.act \.what-col\{[^}]*overflow-wrap:anywhere;hyphens:auto[^}]*\}\.act \.place\{max-width:100%\}/);
+  assert.match(css, /\.actbtns\{display:flex;flex:none;margin-left:auto\}/);
+  assert.match(css, /@media \(max-width:599px\)\{\.actbtns\{flex-direction:column\}\}/);
+  assert.match(src("Plan.tsx"), /<span className="actbtns"><IconButton icon="pin"/);
+});

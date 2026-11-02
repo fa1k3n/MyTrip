@@ -236,6 +236,9 @@ dialog h3:first-of-type,dialog .dh{padding-right:44px}
 /* A side section's heading. */
 .sec>summary h3{margin:0}
 .act .what,.act .what-col{flex:1 1 auto}.act .grip,.act>.icon{flex:none}.act .place{text-align:left}
+.act .what,.act .what-col{overflow-wrap:anywhere;hyphens:auto}.act .place{max-width:100%} /* a long word breaks instead of running under the buttons (RS-11) */
+.actbtns{display:flex;flex:none;margin-left:auto}.act>.actbtns{align-self:center}.actbtns .icon{margin-left:0} /* pin and edit (ED-24) */
+@media (max-width:599px){.actbtns{flex-direction:column}} /* stacked on a phone, so the text gets their width (RS-11) */
 /* Phones (RS-01): the day tools get a row of their own under the header so the title keeps its width. */
 @media (max-width:767px){.day .tools{position:static;justify-content:flex-end;padding:0 40px 0 8px;margin-top:-46px;pointer-events:none}.day .tools > *{pointer-events:auto}.day.open .hd{padding-right:14px}}
 /* The trip title row. */

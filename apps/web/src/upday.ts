@@ -20,6 +20,13 @@ export function nowAt(list: { start?: string }[], now: string | undefined) {
   return i < 0 ? list.length : i;
 }
 
+/** Whether an activity has ended by `now`: at its end, else when the next one starts; never without `now` (another day) (UP-50). */
+export function hasEnded<A extends Timed>(list: A[], i: number, now: string | undefined) {
+  if (!now) return false;
+  const end = activityEnd(list[i]!) ?? list.slice(i + 1).find((x) => x.start)?.start;
+  return !!end && toMin(end) <= toMin(now);
+}
+
 /** Activities that end after the next timed activity starts, fixed or estimated (UP-28). */
 export function clashes<A extends Timed>(list: A[]) {
   const out = new Map<string, { end: string; with: A }>();

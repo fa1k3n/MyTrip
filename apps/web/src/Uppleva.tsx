@@ -2,7 +2,9 @@
 import { useEffect, useState } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
 import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.ts";
-import { clashes, durationText, nowAt, upDayTime, upTime } from "./upday.ts";
+import { clashes, durationText, hasEnded, nowAt, upDayTime, upTime } from "./upday.ts";
+import { verdictWish } from "./memories.ts";
+import { Verdicts } from "./Verdicts.tsx"; // UP-50
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
 import { geocodeUrl } from "./weather.ts";
 import { guessWish, wishChoices } from "./money.ts";
@@ -139,11 +141,13 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
   const now = useClock(t.timezone, day.date === p.today);
   const at = nowAt(day.activities, now), clash = clashes(day.activities), who = hiddenFromIn(day);
   const currency = useDayCurrency(day, t.currency, p.today);
+  const rates = p.perms.view.mi.memories === "write" && !!p.memoryBy; // verdicts on today's ended activities (UP-50)
   const line = now && <li className="nowline" key="now"><span>{sv.up.now} {now.replace(":", ".")}</span></li>;
   return <><ol className={`upday${add ? " withfab" : ""}`}>
     {day.activities.map((a, i) => {
       const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false); // UP-36
       const hid = who.get(a.id), eye = p.edit && (() => p.edit({ kind: "hidden", dayId: day.id, id: a.id }));
+      const wish = rates ? verdictWish(t.dreams, a, hasEnded(day.activities, i, now)) : undefined;
       const card = <li key={a.id} className={`card upact ${c ? "warn" : ""} ${hid ? "hiddenrow" : ""}`}>
         {hid && <span className="upeye"><Eye t={t} who={hid} open={eye} /></span> /* top right, not in the title (UP-32) */}
         <span className="upwhen">
@@ -160,6 +164,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
             {add && !a.hidden && <IconButton icon="money" look="bare" tip="left" label={sv.up.expenseTitle(a.text)}
               onClick={() => p.addShortExpense(currency, { id: a.id, text: a.text, category: a.category, dreamId: a.dreamId } /* its wish too (UP-47) */)} />}
           </span>
+          {wish && <Verdicts t={t} id={wish.id} title={wish.title} by={p.memoryBy} writes run={p.run} />}
         </span>
       </li>;
       const way = a.travel && <TravelRow key={`way-${a.id}`} travel={a.travel} li href={wayUrl(t, day.id, a.id)} />; // TR-20, TR-21

@@ -130,7 +130,7 @@ export const sv = {
     waiting: "Ej skickat", noContact: "Ingen kontakt med servern.", server: (n: number) => `Servern svarade ${n}.`, sendNow: "Skicka nu", // PW-18
     sending: "Skickar…", tried: (why: string, hhmm: string) => `${why} Försökte ${hhmm}.`, title: "Ej skickade utlägg", // PW-19, UP-46
     failed: (reason: string) => `Kunde inte skickas. ${reason}`, retry: "Försök igen", remove: "Ta bort",
-    removeAsk: "Ta bort utlägget? Det har inte kommit fram.", forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot det (${status}).`,
+    removeAsk: "Ta bort utlägget? Det har inte kommit fram.", noRate: (c: string) => `Väntar på växelkursen för ${c}.`, /* UP-49 */ forbidden: "Behörigheten har ändrats.", rejected: (status: number) => `Servern tog inte emot det (${status}).`,
   },
   offline: { // PW-04, PW-10
     title: "Offline", since: (time: string) => `Offline – senast uppdaterad ${time}`,
@@ -249,7 +249,7 @@ export const sv = {
   replacePurposeAsk: "Ersätta det som står i Syfte med förslaget?", replacePurpose: "Ersätt",
   newDay: "Ny dag", emptyDay: "Inget planerat än.", editDay: "Ändra dag",
   login: {
-    title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut",
+    title: "Logga in", password: "Lösenord", submit: "Logga in", logout: "Logga ut", logoutAsk: "Logga ut?", // PW-23
     noLink: "Logga in med ditt konto, eller öppna resan med länken du fått.",
     expired: "Länken gäller inte längre. Be om en ny länk, eller logga in med ditt konto.",
     email: "Mejladress", google: "Logga in med Google", // US-07, US-09

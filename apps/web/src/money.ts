@@ -76,13 +76,14 @@ export const balanceText = (v: number) =>
 
 export type ExpenseInput = { text: string; amount: string; category: string; paidBy: string; sharedBy: string[]; addedBy: string; activityId?: string;
   dreamId?: string; // the wish it was for (UP-47)
-  foreign?: { currency: string; rate: number; rateDate: string }; // `amount` is then in this currency (UP-25)
+  foreign?: { currency: string; rate?: number; rateDate?: string }; // `amount` is then in this currency (UP-25); without a rate it is converted when sent (UP-49)
 };
 
 /** A new expense with who added it and when (MI-02, UP-13). `date` is the trip's today, `at` the moment as ISO time. */
 /** An amount in another currency as the trip's amount, rounded to öre, with what was entered (UP-25). */
 function converted(amount: number, f: ExpenseInput["foreign"]) {
   if (!f) return {};
+  if (!f.rate || !f.rateDate) return { amount, foreign: { amount, currency: f.currency } }; // UP-49
   return { amount: Math.round(amount * f.rate * 100) / 100, foreign: { amount, currency: f.currency, rate: f.rate, rateDate: f.rateDate } };
 }
 

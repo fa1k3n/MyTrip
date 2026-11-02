@@ -25,6 +25,11 @@ export function experienced<W extends Wish>(t: { dreams: W[]; days: Day[] }, tod
   return t.dreams.filter((w) => done.has(w.id) && !w.hidden);
 }
 
+/** The wish to give a verdict on from an activity's card in Uppleva: an ended, visible activity's visible wish (UP-50). */
+export function verdictWish<W extends Wish>(dreams: W[], a: { dreamId?: string; hidden?: boolean }, ended: boolean) {
+  return ended && a.dreamId && !a.hidden ? dreams.find((w) => w.id === a.dreamId && !w.hidden) : undefined;
+}
+
 /** How many gave each verdict, never who (MI-18). */
 export function verdictCounts(t: { memories: Memory[] }, dreamId: string): Record<Verdict, number> {
   const n = { again: 0, ok: 0, never: 0 };

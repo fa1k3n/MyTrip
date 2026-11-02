@@ -19,10 +19,29 @@ export function saveCopy(s: Store, link: string, part: Pick<Copy, "me" | "trips"
 }
 /** A link leaves the phone with its copy and its waiting expenses (PW-17). */
 export const dropCopy = (s: Store, link: string) => { s.removeItem(PREFIX + link); s.removeItem(QUEUE + link); };
-/** #admin removes every link and so every copy and queue (PW-17). */
+/** #admin removes every link and so every copy and queue (PW-17), but not the account's (PW-22). */
 export function dropAllCopies(s: Store) {
-  const keys = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k && (k.startsWith(PREFIX) || k.startsWith(QUEUE)));
+  const keys = Array.from({ length: s.length }, (_, i) => s.key(i))
+    .filter((k): k is string => !!k && [PREFIX, QUEUE].some((p) => k.startsWith(p) && !k.startsWith(p + "@")));
   for (const k of keys) s.removeItem(k);
+}
+
+/** An account keeps its copy and queue under its id, marked so that it can never be a link key (PW-22). */
+export const accountSlot = (id: string) => `@${id}`;
+const ACCOUNT = "mytrip.account";
+/** The account that last logged in on the phone, whose copy a start without a network reads (PW-22). */
+export const storedAccount = (s: Store) => s.getItem(ACCOUNT);
+/** An account logged in: another account's copy and queue leave the phone (PW-22). */
+export function keepAccount(s: Store, id: string) {
+  const old = s.getItem(ACCOUNT);
+  if (old && old !== id) dropCopy(s, accountSlot(old));
+  try { s.setItem(ACCOUNT, id); } catch { /* storage blocked: online only */ }
+}
+/** Logging out removes the account's copy and queue from the phone (PW-23). */
+export function forgetAccount(s: Store) {
+  const old = s.getItem(ACCOUNT);
+  if (old) dropCopy(s, accountSlot(old));
+  s.removeItem(ACCOUNT);
 }
 
 /** The time of day, with the date when it is not today, in the trip's time zone. */
@@ -41,9 +60,19 @@ export function keptForecast<F>(c: Copy | null, tripId: string): { days: Record<
   return f?.tripId === tripId && f.days && c?.forecastAt ? { days: f.days, at: c.forecastAt } : null;
 }
 
-/** An expense on the phone that the server does not have yet (PW-06), or that it rejected, with the reason (PW-09). */
+/** An expense on the phone that the server does not have yet (PW-06), or that it rejected, with the reason (PW-09). An account's
+ * keeps its trip; a link's goes to the link's trip (PW-22). */
 export type Expense = { id: string; amount: number; [k: string]: unknown };
-export type Waiting = { expense: Expense; state: "waiting" | "failed"; reason?: string };
+export type Waiting = { expense: Expense; state: "waiting" | "failed"; reason?: string; tripId?: string; home?: string }; // home: the trip's currency, to convert to (UP-49)
+
+type Foreign = { amount: number; currency: string; rate?: number; rateDate?: string };
+/** An expense in another currency still without a rate: it waits for one before it is sent (UP-49). */
+export const unrated = (e: Expense) => { const f = e.foreign as Foreign | undefined; return !!f && !f.rate; };
+/** The expense converted with the rate of its date, as the form does with a network (UP-25, UP-49). */
+export function withRate(e: Expense, r: { rate: number; date: string }): Expense {
+  const f = e.foreign as Foreign;
+  return { ...e, amount: Math.round(f.amount * r.rate * 100) / 100, foreign: { amount: f.amount, currency: f.currency, rate: r.rate, rateDate: r.date } };
+}
 /** What sending one expense gave: recorded, not now (try later, with why: PW-18), or rejected with a reason. */
 export type Sent = { ok: true } | { offline: true; why?: string } | { failed: string };
 
@@ -63,14 +92,18 @@ export function loadQueue(s: Store, link: string): Waiting[] {
 export function saveQueue(s: Store, link: string, q: Waiting[]) {
   try { if (q.length) s.setItem(QUEUE + link, JSON.stringify(q)); else s.removeItem(QUEUE + link); } catch { /* storage blocked */ }
 }
-export const enqueue = (q: Waiting[], expense: Expense): Waiting[] => [...q, { expense, state: "waiting" }];
-export const retry = (q: Waiting[], id: string): Waiting[] => q.map((x) => (x.expense.id === id ? { expense: x.expense, state: "waiting" } : x));
+export const enqueue = (q: Waiting[], expense: Expense, tripId?: string, home?: string): Waiting[] =>
+  [...q, { expense, state: "waiting", ...(tripId ? { tripId } : {}), ...(home ? { home } : {}) }];
+export const retry = (q: Waiting[], id: string): Waiting[] =>
+  q.map((x) => (x.expense.id === id ? { expense: x.expense, state: "waiting", ...(x.tripId ? { tripId: x.tripId } : {}), ...(x.home ? { home: x.home } : {}) } : x));
 export const dequeue = (q: Waiting[], id: string) => q.filter((x) => x.expense.id !== id);
 export const unsent = (q: Waiting[]) => q.length;
 
+/** The waiting expenses of one trip: an account's carry their trip, a link's belong to its only trip (PW-22). */
+export const waitingFor = (q: Waiting[], tripId: string | undefined) => q.filter((x) => !x.tripId || x.tripId === tripId);
 /** The trip with the expenses still on the phone, marked, so the budget status counts them (PW-06). */
-export function withWaiting<T extends { expenses: Expense[] }>(t: T, q: Waiting[]): Omit<T, "expenses"> & { expenses: (T["expenses"][number] & { waiting?: Waiting["state"] })[] } {
-  const extra = q.filter((x) => !t.expenses.some((e) => e.id === x.expense.id)).map((x) => ({ ...x.expense, waiting: x.state }));
+export function withWaiting<T extends { id?: string; expenses: Expense[] }>(t: T, q: Waiting[]): Omit<T, "expenses"> & { expenses: (T["expenses"][number] & { waiting?: Waiting["state"] })[] } {
+  const extra = waitingFor(q, t.id).filter((x) => !unrated(x.expense) && !t.expenses.some((e) => e.id === x.expense.id)) /* no rate, no amount to count (UP-49) */.map((x) => ({ ...x.expense, waiting: x.state }));
   return { ...t, expenses: [...t.expenses, ...extra] };
 }
 

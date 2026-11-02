@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type AiAdded, type Me } from "./api.ts";
-import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, withWaiting, type Expense, type Waiting } from "./offline.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type AiAdded, type Me } from "./api.ts";
+import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { ABOUT_PAGE, forInstalled, landsOnAbout, needsConsent, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
@@ -153,8 +153,8 @@ export function App() {
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
   const flushWaiting = useCallback(async () => {
-    const tripId = sendTrip(me, linkKey()); // also when logged in as admin with a link on the phone (PW-20)
-    if (!tripId) return;
+    if (!me) return;
+    const tripId = sendTrip(me, linkKey()); // also when logged in as admin with a link on the phone (PW-20); an account's carry their trip (PW-22)
     setSending((n) => n + 1);
     try { if (await sendWaiting(tripId)) load(); } finally { setSending((n) => n - 1); } // PW-07
     setWaiting(queue.load());
@@ -226,7 +226,12 @@ export function App() {
     try { if (localStorage.getItem(k) === today) return; localStorage.setItem(k, today); } catch { /* storage blocked: send anyway, the server keeps one a day */ }
     api.seen(tripId, tab).catch(() => {});
   }, [me, view, tab, tripId]);
-  const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
+  const logout = async () => {
+    const n = queue.load().length;
+    if (n && !(await ask(`${sv.login.logoutAsk} ${sv.choose.unsent(n)}`, { ok: sv.login.logout }))) return; // PW-23
+    await api.logout().catch(() => {});
+    forgetDeviceAccount(); setWaiting([]); setTrips(null); setView("portal"); setMe(null);
+  };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
   const newTrip = () => setNewOpen(true);
   /** AI-10: a trip with its draft opens on Nåla with Ångra for the draft (AI-78); one without, on Drömmar. */
@@ -370,8 +375,9 @@ export function App() {
       const all = defaultSharers(t!.travelers); // shared by all who share costs (MI-02, MI-38)
       const cur = str("currency") || t!.currency;
       const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
-      if (rate === null) return setErr(sv.up.noRate(cur));
-      const foreign = rate && { currency: cur, rate: rate.rate, rateDate: rate.date };
+      const queued = !!linkKey() || account; // kept on the phone: it may wait for its rate (UP-49)
+      if (rate === null && !queued) return setErr(sv.up.noRate(cur));
+      const foreign = rate ? { currency: cur, rate: rate.rate, rateDate: rate.date } : rate === null ? { currency: cur } : undefined;
       const wish = activity ? undefined : short?.choices?.find((x) => x.id === str("dream")); // the wish chosen in the sheet (UP-47)
       const typed = { text: str("text"), amount: str("amount") };
       const input = { ...(activity ? activityExpense(activity, typed, payer, all) // the card's activity and its wish (UP-22, UP-23, UP-47)
@@ -380,8 +386,8 @@ export function App() {
       const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
       if (!self && short?.payer) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
-      if (linkKey()) { // kept on the phone at once and sent from there, with or without a network (PW-06, PW-07)
-        queue.save(enqueue(queue.load(), r.ops[0].value as Expense));
+      if (queued) { // kept on the phone at once and sent from there, with or without a network (PW-06, PW-07, PW-22)
+        queue.save(enqueue(queue.load(), r.ops[0].value as Expense, linkKey() ? undefined : t!.id, t!.currency));
         setWaiting(queue.load());
         flushWaiting();
       } else change(r.ops, "add expense");
@@ -448,7 +454,7 @@ export function App() {
   );
   else page = (
     <TripView
-      t={withWaiting(t, waiting) as Trip} waiting={waiting} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
+      t={withWaiting(t, waiting) as Trip} waiting={waitingFor(waiting, t.id)} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
       cover={covers[t.id]} tab={tab} open={open} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} openDays={(ids) => { setOpen(Object.fromEntries(ids.map((id) => [id, true]))); if (ids[0]) setScrollTo(ids[0]); }}

@@ -33,6 +33,7 @@ export function parseRate(json: unknown, to: string): { rate: number; date: stri
 /** "28,50 € (320,06 kr)": the amount as paid, then in the trip's currency (UP-26). */
 export function expenseAmountText(e: { amount: number; foreign?: { amount: number; currency: string; rate?: number; rateDate?: string } }, tripCurrency: string) {
   const home = tripCurrency === "SEK" ? kr(e.amount) : money(e.amount, tripCurrency);
+  if (e.foreign && !e.foreign.rate) return money(e.foreign.amount, e.foreign.currency); // no rate yet: no amount in the trip's currency (UP-49)
   return e.foreign ? `${money(e.foreign.amount, e.foreign.currency)} (${home})` : home;
 }
 

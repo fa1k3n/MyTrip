@@ -1,7 +1,7 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
 import type { Traffic } from "./transport.ts";
 
-import { dropAllCopies, dropCopy, flush, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, timeoutSignal, triedAt, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, parseSetupHash, removeLink, type Me } from "./access.ts";
 export type { Me } from "./access.ts";
@@ -87,15 +87,27 @@ const setOffline = (next: { at?: string } | null) => {
   listeners.forEach((f) => f());
 };
 addEventListener("online", () => setOffline(null));
-/** The link's copy on the phone, to read or write (PW-03). */
+/** The account last logged in on the phone, whose copy is used when no link is (PW-22). */
+let account = (() => { try { return storedAccount(localStorage); } catch { return null; } })();
+/** Where the phone keeps what it got: the link in use, else the account (PW-03, PW-22). */
+const slot = () => link ?? (account ? accountSlot(account) : null);
+/** An account answered: its copy is kept from now on, and another account's leaves the phone (PW-22). */
+function adoptAccount(me: Me) {
+  if (link || !("user" in me)) return;
+  account = me.user.id;
+  try { keepAccount(localStorage, account); } catch { /* blocked: online only */ }
+}
+/** Logging out: the account's copy and waiting expenses leave the phone (PW-23). */
+export const forgetDeviceAccount = () => { account = null; try { forgetAccount(localStorage); } catch { /* nothing stored */ } };
+/** The copy of the link or account on the phone, to read or write (PW-03, PW-22). */
 export const copy = {
-  load: (): Copy | null => { try { return link ? loadCopy(localStorage, link) : null; } catch { return null; } },
-  save: (part: Parameters<typeof saveCopy>[2]) => { try { if (link) saveCopy(localStorage, link, part, new Date().toISOString()); } catch { /* blocked */ } },
+  load: (): Copy | null => { const k = slot(); try { return k ? loadCopy(localStorage, k) : null; } catch { return null; } },
+  save: (part: Parameters<typeof saveCopy>[2]) => { const k = slot(); try { if (k) saveCopy(localStorage, k, part, new Date().toISOString()); } catch { /* blocked */ } },
 };
-/** The link's expenses that the server does not have yet (PW-06). */
+/** The expenses of the link or account that the server does not have yet (PW-06, PW-22). */
 export const queue = {
-  load: (): Waiting[] => { try { return link ? loadQueue(localStorage, link) : []; } catch { return []; } },
-  save: (q: Waiting[]) => { try { if (link) saveQueue(localStorage, link, q); } catch { /* blocked */ } },
+  load: (): Waiting[] => { const k = slot(); try { return k ? loadQueue(localStorage, k) : []; } catch { return []; } },
+  save: (q: Waiting[]) => { const k = slot(); try { if (k) saveQueue(localStorage, k, q); } catch { /* blocked */ } },
 };
 /** One expense to the server. No network, a conflict or a server error: try later and say why, with when; otherwise the reason
  * (PW-07, PW-09, PW-18, PW-19). A request without an answer is given up after 20 seconds, in every browser (PW-19). */
@@ -110,25 +122,38 @@ async function sendExpense(tripId: string, e: Expense): Promise<Sent> {
   }
 }
 let sendingTo = "";
+/** A waiting expense in another currency, converted with the rate of its date; null while no rate can be had (UP-49). */
+async function rated(e: Expense, home: string | undefined) {
+  if (!home) return null;
+  const { rateFor } = await import("./currency.ts");
+  const r = await rateFor((e.foreign as { currency: string }).currency, home, String(e.date));
+  return r && withRate(e, r);
+}
 /** Sends the waiting expenses; ones added meanwhile stay. True when the server got at least one (PW-07). One send at a time: a
  * call during a send waits for it and sends again, so "Skicka nu" always tries (PW-19). */
 const sendQueue = serial(async () => {
   const before = queue.load();
   if (!before.some((x) => x.state === "waiting")) return false;
-  const after = await flush(before, (e) => sendExpense(sendingTo, e));
+  const of = (e: Expense) => before.find((x) => x.expense.id === e.id);
+  const after = await flush(before, async (e) => {
+    const ready = unrated(e) ? await rated(e, of(e)?.home) : e; // the rate first (UP-49)
+    if (!ready) return { offline: true, why: triedAt(sv.queue.noRate((e.foreign as { currency: string }).currency), new Date()) };
+    return sendExpense(of(e)?.tripId ?? sendingTo, ready); // an account's goes to its own trip (PW-22)
+  });
   const sent = before.filter((x) => !after.some((a) => a.expense.id === x.expense.id)).map((x) => x.expense.id);
   queue.save(queue.load().filter((x) => !sent.includes(x.expense.id)).map((x) => after.find((a) => a.expense.id === x.expense.id) ?? x));
   return sent.length > 0;
 });
-export function sendWaiting(tripId: string): Promise<boolean> {
+export function sendWaiting(tripId = ""): Promise<boolean> {
   sendingTo = tripId;
   return sendQueue();
 }
 
-/** A read that falls back on the phone's copy when the server cannot be reached; only links keep one (PW-03, PW-05). */
+/** A read that falls back on the phone's copy when the server cannot be reached; links and accounts keep one (PW-03, PW-05, PW-22). */
 async function kept<T>(part: "me" | "trips", path: string): Promise<T> {
   try {
     const v = await call<T>(path);
+    if (part === "me") adoptAccount(v as Me);
     copy.save({ [part]: v });
     setOffline(null);
     return v;

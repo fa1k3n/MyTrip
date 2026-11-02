@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { kr, shortDate } from "./format.ts";
 import { approveExpense, balances, byDate, mayRelink, mayRemove, rejectExpense, removeExpense, removePayment, settle, settled, sharersText, paidTotals, unhandled, type Transfer, activityTitle } from "./money.ts";
-import { experienced, memoryOps, mineOf, notesOf, verdictCounts, VERDICTS, type MinnasView } from "./memories.ts";
+import { experienced, notesOf, type MinnasView } from "./memories.ts";
+import { Verdicts } from "./Verdicts.tsx";
 import { DreamCard } from "./Dreams.tsx";
 import { BudgetPlanView } from "./Donut.tsx";
 import { IconButton, Icon } from "./Icons.tsx";
@@ -27,20 +28,6 @@ type Props = {
 
 
 const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches; // AC-06
-
-/** A verdict's count in the button's corner: it pops when it grows, bounces when it shrinks and shrinks away at zero (MI-17, MI-28). */
-function Count({ n }: { n: number }) {
-  const el = useRef<HTMLSpanElement>(null), was = useRef(n);
-  useEffect(() => {
-    const e = el.current, prev = was.current;
-    was.current = n;
-    if (!e || prev === n || still() || typeof e.animate !== "function") return;
-    e.animate(n > prev ? [{ transform: "scale(.2)" }, { transform: "scale(1.2)" }, { transform: "none" }]
-      : n ? [{ transform: "scale(1.25)" }, { transform: "none" }] : [{ transform: "none", opacity: 1 }, { transform: "scale(0)", opacity: 0 }],
-      { duration: 340, easing: "cubic-bezier(.34,1.56,.64,1)" });
-  }, [n]);
-  return <span ref={el} className="vcount" data-n={n} aria-hidden="true">{n || ""}</span>;
-}
 
 /** Upplevt or Pengar, as chosen with the icons on the right under the tabs (MI-37). */
 export function Minnas(p: Props & { view: MinnasView }) {
@@ -67,18 +54,8 @@ function Minnen({ t, memories, run, today, edit, by, setBy, views }: Props) {
     const el = strip.current, card = el?.firstElementChild as HTMLElement | null;
     el?.scrollBy({ left: dir * ((card?.offsetWidth ?? 300) + 14), behavior: still() ? "auto" : "smooth" });
   };
-  const verdicts = (id: string, title: string) => {
-    const n = verdictCounts(t, id), mine = by ? mineOf(t, id, by)?.verdict : undefined;
-    return <div className="verdicts">
-      {VERDICTS.map((v) => <span className="verdict" key={v}>{/* the count in the corner, as the money button once had (MI-17) */}
-        {writes ? <IconButton icon={v} tip="up" pressed={mine === v} label={sv.minnas.give(sv.minnas.verdicts[v], title, n[v])}
-          onClick={() => run((x) => memoryOps(x, id, by!, { verdict: v }), `verdict ${v}`)} />
-          : <span className="btn ghost icon" role="img" aria-label={sv.minnas.count(sv.minnas.verdicts[v], n[v])} title={sv.minnas.verdicts[v]}><Icon name={v} /></span>}
-        <Count n={n[v]} />
-      </span>)}
-      {writes && <IconButton icon="comment" tip="up" label={sv.minnas.write(title)} onClick={() => edit({ kind: "memory", dreamId: id, by: by! })} />}
-    </div>;
-  };
+  const verdicts = (id: string, title: string) =>
+    <Verdicts t={t} id={id} title={title} by={by} writes={writes} run={run} comment={() => edit({ kind: "memory", dreamId: id, by: by! })} />;
   return <>
     <div className="vhead"><span className="vtitle"><h2>{sv.minnas.memories}</h2>{/* the album beside the heading, so the view buttons are the same in both views (MI-39) */}
         {t.album && <a className="btn ghost icon tip-right" href={t.album} target="_blank" rel="noopener noreferrer" aria-label={sv.minnas.album} data-tip={sv.minnas.album}><Icon name="image" /></a>}</span>

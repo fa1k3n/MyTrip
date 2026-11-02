@@ -9,7 +9,7 @@ import { Icon, IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
 /** The helpers run right after the draft, in this order in the checklist (AI-76, AI-80). */
-export const DRAFT_HELPERS = ["prep", "wishes"] as const;
+export const DRAFT_HELPERS = ["prep", "wishes", "packing"] as const;
 type Step = { state: "wait" | "run" | "done" | "failed"; since: number; note?: string }; // wait: shown greyed until it starts (AI-76)
 /** The trip before and after its draft, for Ångra (AI-78, ED-22). */
 export type Drafted = { before: Trip; after: Trip };
@@ -54,11 +54,11 @@ export function NewTripDialog({ ai, created, helperDone, allDone, close }: {
     setReady({ id, drafted });
     if (!offered.length) return go(id, drafted);
     offered.forEach((n) => step(n, { state: "run", since: Date.now() }));
-    const added: Required<AiAdded> = { activities: 0, tasks: 0, bookings: 0, wishes: 0, info: 0 };
+    const added: Required<AiAdded> = { activities: 0, tasks: 0, bookings: 0, wishes: 0, info: 0, packing: 0 };
     await Promise.all(offered.map(async (n) => { // at the same time; what each one makes is applied as soon as it is done (AI-80)
       const h = await api.ai(id, n, { apply: true });
       if (h.ok) { helperDone(id); for (const k of Object.keys(added) as (keyof AiAdded)[]) added[k] += h.added?.[k] ?? 0; }
-      const n2 = h.ok ? (h.added ? h.added.activities + h.added.tasks + h.added.bookings + (h.added.info ?? 0) : h.proposalIds.length) : 0;
+      const n2 = h.ok ? (h.added ? h.added.activities + h.added.tasks + h.added.bookings + (h.added.info ?? 0) + (h.added.packing ?? 0) : h.proposalIds.length) : 0;
       step(n, h.ok ? { state: "done", note: sv.newTripAi.addedCount(n2) } : { state: "failed", note: aiErrorText(h) });
     }));
     go(id, drafted); // all done: to the trip by itself

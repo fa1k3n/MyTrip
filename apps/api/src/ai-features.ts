@@ -124,4 +124,46 @@ the day's activities and travel, for example "Hagenbeck och hamnrundtur"; never 
   },
 };
 
-export const FEATURES: Record<string, AiFeature> = { prep, wishes, draft };
+const PACK = /^(?:travelers\/(\d+)\/)?packing\/-$/;
+/** The list an item goes on: "shared", or "r1", "r2" … for the travelers in order, as the AI service knows them (AI-04). */
+const listOf = (path: string) => { const m = PACK.exec(path); return !m ? undefined : m[1] === undefined ? "shared" : `r${Number(m[1]) + 1}`; };
+const plainItem = (s: string) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/** Packlistor: a shared packing list and one per traveler, from the season, the places, the means of transport, the activities and the ages (AI-89). */
+const packing: AiFeature = {
+  area: "changes",
+  instructions: `Your job: write the packing lists for this trip: one shared list for the family and one for each traveler.
+Think about the season and the usual weather at those places on those dates, the means of transport (a long car ride, a ferry, flying),
+the planned activities (swimming, hiking, museums, a fine dinner) and each traveler's age: a small child needs other things than an adult.
+Put what the family shares (chargers, first aid, snacks for the car, travel documents for all) on the shared list, and clothes and personal things
+on each traveler's own list. Keep each item short, like "Regnjacka" or "Badkläder", without counts unless they matter ("3 par strumpor" is fine).
+At most 15 items on the shared list and at most 15 per traveler, the most important first. Leave out what a list already has.`,
+  task: `Add each item of the shared list with an add operation on packing/- whose value is the item as a short Swedish text,
+and each item of a traveler's list with an add operation on travelers/<index>/packing/-, where index is the traveler's place in the list of travelers,
+counted from 0 (r1 is index 0, r2 is index 1). The trip's packing holds the lists as they are: shared, r1, r2 …
+The value is only the text, never an object.`,
+  allows: (o) => o.op === "add" && PACK.test(o.path) && typeof o.value === "string" && !!o.value.trim() && o.value.length <= 60,
+  helper: {
+    fingerprint: (t: Trip) => JSON.stringify({ // AI-88: not the lists themselves, which the helper and the travelers change
+      purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null),
+      days: t.days.map((d) => [d.date, d.location ?? "", d.country ?? "", d.legs.map((l) => l.vehicle), d.activities.map((a) => [a.text, a.category ?? ""])]),
+    }),
+    known: (t: Trip) => [...t.packing.map((x) => `packing shared: ${x}`), ...t.travelers.flatMap((p, i) => p.packing.map((x) => `packing r${i + 1}: ${x}`))],
+    textOf: (o) => `packing ${listOf(o.path) ?? ""}: ${typeof o.value === "string" ? o.value : ""}`,
+    finish: (o) => (typeof o.value === "string" ? { ...o, value: o.value.trim() } : o),
+    group: (ops, t) => { // one suggestion per list, without what the list has, each item marked as AI until someone keeps it
+      const out = new Map<string, Op[]>();
+      for (const o of ops) {
+        const m = PACK.exec(o.path), list = m && t && (m[1] === undefined ? t : t.travelers[Number(m[1])]);
+        if (!m || !list || typeof o.value !== "string") continue;
+        const items = out.get(o.path) ?? [], had = [...list.packing, ...items.map((x) => String(x.value))].map(plainItem);
+        if (!had.includes(plainItem(o.value))) out.set(o.path, [...items, o]);
+      }
+      return [...out.entries()].map(([path, items]) => {
+        const m = PACK.exec(path)!, base = m[1] === undefined ? "" : `travelers/${m[1]}/`, list = m[1] === undefined ? t! : t!.travelers[Number(m[1])]!;
+        return [...items, { op: "set" as const, path: `${base}packingAi`, value: [...(list.packingAi ?? []), ...items.map((x) => String(x.value))] }];
+      });
+    },
+  },
+};
+
+export const FEATURES: Record<string, AiFeature> = { prep, wishes, draft, packing };

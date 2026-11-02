@@ -1056,7 +1056,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const r = await runFeature(t, name, f, c.get("user")?.id ?? whoOf(c), actorName(c, t));
     if ("error" in r) return r.error === "cap" ? c.json({ error: "cap", scope: r.scope }, 429) : c.json({ error: r.error }, 502);
     if (applyFirst && !("error" in r)) {
-      const applied = { activities: 0, tasks: 0, bookings: 0, wishes: 0, info: 0 }, actor = `ai (${actorName(c, t)})`;
+      const applied = { activities: 0, tasks: 0, bookings: 0, wishes: 0, info: 0, packing: 0 }, actor = `ai (${actorName(c, t)})`;
       for (const p of (await store.proposals(t.id)).filter((x) => r.proposalIds.includes(x.id))) { // one at a time, so one that fails stays a proposal
         const ops = onItsDay(await load(t.id), p);
         if (!ops) continue;
@@ -1069,10 +1069,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
           else if (o.path === "bookings/-") applied.bookings++;
           else if (o.path === "dreams/-") applied.wishes++;
           else if (o.path === "info/-") applied.info++; // AI-87
+          else if (/^(travelers\/\d+\/)?packing\/-$/.test(o.path)) applied.packing++; // AI-89
         }
       }
-      const { info, ...rest } = applied;
-      return c.json({ applied: { ...rest, ...(info ? { info } : {}) }, proposalIds: r.proposalIds, reason: r.reason });
+      const { info, packing, ...rest } = applied;
+      return c.json({ applied: { ...rest, ...(info ? { info } : {}), ...(packing ? { packing } : {}) }, proposalIds: r.proposalIds, reason: r.reason });
     }
     const [pid] = r.proposalIds;
     if (f.applyToNew && pid && isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip

@@ -113,9 +113,9 @@ export const statusBadge = (status: string) => (status === "paid" || status === 
 
 /** What the app says when an AI feature could not run (AI-03, AI-65). */
 /** What the AI added when the trip was made, for the notice when it is done (AI-82). */
-export function aiDoneText(n: { activities: number; tasks: number; bookings: number; info?: number }) {
-  const d = sv.newTripAi.done, c = { ...n, info: n.info ?? 0 };
-  const parts = ([["activities", d.activities], ["tasks", d.tasks], ["bookings", d.bookings], ["info", d.info]] as const)
+export function aiDoneText(n: { activities: number; tasks: number; bookings: number; info?: number; packing?: number }) {
+  const d = sv.newTripAi.done, c = { ...n, info: n.info ?? 0, packing: n.packing ?? 0 };
+  const parts = ([["activities", d.activities], ["tasks", d.tasks], ["bookings", d.bookings], ["info", d.info], ["packing", d.packing]] as const)
     .filter(([k]) => c[k] > 0).map(([k, w]) => `${c[k]} ${c[k] === 1 ? w[0] : w[1]}`);
   if (!parts.length) return d.nothing;
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} och ${parts.at(-1)}` : parts[0]!;

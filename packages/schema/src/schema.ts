@@ -71,6 +71,7 @@ export const Traveler = z.object({
   id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()),
   shares: z.boolean().optional(), // false: not among those who share an expense shared by all, e.g. a child (MI-38)
   packed: z.array(z.string()).default([]), // the items in `packing` that are checked (PK-05)
+  packingAi: z.array(z.string()).optional(), // the items in `packing` the AI added and nobody has kept yet (AI-89)
 });
 export const Stop = z.object({ label: z.string(), sub: z.string(), dayId: Id });
 export const Dream = z.object({
@@ -138,6 +139,7 @@ export const Trip = z.object({
   album: z.string().url().regex(/^https:\/\//).optional(), // a link to the travelers' shared album, no upload (MI-20)
   info: z.array(Info).default([]), packing: z.array(z.string()).default([]), // packing: the shared list (PK-01)
   packed: z.array(z.string()).default([]), // checked items of the shared list (PK-05)
+  packingAi: z.array(z.string()).optional(), // AI items of the shared list not kept yet (AI-89)
   stops: z.array(Stop), days: z.array(Day), places: z.array(Place),
   bookings: z.array(Booking), tasks: z.array(Task), travelers: z.array(Traveler),
 });

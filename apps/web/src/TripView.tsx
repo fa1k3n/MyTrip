@@ -113,7 +113,7 @@ export function AiKeep({ item, text, run }: { item: AiItem; text: string; run: R
 /** AI-84: what the AI added and nobody has confirmed yet, as buttons that show it, and Behåll allt. Calm, not a warning. */
 function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (ids: string[]) => void; setTab: (t: Tab) => void }) {
   const n = aiCounts(t), r = sv.aiReview;
-  if (!n.activities && !n.tasks && !n.bookings && !n.wishes && !n.info) return null;
+  if (!n.activities && !n.tasks && !n.bookings && !n.wishes && !n.info && !n.packing) return null;
   const section = (id: string) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } return !!d; };
   const later = (id: string, tries = 20) => { if (!section(id) && tries > 0) setTimeout(() => later(id, tries - 1), 100); }; // once the other tab has loaded
   const count = (k: keyof typeof r.kinds, v: number, go: () => void) => v > 0 && <button type="button" className="aicount" onClick={go}>{v} {v === 1 ? r.kinds[k][0] : r.kinds[k][1]}</button>;
@@ -122,6 +122,7 @@ function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (
     {count("activities", n.activities, () => openDays(n.days))}{count("tasks", n.tasks, () => section("sec-tasks"))}
     {count("bookings", n.bookings, () => section("sec-bookings"))}{count("wishes", n.wishes, () => setTab("dr"))}
     {count("info", n.info ?? 0, () => { setTab("up"); later("sec-info"); }) /* Praktiskt is in Uppleva (PI-07) */}
+    {count("packing", n.packing ?? 0, () => section("sec-packing")) /* AI-89 */}
     <button type="button" className="btn ghost aikeepall" onClick={() => run((x) => keepAllAi(x), "keep ai")}><Icon name="check" />{r.keepAll}</button>
   </div>;
 }

@@ -14,7 +14,7 @@ import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
-import { mailTwins, suggestionsAt, type Pending } from "./proposals.ts";
+import { aiSuggestions, mailTwins, suggestionsAt, type Pending } from "./proposals.ts";
 
 /** Approving and rejecting proposals, for those who review them (MC-18, AI-70). */
 type Review = { approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void> };
@@ -134,12 +134,12 @@ function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Tri
 }
 
 /** A helper's pending suggestions of one kind, read again after each change of the trip (AI-70, BK-21). */
-function useAiSuggestions(t: Trip, may: boolean, feature: string, path: string) {
+function useAiSuggestions(t: Trip, may: boolean, feature: string, path: string | null) { // path null: all of the feature's (AI-89)
   const [list, setList] = useState<Pending[]>([]);
   useEffect(() => {
     if (!may) { setList([]); return; }
     let live = true;
-    api.proposals(t.id).then((ps) => { if (live) setList(suggestionsAt(ps as unknown as Pending[], feature, path)); }, () => {});
+    api.proposals(t.id).then((ps) => { if (live) setList(path === null ? aiSuggestions(ps as unknown as Pending[], feature) : suggestionsAt(ps as unknown as Pending[], feature, path)); }, () => {});
     return () => { live = false; };
   }, [t, may, feature, path]);
   return list;
@@ -210,9 +210,10 @@ export function PracticalInfo({ t, edit, onPlace, part, review, run }: { part: M
   );
 }
 
-function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck, tick }: {
+function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck, tick, ai, keep }: {
   name: string; items: string[]; packed: (item: string) => boolean; count: { packed: number; total: number }; tick: boolean;
   onAdd: (text: string) => void; onRemove: (i: number) => void; onCheck: (item: string) => void;
+  ai: string[]; keep?: (item: string) => ReactNode; // AI-89: the items the AI added, and their keep and remove buttons
 }) {
   const [v, setV] = useState("");
   const submit = (e: FormEvent) => { e.preventDefault(); if (v.trim()) { onAdd(v); setV(""); } };
@@ -221,8 +222,8 @@ function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck, tic
       <summary><span>{name} <small className="ro">({count.packed}/{count.total})</small></span></summary>
       <ul>{items.map((it, i) => (
         <li key={`${i}-${it}`}>
-          <label className="check"><input type="checkbox" checked={packed(it)} disabled={!tick} onChange={() => onCheck(it)} /><span className={packed(it) ? "done" : ""}>{it}</span></label>
-          <IconButton icon="trash" look="bare" tip="left" label={`${sv.removeItem} ${it}`} onClick={() => onRemove(i)} mut /></li>
+          <label className="check"><input type="checkbox" checked={packed(it)} disabled={!tick} onChange={() => onCheck(it)} /><span className={packed(it) ? "done" : ""}>{ai.includes(it) && <AiMark label={sv.aiRun.aiMade} />}{it}</span></label>
+          {ai.includes(it) && keep ? keep(it) : <IconButton icon="trash" look="bare" tip="left" label={`${sv.removeItem} ${it}`} onClick={() => onRemove(i)} mut />}</li>
       ))}</ul>
       <form className="addrow" data-mut="" onSubmit={submit}>
         <input value={v} onChange={(e) => setV(e.target.value)} aria-label={`${sv.itemLabel}, ${name}`} placeholder={sv.itemLabel} />
@@ -232,17 +233,35 @@ function PackingList({ name, items, packed, count, onAdd, onRemove, onCheck, tic
   );
 }
 
-function Packing({ t, run, part, tick }: { part: MayOf; t: Trip; run: Run; tick: boolean }) {
-  const lists = [{ id: "shared", name: sv.sharedList, items: t.packing },
-    ...t.travelers.map((x) => ({ id: x.id, name: x.age ? `${x.name}, ${x.age} ${sv.years}` : x.name, items: x.packing }))]; // PK-03
+/** A suggestion of the helper Packlistor: the items for one list, taken or rejected together (AI-89). */
+function PackSuggestion({ p, t, review, done }: { p: Pending; t: Trip; review: Review; done: (err: string | null) => void }) {
+  const m = /^travelers\/(\d+)\//.exec(p.ops[0]?.path ?? ""), who = m ? t.travelers[Number(m[1])]?.name ?? "" : sv.sharedList;
+  const items = p.ops.filter((o) => typeof o.value === "string").map((o) => String(o.value)), text = sv.packSuggestion(who, items);
+  return <div className="row mid todo">
+    <span><AiMark />{text}</span>
+    <span className="end">
+      <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => done(await review.approve(p.id))} />
+      <IconButton icon="close" look="bare" tip="left" label={sv.aiRun.reject(text)} onClick={async () => { await review.reject(p.id); done(null); }} />
+    </span>
+  </div>;
+}
+
+function Packing({ t, run, part, tick, review }: { part: MayOf; t: Trip; run: Run; tick: boolean; review?: Review }) {
+  const suggested = useAiSuggestions(t, !!review && part("packing"), "packing", null); // AI-89: one per list
+  const [err, setErr] = useState<string | null>(null);
+  const lists = [{ id: "shared", name: sv.sharedList, items: t.packing, ai: t.packingAi ?? [] },
+    ...t.travelers.map((x) => ({ id: x.id, name: x.age ? `${x.name}, ${x.age} ${sv.years}` : x.name, items: x.packing, ai: x.packingAi ?? [] }))]; // PK-03
   return (
-    <Section title={sv.packing} may={part("packing")}>
+    <Section title={sv.packing} may={part("packing")} id="sec-packing" flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
       {lists.map((l) => (
         <PackingList key={l.id} tick={tick} name={l.name} items={l.items} packed={(it) => isPacked(t, l.id, it)} count={packedCount(t, l.id)}
           onCheck={(it) => run((x) => togglePacked(x, l.id, it), isPacked(t, l.id, it) ? "unpacked" : "packed")}
           onAdd={(text) => run((x) => addPacking(x, l.id, text), "add packing")}
-          onRemove={(i) => run((x) => removePacking(x, l.id, i), "remove packing")} />
+          onRemove={(i) => run((x) => removePacking(x, l.id, i), "remove packing")} ai={l.ai}
+          keep={part("packing") ? (it) => <AiKeep item={{ kind: "packing", list: l.id, item: it }} text={it} run={run} /> : undefined} />
       ))}
+      {review && suggested.map((p) => <PackSuggestion key={p.id} p={p} t={t} review={review} done={setErr} />)}
+      {err && <p className="err" role="alert">{err}</p>}
     </Section>
   );
 }
@@ -260,6 +279,6 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
-    {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}
+    {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} review={review} />}
   </>;
 }

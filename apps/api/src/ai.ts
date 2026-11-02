@@ -61,6 +61,7 @@ export function aiView(t: Trip) {
   const view = {
     title: txt(t.title), purpose: txt(t.purpose), timezone: t.timezone, currency: t.currency,
     travelers: t.travelers.map((x, i) => ({ ref: `r${i + 1}`, who: label(x) })),
+    packing: { shared: t.packing.map(scrub), ...Object.fromEntries(t.travelers.map((x, i) => [`r${i + 1}`, x.packing.map(scrub)])) }, // the lists by traveler (AI-89)
     days: t.days.map((d) => ({
       id: d.id, date: d.date, title: txt(d.title), aiTitle: d.aiTitle, summary: txt(d.summary), location: txt(d.location), country: d.country, start: d.start, end: d.end,
       legs: d.legs.map((l) => ({ vehicle: l.vehicle, origin: txt(l.origin), destination: txt(l.destination), departure: l.departure, durationMin: l.durationMin })),

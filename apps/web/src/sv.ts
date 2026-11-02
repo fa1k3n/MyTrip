@@ -64,7 +64,7 @@ export const sv = {
     title: "Nytt från AI", keepAll: "Behåll allt", kept: "Behållet, AI-märket är borttaget", keep: (n: string) => `Behåll: ${n}`, remove: (n: string) => `Ta bort: ${n}`,
     removeDay: "Ta bort AI-förslagen för dagen",
     kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"],
-      info: ["kort i Praktisk info", "kort i Praktisk info"] }, // AI-87
+      info: ["kort i Praktisk info", "kort i Praktisk info"], packing: ["sak i packlistorna", "saker i packlistorna"] }, // AI-87, AI-89
   },
   people: { traveler: "Resenär", planner: "Planerare", noShare: "delar inte på kostnader" }, // AU-38
   mailIn: { // BK-26, BK-27
@@ -163,7 +163,7 @@ export const sv = {
     note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
     makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI", howTo: "Se filmen om hur det går till.", // UI-23
     working: "Skapar din resa…", busy: "AI-tjänsten gör ett utkast utifrån din beskrivning. Det tar upp till en minut.", seconds: (n: number) => `${n} s`, // AI-76
-    steps: { draft: "Skapar resa och rutt", prep: "Letar upp bra att veta inför resan", wishes: "Föreslår aktiviteter som passar" } as Record<string, string>,
+    steps: { draft: "Skapar resa och rutt", prep: "Letar upp bra att veta inför resan", wishes: "Föreslår aktiviteter som passar", packing: "Skriver packlistor" } as Record<string, string>,
     stepState: { wait: "väntar", run: "pågår", done: "klart", failed: "misslyckades" },
     background: "Resan är klar att öppna. Resten läggs in medan du tittar, i Nåla och Önska.", goTrip: "Gå till resan",
     drafted: "Utkastet är inlagt", // AI-78: with Ångra
@@ -171,6 +171,7 @@ export const sv = {
     done: { // AI-82
       activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning att boka", "bokningar att boka"],
       info: ["kort i Praktisk info", "kort i Praktisk info"], // AI-87
+      packing: ["sak i packlistorna", "saker i packlistorna"], // AI-89
       text: (list: string, one: boolean, neuter = false) => `AI är klar: ${list} är ${one ? (neuter ? "inlagt" : "inlagd") : "inlagda"}. Ta bort det du inte vill ha.`,
       nothing: "AI är klar men hittade inget mer att lägga in.",
     },
@@ -203,6 +204,7 @@ export const sv = {
     helpers: {
       prep: ["Bra att veta inför resan", "Föreslår regler och dokument längs hela resvägen som uppgifter i Att göra, och det som måste bokas under Bokningar."],
       wishes: ["Förslag på önskningar", "Föreslår riktiga platser som passar resan, var och en med en aktivitet på en dag där den passar."], // AI-71, AI-77
+      packing: ["Packlistor", "Skriver en gemensam packlista och en för varje resenär efter resans väder, aktiviteter och åldrar."], // AI-89
     } as Record<string, [string, string]>,
     info: (name: string) => `Om ${name}`, // AI-74
     about: { prep: [
@@ -214,6 +216,10 @@ export const sv = {
       "Letar på webben upp 5 till 8 riktiga platser och aktiviteter som passar det ni skrivit i syftet, platserna på resan och resenärernas åldrar.",
       "Varje förslag blir en önskan under Förslag i Önska och en aktivitet på en dag där den passar, märkt med AI-stjärnan i Nålas dagkort. Tar du med förslaget kommer båda in, avvisar du det försvinner båda.",
       "Hjälpen körs av sig själv tio minuter efter att resans syfte, platser eller resenärer ändrats. Med Kör nu körs den direkt. Varje körning kostar en liten summa.",
+    ], packing: [
+      "Skriver en gemensam packlista och en för varje resenär, efter årstiden och vädret som brukar vara där, hur ni reser, vad ni ska göra och resenärernas åldrar.",
+      "Hjälpen körs av sig själv tio minuter efter att resans datum, platser, färdsätt, aktiviteter, resenärer eller syfte ändrats. Med Kör nu körs den direkt.",
+      "Förslagen hamnar under Packlista i Nåla, ett per lista, märkta AI-förslag. Inget läggs till förrän du tar med det, och det som redan står på listan föreslås inte igen. Varje körning kostar en liten summa.",
     ] } as Record<string, string[]>,
     runNow: (name: string) => `Kör nu: ${name}`, ran: (n: number) => (n ? `${n} nya förslag.` : "Inget nytt att föreslå."),
     never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
@@ -294,6 +300,7 @@ export const sv = {
   addTask: "Lägg till uppgift", newTask: "Ny uppgift", editTask: "Ändra uppgift", due: "Klart senast",
   info: "Praktiskt", addInfo: "Lägg till praktisk info", newInfo: "Ny praktisk info", editInfo: "Ändra praktisk info", noInfo: "Ingen praktisk info ännu.",
   unsuitable: "Passar inte", unsuitableLabel: "Passar inte, därför (lämna tomt om den passar)", verify: "Uppgiften kan vara inaktuell, kontrollera den innan.", verifyLabel: "Källan kan vara inaktuell",
+  packSuggestion: (who: string, items: string[]) => `Packlista ${who}: ${items.slice(0, 4).join(", ")}${items.length > 4 ? ` och ${items.length - 4} till` : ""}`, /* AI-89 */
   packing: "Packlista", sharedList: "Alla", addItem: "Lägg till", itemLabel: "Sak att packa", removeItem: "Ta bort", years: "år",
   editPlace: "Ändra plats", placeNew: "Ny plats", phone: "Telefon", notes: "Bra att veta", website: "Webbplats",
   bookingUrl: "Länk för bokning eller biljett", bookingLabel: "Text på knappen, t.ex. Köp biljett", bookTicket: "Boka biljett",

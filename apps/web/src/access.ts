@@ -122,9 +122,9 @@ export const showInstallHint = (ua: string, installed: boolean, closed: boolean)
 /** The link the phone keeps for a trip, so a notice opens that trip (NT-04). */
 export const linkForTrip = (keys: string[], tripId: string) => keys.find((k) => tripOfLink(k) === tripId) ?? null;
 
-/** The permission matrix's columns, the role that may do most first (AU-34). */
-export const PERM_ROLES = ["planner", "traveler", "follower"] as const;
-/** The icon of each level in the permission matrix; a page row is Synlig or Dold (AU-35). */
+/** The permission card's columns: a Planerare always has everything, so only Resenär and Följare are chosen (AU-37). */
+export const PERM_ROLES = ["traveler", "follower"] as const;
+/** The icon of each level in the permission card; a tab row is Synlig or Dold (AU-37). */
 export const LEVEL_ICON = { hidden: "eyeoff", read: "eye", shown: "eye", check: "check", add: "plus", write: "edit" } as const;
-/** The level after `cur` among those a cell allows, round to the first again (AU-35). */
+/** The level after `cur` among those a cell allows, round to the first again (AU-37). */
 export const nextLevel = (levels: readonly string[], cur: string) => levels[(levels.indexOf(cur) + 1) % levels.length]!;

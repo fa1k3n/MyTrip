@@ -39,8 +39,6 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .asklist{margin:0 0 12px;padding-left:20px}
 .btn:disabled{opacity:.45;cursor:default} /* e.g. Skicka nu while sending (PW-19) */
 @media (max-width:599.98px){.uppage{padding-bottom:84px}} /* room for the floating add button at the end of Uppleva (UP-46) */
-.sharegrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px 6px;margin-top:10px;max-width:480px} /* MI-38: six to a row */
-.sharer{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}.sharer>span:last-child{font-size:.85rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .manifest{font-family:Fraunces,Georgia,serif;font-size:1.1rem;line-height:1.7;padding:22px;border-left:5px solid var(--acc)}
 .tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;background:var(--bg);padding:8px 0;margin-bottom:8px}
 .tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px;font-weight:600}
@@ -302,35 +300,21 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 .hidefrom{border:1px solid var(--line);border-radius:10px;padding:6px 12px 2px;margin:4px 0 12px}.hidefrom legend{padding:0 4px;font-size:.9rem}
 .hidefrom .note{margin:2px 0 6px}
 .navgap{display:inline-block;width:44px;height:44px} /* the place of a missing previous or next day button (UP-09) */
-/* Permissions (AU-20): a matrix with a column per role; pages as groups with their components under them; a pill per cell coloured
-   by level, from grey (hidden) to terracotta (change); "–" where the page is hidden for the role. */
+/* Permissions (AU-36, AU-37): a column per role, Resenär and Följare; tabs, then content, each a row; one button per cell coloured
+   by level, from grey (hidden) to terracotta (change); "–" where a role can have only one level. */
 .pgrid{margin-top:6px}
-.lvlcell{display:inline-flex}.lvlcell .btn.icon{border:1.5px solid;border-radius:50%;width:44px;height:44px} /* AU-35: one button per cell */
+.lvlcell{display:inline-flex}.lvlcell .btn.icon{border:1.5px solid;border-radius:50%;width:44px;height:44px} /* AU-37: one button per cell */
 .lvlcell.lvl-hidden{color:var(--mute)}.lvlcell.lvl-hidden .btn.icon{color:var(--mute);border-color:var(--line);background:var(--card)}
 .lvlcell.lvl-read,.lvlcell.lvl-shown{color:var(--sageT)}.lvlcell.lvl-read .btn.icon,.lvlcell.lvl-shown .btn.icon{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 14%,var(--card))}
 .lvlcell.lvl-check,.lvlcell.lvl-add{color:var(--sageT)}.lvlcell.lvl-check .btn.icon,.lvlcell.lvl-add .btn.icon{color:var(--sageT);border-color:var(--sageT);background:color-mix(in srgb,var(--sage) 30%,var(--card))}
 .lvlcell.lvl-write{color:var(--acct)}.lvlcell.lvl-write .btn.icon{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
 .plegend .lvlcell svg{width:16px;height:16px}
-.prow{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(86px,128px));gap:6px;align-items:center;padding:3px 0}
-.prow>span:not(:first-child){display:flex;justify-content:center;align-items:center}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(56px,76px));gap:6px;align-items:center;padding:3px 0} /* AU-37: Resenär and Följare */
+.prow>span:not(:first-child){display:flex;justify-content:center;align-items:center}.prow>span:first-child small{display:block;font-size:.8rem}
 .phead{position:sticky;top:0;background:var(--card);z-index:1;padding-bottom:6px}
-.phead .who{font-size:.85rem;padding:2px 8px;min-height:30px;justify-content:center;gap:2px}.phead .who .icon{width:30px;height:30px}
-.pgroup{border-top:1px solid var(--line);padding:6px 0 4px}
-.ppage>span:first-child{font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:.85rem}
-.prow:not(.ppage):not(.phead)>span:first-child{padding-left:14px;font-size:.92rem}
+.phead .who{font-size:.85rem;padding:2px 0;min-height:30px;justify-content:center;gap:2px;flex-direction:column}.phead .who small{font-size:.75rem}.phead .who .icon{width:30px;height:30px}
+.psec>span:first-child{grid-column:1/-1;font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:.85rem;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .na{color:var(--mute);min-height:44px;display:inline-flex;align-items:center}
-/* Narrow screens: the row's name on a line of its own above the three role cells, so nothing overlaps (AU-20, RS-*). */
-@media (max-width:599px){
-  .prow{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:2px}
-  .prow>span:first-child{grid-column:1/-1}
-  .phead>span:first-child{display:none}
-  .prow:not(.ppage):not(.phead)>span:first-child{padding-left:0;font-size:.88rem;color:var(--mute)}
-}
-/* Each page of the permissions matrix folds, with the same chevron as the side sections (AU-20). */
-.pfold{display:inline-flex;align-items:center;gap:10px;min-height:44px;background:none;border:0;padding:0;font:inherit;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:inherit;cursor:pointer;text-align:left}
-.pfold::after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);margin-top:-4px}
-.pfold[aria-expanded=true]::after{transform:rotate(225deg);margin-top:4px}
-.pfold:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
 .lock .add:has(> [data-mut]){display:none} /* an add button for editing leaves no gap while its part is locked (UI-09) */
 /* PW-16: the start page with the trips of the links on the phone; each card can be removed (PW-17) */
 .tripwrap{position:relative}.tripwrap .rm{position:absolute;bottom:10px;right:10px}.tripwrap .rm .btn.icon{background:var(--card)}
@@ -504,8 +488,9 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .phead .who{border:0;background:none;padding:0;gap:0}.plegend{display:flex;flex-wrap:wrap;gap:6px 14px}.plegend>span{display:inline-flex;align-items:center;gap:6px}.plegend .rolemark{width:24px;height:24px}.plegend .rolemark svg{width:13px;height:13px}
 .roletoggle{display:inline-flex;gap:2px;margin-right:4px}.rt.traveler .btn.icon{color:var(--sageT)}.rt.planner .btn.icon{color:var(--acct)} /* AU-33 */
 .rt.traveler .btn.icon[aria-pressed="true"]{background:var(--sage);border-color:var(--sage);color:#fff}.rt.planner .btn.icon[aria-pressed="true"]{color:#fff}
-.pname{display:inline-flex;align-items:center;gap:2px} /* AU-32 */
-.people .row{flex-wrap:wrap}label.account{flex-basis:100%;margin:0 0 4px}label.account input{margin:0}
+.trow{flex-wrap:nowrap}.tperson{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:52px;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-align:left;cursor:pointer} /* AU-38 */
+.tperson:focus-visible{outline:3px solid var(--sage);outline-offset:2px;border-radius:10px}.rolemark.initial{width:40px;height:40px;font-weight:700;font-size:1rem;flex:0 0 auto}
+.tname{display:flex;flex-direction:column;min-width:0}.tname small{font-size:.85rem}.sharebar{gap:8px;justify-content:center}fieldset.trole{border:0;padding:0;margin:8px 0}.trole .rolename{margin-left:6px;font-weight:600}
 .setuplink{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}.setuplink p{margin:0}
 .users .row{flex-wrap:wrap}.users .row .end{margin-left:auto}
 .adduser{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:12px}.adduser label{flex:1 1 180px}

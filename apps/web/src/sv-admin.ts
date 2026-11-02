@@ -9,16 +9,18 @@ export const svAdmin = {
     hint: "För vänner som inte följer med: den som har länken är Följare och kan bara läsa resan. Bokningsnummer visas inte.",
     confirmReplace: "Byta länk? Den gamla länken slutar fungera direkt.",
   },
-  shares: { title: "Delar på kostnader", toggle: (n: string) => `${n} delar på kostnader`,
-    hint: "Ett utlägg som delas av alla delas bara av dem som delar. Intryckt knapp betyder att personen delar. Släpp den för till exempel barn. För ett enskilt utlägg kan du ändå välja vem som delar, under Pengar." }, // MI-38
-  people: { // AU-11
-    title: "Personliga länkar", role: "Behörighet", roles: { traveler: "Resenär", planner: "Planerare" }, follower: "Följare",
-    roleOf: (role: string, n: string) => `${role}: ${n}`, // AU-33
-    hint: "Varje resenär har en egen länk. Välj behörighet med knapparna: resväskan är Resenär (läsa, bocka av och lägga till egna utlägg), kompassen är Planerare (dessutom ändra allt för resan). Pennan byter namn.",
-    copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Byt länk för ${n}`,
+  people: { // AU-38
+    title: "Resenärer", role: "Behörighet", roles: { traveler: "Resenär", planner: "Planerare" }, follower: "Följare",
+    roleOf: (role: string, n: string) => `${role}: ${n}`,
+    hint: "Tryck på en resenär för att ändra namn, behörighet, konto och om hen delar på kostnader.",
+    roleHint: "Resenär läser, bockar av och lägger till egna utlägg. Planerare kan dessutom ändra allt för resan.",
+    open: (n: string) => `Ändra ${n}`, edit: (n: string) => `Ändra ${n}`, share: (n: string) => `Dela länk för ${n}`,
+    copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Ny länk för ${n}`,
     copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Inga resenärer än. Lägg till dem med plusknappen.",
-    account: (n: string) => `Konto för ${n} (mejladress)`, accountPlaceholder: "Konto (mejladress)", // US-21
-    accountHint: "Skriv in mejladressen till en resenärs konto, så ser hen resan när hen loggar in. Saknar adressen konto kopplas det när kontot skapas.",
+    shares: "Delar på kostnader", // MI-38
+    sharesHint: "Ett utlägg som delas av alla delas bara av dem som delar på kostnader. Stäng av för till exempel barn. För ett enskilt utlägg kan du ändå välja vem som delar, under Pengar.",
+    account: "Konto (mejladress)", accountPlaceholder: "namn@exempel.se", // US-21
+    accountHint: "Med en mejladress ser resenären resan när hen loggar in. Saknar adressen konto kopplas det när kontot skapas.",
     accountTaken: "Adressen används redan av en annan resenär i resan.", accountBad: "Det där är ingen mejladress.",
   },
   inbox: { // BK-26
@@ -41,18 +43,14 @@ export const svAdmin = {
     show: (n: string) => `Visa QR-kod för ${n}`, title: (n: string) => `Länk för ${n}`, label: (n: string) => `QR-kod med länken för ${n}`,
     hint: "Låt den andra skanna koden med kameran i sin telefon.",
   },
-  perms: { // AU-20
-    title: "Behörigheter", hint: "Vad varje roll får se och ändra i den här resan.",
+  perms: { // AU-36, AU-37
+    title: "Behörigheter", hint: "Vad resenärer och följare får se och göra i den här resan. Det som gäller ett innehåll gäller på alla flikar.",
     roles: { follower: "Följare", traveler: "Resenär", planner: "Planerare" }, shown: "Synlig",
-    legend: { follower: "Följare", traveler: "Resenär", planner: "Planerare", admin: "Du som administratör kan alltid allt" }, page: "Sidan", off: "Sidan är dold", // AU-34: legend
-    part: {
-      dr: { dreams: "Önskningar" },
-      nala: { plan: "Dagar och aktiviteter", bookings: "Bokningar", budget: "Budget", tasks: "Att göra", info: "Praktiskt", packing: "Packlista" },
-      up: { budget: "Resans budget", bookings: "Biljetter och bokningar", expenses: "Lägga till utlägg" },
-      mi: { expenses: "Utlägg", budget: "Budget", memories: "Upplevt" },
-    } as Record<string, Record<string, string>>,
-    level: { hidden: "Dold", read: "Läsa", check: "Bocka av", add: "Lägga till", write: "Ändra" },
+    legend: { follower: "Följare", traveler: "Resenär" }, tab: "Fliken", tabs: "Flikar", contents: "Innehåll",
+    content: { plan: "Planen", dreams: "Önskningar", bookings: "Bokningar och biljetter", money: "Pengar", todo: "Att göra och packning", info: "Praktiskt", memories: "Minnen" },
+    contentHint: { money: "Budget och utlägg", todo: "Uppgifter och packlistor" } as Record<string, string>,
+    level: { hidden: "Dold", read: "Läsa", check: "Bocka av", add: "Lägga till utlägg", write: "Ändra" },
     cell: (part: string, role: string, level: string) => `${part}, ${role}: ${level}. Tryck för att byta.`, // AU-35
-    reset: (role: string) => `Återställ standard för ${role}`, fixed: "Resans inställningar och länkar kan bara Planerare och du ändra.",
+    reset: (role: string) => `Återställ standard för ${role}`, fixed: "Planerare och du som administratör kan alltid allt. Resans inställningar och länkar kan bara ni ändra.",
   },
 };

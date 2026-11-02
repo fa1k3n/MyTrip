@@ -151,3 +151,6 @@ export function helperLine(s: { at?: string; result?: string; remaining: number 
   const when = `${dayMonth(day)} ${time}`;
   return `${s.result === "error" ? r.failed(when) : r.last(when) + (s.result === "nothing" ? r.nothing : "")} · ${left}`;
 }
+
+/** The line under a traveler's name in the card Resenärer: the permission, and when the traveler does not share costs (AU-38, MI-38). */
+export const travelerLine = (role: "traveler" | "planner", shares: boolean) => [sv.people[role], ...(shares ? [] : [sv.people.noShare])].join(" · ");

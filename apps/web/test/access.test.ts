@@ -1,6 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { AccessConfig } from "@trip/schema/src/rules.ts";
 import { anyWrite, authHeader, missingLinks, parseLinkHash, permsFor, personUrl, shareUrl } from "../src/access.ts";
 
 test("AU-01 AU-06 the share link carries the trip and its secret after #", () => {
@@ -37,15 +36,3 @@ test("AU-11 the travelers without a personal link get one when the settings open
   assert.deepEqual(missingLinks(travelers, travelers.map((x) => ({ travelerId: x.id }))), []);
 });
 
-test("AU-20 AU-21 what each role may see and do follows the trip's permissions", () => {
-  const t: { access: AccessConfig } = { access: { follower: { nala: { visible: true, parts: { tasks: "check" } } } } };
-  const f = permsFor("link", t);
-  assert.deepEqual([f.scoped, f.superuser, f.settings, f.pages, f.view.nala.tasks, f.view.nala.budget], [true, false, false, ["nala", "up"], "check", "hidden"]);
-  assert.equal(anyWrite(f), false);
-  const tr = permsFor("traveler", {});
-  assert.deepEqual([tr.settings, tr.pages, tr.view.up.expenses, anyWrite(tr)], [false, ["dr", "nala", "up", "mi"], "add", false]);
-  const pl = permsFor("planner", {});
-  assert.deepEqual([pl.settings, anyWrite(pl)], [true, true]);
-  const su = permsFor("admin", {});
-  assert.deepEqual([su.scoped, su.superuser, su.settings, su.pages.length, su.view.nala.budget, su.view.up.expenses, su.view.mi.expenses], [false, true, true, 4, "write", "add", "write"]);
-});

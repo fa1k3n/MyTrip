@@ -38,8 +38,8 @@ test("MI-21 MI-18 who gets memories, comments and the album", async () => {
     "others' comments removed, the hidden wish's memory blanked, the own comment kept");
   const f = await json(call(app, "/api/trips/berlin", await link(app)));
   assert.deepEqual([f.album, f.memories], [undefined, []]);
-  await call(app, "/api/trips/berlin/changes", "a", "POST", { baseRevision: (await json(call(app, "/api/trips/berlin", "a"))).revision, ops: [{ op: "set", path: "access", value: { planner: { mi: { parts: { memories: "hidden" } } } } }], reason: "x" });
-  const hid = await json(call(app, "/api/trips/berlin", anna));
+  await call(app, "/api/trips/berlin/changes", "a", "POST", { baseRevision: (await json(call(app, "/api/trips/berlin", "a"))).revision, ops: [{ op: "set", path: "access", value: { traveler: { content: { memories: "hidden" } } } }], reason: "x" });
+  const hid = await json(call(app, "/api/trips/berlin", bo)); // AU-36: a Planerare always has everything, so a Resenär is the one hidden from
   assert.deepEqual([hid.album, hid.memories], [undefined, []]);
 });
 

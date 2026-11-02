@@ -1,11 +1,11 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
 import { LEVEL_ICON, linkFromText, missingLinks, nextLevel, PERM_ROLES, personUrl, shareUrl } from "./access.ts";
-import { DEFAULT_ACCESS, levelsFor, PAGE_PARTS, PAGES, type Level, type Page } from "@trip/schema/src/rules.ts";
-import { tripRange } from "./edit.ts";
-import { tripDates } from "./format.ts";
+import { CONTENT, contentLevels, DEFAULT_CONTENT, DEFAULT_TABS, ownAccess, PAGES, type Level, type RoleAccess } from "@trip/schema/src/rules.ts";
+import { renameTraveler, tripRange } from "./edit.ts";
+import { travelerLine, tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
@@ -198,130 +198,157 @@ function Inbox({ t }: { t: Trip }) {
   );
 }
 
-/** AU-11: a personal link per traveler, created with the permission Resenär when missing; the permission is two toggle buttons (AU-33),
- * and the pencil renames the traveler (AU-32). */
-function PeopleLinks({ t, add }: { t: Trip; add: (id?: string) => void }) {
+/** AU-38: the travelers in one calm card: a row each with the permission's colour and a line on how they take part, a button that
+ * shares the personal link (AU-11, AU-31), and the row opens the traveler's dialog. A link with the permission Resenär is made
+ * for each traveler who has none. */
+function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: Run }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
-  const [copied, setCopied] = useState(""), [showQr, setShowQr] = useState<{ url: string; name: string } | null>(null);
+  const [open, setOpen] = useState<string | null>(null), [sharing, setSharing] = useState<string | null>(null);
   useEffect(() => {
     api.people(t.id).then(async (ls) => {
       const made = await Promise.all(missingLinks(t.travelers, ls).map((id) => api.setPerson(t.id, id, "traveler")));
       setLinks([...ls, ...made]);
     }, () => setLinks([]));
   }, [t.id, t.travelers.map((x) => x.id).join()]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when travelers change
-  const put = (l: PersonLinkInfo) => { setLinks((ls) => [...(ls ?? []).filter((x) => x.travelerId !== l.travelerId), l]); setCopied(""); };
-  const [accountErr, setAccountErr] = useState<{ id: string; text: string } | null>(null);
-  /** US-21: the address of the traveler's account, saved when the field is left. */
-  const saveAccount = async (l: PersonLinkInfo, value: string) => {
-    if (value.trim().toLowerCase() === (l.account ?? "")) return;
-    try { put(await api.setPerson(t.id, l.travelerId, l.role, value.trim() || null)); setAccountErr(null); }
-    catch (x) { setAccountErr({ id: l.travelerId, text: x instanceof ApiError && x.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad }); }
-  };
-  const copy = async (l: PersonLinkInfo, name: string) => {
-    try { await navigator.clipboard.writeText(personUrl(location.origin, t.id, l.travelerId, l.secret)); setCopied(name); } catch { /* no clipboard */ }
-  };
+  const put = (l: PersonLinkInfo) => setLinks((ls) => [...(ls ?? []).filter((x) => x.travelerId !== l.travelerId), l]);
+  const linkOf = (id: string) => links?.find((y) => y.travelerId === id);
+  const who = t.travelers.find((x) => x.id === open), shared = t.travelers.find((x) => x.id === sharing);
   return (
     <div className="card people">
       <h3>{svAdmin.people.title}</h3>
-      <p className="ro note">{svAdmin.people.hint} {svAdmin.people.accountHint}</p>
+      <p className="ro note">{svAdmin.people.hint}</p>
       {!t.travelers.length && <p className="ro">{svAdmin.people.noTravelers}</p>}
       {links && t.travelers.map((x) => {
-        const l = links.find((y) => y.travelerId === x.id);
+        const l = linkOf(x.id), role = l?.role ?? "traveler";
         return (
-          <div className="row mid" key={x.id}>
-            <span className="pname">{x.name}<IconButton icon="edit" look="bare" tip="right" label={sv.renameTraveler(x.name)} onClick={() => add(x.id)} /></span>
-            <span className="end">
-              {l && <>
-                <span className="roletoggle" role="group" aria-label={`${svAdmin.people.role}, ${x.name}`}>
-                  {(["traveler", "planner"] as const).map((r) => <span key={r} className={`rt ${r}`}>
-                    <IconButton icon={ROLE_ICON[r]} look="bare" tip="left" pressed={l.role === r} label={svAdmin.people.roleOf(svAdmin.people.roles[r], x.name)}
-                      onClick={async () => { if (l.role !== r) put(await api.setPerson(t.id, x.id, r)); }} /></span>)}
-                </span>
-                <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(x.name)}
-                  onClick={() => setShowQr({ url: personUrl(location.origin, t.id, l.travelerId, l.secret), name: x.name })} />
-                <IconButton icon="copy" look="bare" tip="left" label={svAdmin.people.copy(x.name)} onClick={() => copy(l, x.name)} />
-                <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.people.replace(x.name)}
-                  onClick={async () => { if (await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace })) put(await api.renewPerson(t.id, x.id)); }} />
-              </>}
-            </span>
-            {l && <label className="account"><span className="sr">{svAdmin.people.account(x.name)}</span>
-              <input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} defaultValue={l.account ?? ""} key={l.account ?? ""}
-                aria-invalid={accountErr?.id === x.id || undefined} onBlur={(e) => saveAccount(l, e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }} /></label>}
-            {accountErr?.id === x.id && <p className="err" role="alert">{accountErr.text}</p>}
+          <div className="row mid trow" key={x.id}>
+            <button type="button" className="tperson" onClick={() => setOpen(x.id)} aria-label={svAdmin.people.open(x.name)}>
+              <span className={`rolemark initial ${role}`} role="img" aria-label={svAdmin.people.roles[role]} title={svAdmin.people.roles[role]}>{x.name.slice(0, 1).toUpperCase()}</span>
+              <span className="tname"><b>{x.name}</b><small className="ro">{travelerLine(role, x.shares !== false)}</small></span>
+            </button>
+            {l && <span className="end"><IconButton icon="link" look="bare" tip="left" label={svAdmin.people.share(x.name)} onClick={() => setSharing(x.id)} /></span>}
           </div>
         );
       })}
       <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={add} tip="right" /></div> {/* AU-26, UI-09 */}
-      {copied && <p className="ro" role="status">{svAdmin.people.copied(copied)}</p>}
-      {showQr && <QrDialog url={showQr.url} name={showQr.name} close={() => setShowQr(null)} />}
+      {shared && linkOf(shared.id) && <ShareDialog t={t} name={shared.name} link={linkOf(shared.id)!} put={put} close={() => setSharing(null)} />}
+      {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} run={run} close={() => setOpen(null)} />}
     </div>
   );
 }
 
-/** Who shares an expense shared by all: a toggle button per traveler, pressed by default, off for example for children (MI-38). */
-function Sharing({ t, run }: { t: Trip; run: Run }) {
-  if (t.travelers.length < 2) return null;
+/** AU-38, AU-31: a personal link as a QR code, with buttons to copy it and to make a new one that replaces it at once (AU-11). */
+function ShareDialog({ t, name, link, put, close }: { t: Trip; name: string; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; close: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const url = personUrl(location.origin, t.id, link.travelerId, link.secret);
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); } catch { /* no clipboard */ } };
+  return <QrDialog url={url} name={name} close={close}>
+    <div className="row mid sharebar">
+      <IconButton icon="copy" tip="right" label={svAdmin.people.copy(name)} onClick={copy} />
+      <IconButton icon="refresh" tip="right" label={svAdmin.people.replace(name)}
+        onClick={async () => { if (await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace })) { put(await api.renewPerson(t.id, link.travelerId)); setCopied(false); } }} />
+    </div>
+    {copied && <p className="ro" role="status">{svAdmin.people.copied(name)}</p>}
+  </QrDialog>;
+}
+
+/** AU-38: a traveler's name (AU-32), permission (AU-11), Delar på kostnader (MI-38) and account (US-21), saved together. */
+function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["travelers"][number]; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; run: Run; close: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [name, setName] = useState(x.name), [role, setRole] = useState(link.role), [shares, setShares] = useState(x.shares !== false);
+  const [account, setAccount] = useState(link.account ?? ""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const d = ref.current!, opener = document.activeElement as HTMLElement | null;
+    d.showModal();
+    document.body.style.overflow = "hidden"; // PL-14
+    return () => { document.body.style.overflow = ""; opener?.focus(); };
+  }, []);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    const renamed = renameTraveler(t, x.id, name);
+    if (!renamed.ok) { setErr(renamed.error); return; }
+    setBusy(true);
+    try {
+      if (role !== link.role || account.trim().toLowerCase() !== (link.account ?? "")) put(await api.setPerson(t.id, x.id, role, account.trim() || null));
+    } catch (y) {
+      setErr(y instanceof ApiError && y.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad); setBusy(false); return;
+    }
+    if (renamed.ops.length || shares !== (x.shares !== false))
+      run((y) => { const r = renameTraveler(y, x.id, name); return [...(r.ok ? r.ops : []), ...sharesOps(y, x.id, shares)]; }, "traveler");
+    close();
+  };
   return (
-    <div className="card">
-      <h3>{svAdmin.shares.title}</h3>
-      <p className="ro note">{svAdmin.shares.hint}</p>
-      <div className="sharegrid">{t.travelers.map((x) => ( // six to a row, the name under the button
-        <div className="sharer" key={x.id}><span className="verdict">{/* a toggle in the style of the verdict buttons in Minnas: pressed means shares */}
-          <IconButton icon="users" tip="up" pressed={x.shares !== false} label={svAdmin.shares.toggle(x.name)}
-            onClick={() => run((y) => sharesOps(y, x.id, x.shares === false), "shares")} /></span>
-          <span aria-hidden="true">{x.name}</span></div>
-      ))}</div>
-    </div>
+    <dialog ref={ref} aria-label={svAdmin.people.edit(x.name)} onClose={close}
+      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
+        const r = e.currentTarget.getBoundingClientRect();
+        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
+      }}>
+      <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
+      <form onSubmit={save}>
+        <h3>{svAdmin.people.edit(x.name)}</h3>
+        <label>{sv.name}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <fieldset className="trole"><legend>{svAdmin.people.role}</legend>
+          <span className="roletoggle" role="group" aria-label={svAdmin.people.role}>
+            {(["traveler", "planner"] as const).map((r) => <span key={r} className={`rt ${r}`}>
+              <IconButton icon={ROLE_ICON[r]} look="bare" tip="up" pressed={role === r} label={svAdmin.people.roles[r]} onClick={() => setRole(r)} /></span>)}
+          </span>
+          <span className="rolename">{svAdmin.people.roles[role]}</span>
+          <p className="ro note">{svAdmin.people.roleHint}</p>
+        </fieldset>
+        <label className="check switch"><input type="checkbox" role="switch" checked={shares} onChange={(e) => setShares(e.target.checked)} />{svAdmin.people.shares}</label>
+        <p className="ro note">{svAdmin.people.sharesHint}</p>
+        <label>{svAdmin.people.account}<input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
+        <p className="ro note">{svAdmin.people.accountHint}</p>
+        {err && <p className="err" role="alert">{err}</p>}
+        <div className="dlgbar"><button className="btn" type="submit" disabled={busy}>{sv.save}</button></div>
+      </form>
+    </dialog>
   );
 }
 
-const ROLES = PERM_ROLES; // AU-34: Planerare first
-/** The role icons of US-23, with an eye for Följare and the crown for the superuser (AU-33, AU-34). */
+const ROLES = PERM_ROLES; // AU-37: Resenär, then Följare
+/** The role icons of US-23, with an eye for Följare and the crown for the superuser (AU-37). */
 const ROLE_ICON = { follower: "eye", traveler: "luggage", planner: "compass", admin: "crown" } as const;
 type ARole = (typeof ROLES)[number];
-/** AU-20: a matrix with a column per role and the pages as groups: whether each page is visible, and the level of each component
- * on it. Each choice is saved at once, built on the latest trip so a change made meanwhile is kept. */
+/** AU-36, AU-37: which tabs Resenär and Följare see, and the level of each kind of content wherever it is shown. Each choice is saved
+ * at once, built on the latest trip so a change made meanwhile is kept. */
 function Permissions({ t, run }: { t: Trip; run: Run }) {
-  const [open, setOpen] = useState<Page[]>([]); // each page folds; closed at first, so the page rows give the overview
-  const raw = (r: ARole, pg: Page) => ({ visible: t.access?.[r]?.[pg]?.visible ?? DEFAULT_ACCESS[r][pg].visible, parts: { ...DEFAULT_ACCESS[r][pg].parts, ...t.access?.[r]?.[pg]?.parts } });
-  const save = (r: ARole, pg: Page, next: { visible?: boolean; parts?: Record<string, Level> } | null) => run((x) => {
-    const { [r]: own = {}, ...others } = x.access ?? {};
-    if (!next) return [{ op: "set", path: "access", value: others }]; // back to the defaults for the role
-    const cur = own[pg] ?? {};
-    return [{ op: "set", path: "access", value: { ...others, [r]: { ...own, [pg]: { ...cur, ...next, parts: { ...cur.parts, ...next.parts } } } } }];
-  }, `access ${r} ${pg}`);
-  /** AU-35: one button per cell that steps through the levels the cell allows, its icon and colour following the level. */
-  const cell = (part: string, r: ARole, value: string, options: [string, string][], onChange: (v: string) => void) => (
-    <span className={`lvlcell lvl-${value}`}><IconButton icon={LEVEL_ICON[value as keyof typeof LEVEL_ICON] ?? "eyeoff"} look="bare" tip="left"
+  const tabs = (r: ARole) => ({ ...DEFAULT_TABS(r), ...ownAccess(t, r).tabs });
+  const content = (r: ARole) => ({ ...DEFAULT_CONTENT(r), ...ownAccess(t, r).content });
+  const save = (r: ARole, next: RoleAccess | null) => run((x) => {
+    const all = Object.fromEntries(ROLES.map((y) => [y, ownAccess(x, y)])) as Record<ARole, RoleAccess>, own = all[r];
+    const value = { ...all, [r]: next ? { tabs: { ...own.tabs, ...next.tabs }, content: { ...own.content, ...next.content } } : {} };
+    return [{ op: "set", path: "access", value: Object.fromEntries(Object.entries(value).filter(([, v]) => Object.keys(v).length)) }];
+  }, `access ${r}`);
+  /** AU-37: one button per cell that steps through the levels the cell allows, its icon and colour following the level. */
+  const cell = (part: string, r: ARole, value: string, options: [string, string][], onChange: (v: string) => void) => options.length < 2
+    ? <span className="na" title={options[0]?.[1]}>–</span>
+    : <span className={`lvlcell lvl-${value}`}><IconButton icon={LEVEL_ICON[value as keyof typeof LEVEL_ICON] ?? "eyeoff"} look="bare" tip="left"
       label={svAdmin.perms.cell(part, svAdmin.perms.roles[r], options.find(([v]) => v === value)?.[1] ?? value)}
-      onClick={() => onChange(nextLevel(options.map(([v]) => v), value))} /></span>
-  );
+      onClick={() => onChange(nextLevel(options.map(([v]) => v), value))} /></span>;
+  const changed = (r: ARole) => Object.keys(ownAccess(t, r)).length > 0;
   return (
     <div className="card perms">
       <h3>{svAdmin.perms.title}</h3>
       <p className="ro note">{svAdmin.perms.hint}</p>
-      <p className="ro note plegend">{(["planner", "traveler", "follower", "admin"] as const).map((r) => /* AU-34: what each icon means */
-        <span key={r}><span className={`rolemark ${r}`} aria-hidden="true"><Icon name={ROLE_ICON[r]} /></span>{svAdmin.perms.legend[r]}</span>)}</p>
-      <p className="ro note plegend">{(["write", "add", "check", "read", "hidden"] as const).map((l) => /* AU-35: the level icons */
+      <p className="ro note plegend">{(["write", "add", "check", "read", "hidden"] as const).map((l) => /* the level icons */
         <span key={l}><span className={`lvlcell lvl-${l}`} aria-hidden="true"><Icon name={LEVEL_ICON[l]} /></span>{svAdmin.perms.level[l]}</span>)}</p>
       <div className="pgrid" role="table" aria-label={svAdmin.perms.title}>
         <div className="prow phead" role="row"><span role="columnheader" />
           {ROLES.map((r) => <span key={r} role="columnheader" className={`who ${r}`}><span className={`rolemark ${r}`} role="img" aria-label={svAdmin.perms.roles[r]} title={svAdmin.perms.roles[r]}><Icon name={ROLE_ICON[r]} /></span>
-            {t.access?.[r] && <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.perms.reset(svAdmin.perms.roles[r])} onClick={() => save(r, "up", null)} />}</span>)}
+            <small>{svAdmin.perms.legend[r]}</small>
+            {changed(r) && <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.perms.reset(svAdmin.perms.roles[r])} onClick={() => save(r, null)} />}</span>)}
         </div>
-        {PAGES.map((pg) => <div key={pg} className="pgroup" role="rowgroup">
-          <div className="prow ppage" role="row"><span role="rowheader">
-            <button className="pfold" aria-expanded={open.includes(pg)} onClick={() => setOpen((o) => (o.includes(pg) ? o.filter((x) => x !== pg) : [...o, pg]))}>{sv.tabs[pg]}</button></span>
-            {ROLES.map((r) => <span key={r} role="cell">{cell(`${svAdmin.perms.page} ${sv.tabs[pg]}`, r, raw(r, pg).visible ? "shown" : "hidden",
-              [["shown", svAdmin.perms.shown], ["hidden", svAdmin.perms.level.hidden]], (v) => save(r, pg, { visible: v === "shown" }))}</span>)}
-          </div>
-          {open.includes(pg) && Object.keys(PAGE_PARTS[pg]).map((k) => <div key={k} className="prow" role="row"><span role="rowheader">{svAdmin.perms.part[pg][k]!}</span>
-            {ROLES.map((r) => <span key={r} role="cell">{raw(r, pg).visible
-              ? cell(`${svAdmin.perms.part[pg][k]!} (${sv.tabs[pg]})`, r, raw(r, pg).parts[k] ?? "hidden", levelsFor(r, pg, k).map((l) => [l, svAdmin.perms.level[l]]),
-                (v) => save(r, pg, { parts: { [k]: v as Level } }))
-              : <span className="na" title={svAdmin.perms.off}>–</span>}</span>)}
-          </div>)}
+        <div className="prow psec" role="row"><span role="rowheader">{svAdmin.perms.tabs}</span></div>
+        {PAGES.map((pg) => <div key={pg} className="prow" role="row"><span role="rowheader">{sv.tabs[pg]}</span>
+          {ROLES.map((r) => <span key={r} role="cell">{cell(`${svAdmin.perms.tab} ${sv.tabs[pg]}`, r, tabs(r)[pg] ? "shown" : "hidden",
+            [["shown", svAdmin.perms.shown], ["hidden", svAdmin.perms.level.hidden]], (v) => save(r, { tabs: { [pg]: v === "shown" } }))}</span>)}
+        </div>)}
+        <div className="prow psec" role="row"><span role="rowheader">{svAdmin.perms.contents}</span></div>
+        {CONTENT.map((c) => <div key={c} className="prow" role="row"><span role="rowheader">{svAdmin.perms.content[c]}
+          {svAdmin.perms.contentHint[c] && <small className="ro">{svAdmin.perms.contentHint[c]}</small>}</span>
+          {ROLES.map((r) => <span key={r} role="cell">{cell(svAdmin.perms.content[c], r, content(r)[c],
+            contentLevels(r, c).map((l) => [l, svAdmin.perms.level[l as Exclude<Level, never>]]), (v) => save(r, { content: { [c]: v as Level } }))}</span>)}
         </div>)}
       </div>
       <p className="ro note">{svAdmin.perms.fixed}</p>
@@ -341,8 +368,7 @@ export function AdminPage({ t, superuser, manager, back, edit, addPerson, change
       <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
       <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div>
       <div className="row mid"><span>{sv.minnas.albumLabel}: {t.album ? <a className="place" href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}</span><IconButton icon="edit" look="bare" tip="left" label={sv.minnas.editAlbum} onClick={() => edit({ kind: "album" })} /></div></div>
-    <PeopleLinks t={t} add={addPerson} />
-    <Sharing t={t} run={run} />
+    <Travelers t={t} add={addPerson} run={run} />
     {superuser && <Permissions t={t} run={run} />}
     <ShareLink t={t} />
     <Inbox t={t} />

@@ -458,7 +458,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!ar) return t;
     const rules = accessFor(t, ar), hide = (p: Part) => rules.parts[p] === "hidden";
     const { budgetMax, access: _all, wishInbox: _w, ...rest } = ar === "planner" ? t : withoutInbox(t); // the address: BK-26, below
-    const own = t.access?.[ar]; // the role's own choices, so the app shows the same as the server sends
+    const own = ar === "planner" ? undefined : t.access?.[ar]; // the role's own choices, so the app shows the same as the server sends
     const out: Trip = { ...rest, ...(!hide("budget") && budgetMax !== undefined ? { budgetMax } : {}), ...(own ? { access: { [ar]: own } } : {}) };
     if (hide("bookings")) out.bookings = [];
     else if (ar === "follower") out.bookings = t.bookings.map(({ reference, files, ...b }) => b); // AU-22, BK-11

@@ -164,8 +164,7 @@ test("AU-21 the server follows the trip's permissions", async () => {
   const access = {
     follower: { nala: { visible: true, parts: { tasks: "check", budget: "read" } } },
     traveler: { nala: { parts: { bookings: "hidden", packing: "read" } }, up: { parts: { bookings: "hidden" } } },
-    planner: { nala: { parts: { budget: "read" } } },
-  };
+  }; // AU-36: a Planerare always has everything, so only Följare and Resenär are set
   assert.equal((await change(app, "a", 1, [{ op: "set", path: "access", value: access }])).status, 200);
   const follow = `link.berlin.${(await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret}`;
   const f = await json(call(app, "/api/trips/berlin", follow));
@@ -176,7 +175,6 @@ test("AU-21 the server follows the trip's permissions", async () => {
   assert.deepEqual([a.bookings, a.travelers[0].packing], [[], ["Pass"]]);
   assert.equal((await change(app, anna, 3, [{ op: "set", path: "packed", value: ["Laddare"] }])).status, 403, "packing is read only");
   const bo = await person(app, "bo", "planner");
-  assert.equal((await change(app, bo, 3, [{ op: "add", path: "budget/-", value: { id: "b9", category: "Övrigt", paid: false } }])).status, 403, "budget is read only");
   assert.equal((await change(app, bo, 3, [{ op: "set", path: "title", value: "Nytt" }])).status, 200, "the trip's own settings stay with the planner");
   assert.equal((await store.load("berlin"))!.revision, 4);
 });
@@ -191,7 +189,7 @@ test("AU-22 permissions belong to the superuser", async () => {
   const f = await json(call(app, "/api/trips/berlin", follow));
   assert.deepEqual([f.bookings.length, f.bookings[0].reference], [1, undefined]);
   assert.deepEqual(Object.keys(f.access), ["follower"], "a link gets only its own role's rules");
-  assert.equal(f.access.follower.up.parts.bookings, "read");
+  assert.equal(f.access.follower.content.bookings, "read", "stored per content (AU-36)");
 });
 
 // REQ: AU-24 an activity similar to a hidden one on the same day is masked for the same travelers; the Planerare sees it marked

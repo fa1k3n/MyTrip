@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "./api.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { onOutside } from "./outside.ts";
 
 export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?: string; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -18,7 +19,7 @@ export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?:
     try { await api.feedback(text, page, tripId); setState("sent"); setText(""); } catch { setState("failed"); }
   };
   return (
-    <dialog ref={ref} aria-label={sv.beta.feedback} onClose={close}>
+    <dialog ref={ref} aria-label={sv.beta.feedback} onClose={close} onClick={onOutside(close)}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
       <h3>{sv.beta.title} <span className="betatag inline">{sv.beta.tag}</span></h3>
       <p className="ro">{sv.beta.lead}</p>

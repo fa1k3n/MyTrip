@@ -4,6 +4,7 @@ import type { Trip } from "@trip/schema";
 import { api } from "./api.ts";
 import { sv } from "./sv.ts";
 import { IconButton } from "./Icons.tsx";
+import { onOutside } from "./outside.ts";
 
 /** Whether mail import is set up for this viewer; the address is made only when the button is pressed (BK-26). */
 function useMailIn(t: Trip, may: boolean) {
@@ -45,10 +46,7 @@ function MailInDialog({ address, close }: { address: string; close: () => void }
   const copy = async () => { try { await navigator.clipboard.writeText(address); setCopied(true); } catch { /* the field can still be copied by hand */ } };
   return (
     <dialog ref={ref} aria-label={sv.mailIn.open} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
+      onClick={onOutside(close)}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
       <h3>{sv.mailIn.open}</h3>
       <p className="ro note">{sv.mailIn.hint}</p>

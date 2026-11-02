@@ -62,7 +62,7 @@ function Budget({ t, edit, part }: { part: MayOf; t: Trip; edit: (d: EditDlg) =>
 }
 
 /** A wish's hearts, read only: votes are given in Önska (DB-02, DB-16). */
-const Votes = ({ n }: { n: number }) => <span className="votes" role="img" aria-label={sv.wish.votes(n)} title={sv.wish.votes(n)}>♥ {n}</span>;
+const Votes = ({ n }: { n: number }) => <span className="votes" role="img" aria-label={sv.wish.votes(n)} title={sv.wish.votes(n)}><Icon name="heart" />{n}</span>;
 
 /** The wishes to plan, the most voted first: each is dragged onto a day or put on one with its button (DB-16..DB-18).
  * Shown only to a role that may change the plan, so every wish can be planned. */

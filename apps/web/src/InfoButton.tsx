@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { onOutside } from "./outside.ts";
 
 export function InfoButton({ title, lines, label }: { title: string; lines: string[]; label: string }) {
   const [open, setOpen] = useState(false);
@@ -22,10 +23,7 @@ function InfoDialog({ title, lines, close }: { title: string; lines: string[]; c
   }, []);
   return (
     <dialog ref={ref} aria-label={title} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
+      onClick={onOutside(close)}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
       <h3>{title}</h3>
       {lines.map((x) => <p key={x}>{x}</p>)}

@@ -41,6 +41,7 @@ import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { newWish, toFill } from "./wishes.ts";
 import type { Drafted } from "./NewTrip.tsx";
+import { onOutside } from "./outside.ts";
 
 const filling = new Set<string>(); // wishes already sent for an automatic image on this page (DB-07)
 
@@ -477,10 +478,7 @@ export function App() {
         : dlg.kind === "transport" ? sv.transport
         : dlg.kind in dlgTitle ? dlgTitle[dlg.kind as keyof typeof dlgTitle] : editTitle(dlg as EditDlg)}
       onClose={() => { setDlg(null); opener.current?.focus(); }}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) setDlg(null);
-      }}
+      onClick={onOutside(() => setDlg(null))}
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>

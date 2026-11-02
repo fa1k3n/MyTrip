@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { onOutside } from "./outside.ts";
 
 type Opts = { ok?: string; details?: string[] };
 
@@ -11,10 +12,7 @@ function AskDialog({ question, ok = sv.remove, details, end }: Opts & { question
   useEffect(() => { ref.current?.showModal(); }, []);
   return (
     <dialog ref={ref} className="ask" aria-label={question} onClose={() => end(false)}
-      onClick={(e) => { // a click on the backdrop answers no, as in the other dialogs (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) end(false);
-      }}>
+      onClick={onOutside(() => end(false))}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => end(false)} /></span>
       <h3>{question}</h3>
       {details?.length ? <ul className="asklist">{details.map((d) => <li key={d}>{d}</li>)}</ul> : null}

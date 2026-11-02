@@ -3,8 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { categoryIcon } from "./categories.ts";
 import { sv } from "./sv.ts";
-import { AiMark, IconButton, PlannedMark } from "./Icons.tsx";
+import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { CatIcon, ICONS } from "./CatIcon.tsx";
+import { WISH_BG } from "./palette.ts";
 import { AiKeep, HiddenText, SuggestionActions, TextEye, type Run, type TripViewProps } from "./TripView.tsx";
 import type { WishSuggestion } from "./aiWishes.ts";
 import { dayLabel } from "./format.ts";
@@ -25,8 +26,6 @@ export function WishPicture({ tripId, file, whole = false }: { tripId: string; f
   return src ? <img className={`wishpic${whole ? " whole" : ""}`} src={src} alt="" /> : null; // a Commons image whole, not cropped (DB-09)
 }
 
-const DREAM_BG = ["#E8D5C4", "#D5E0D8", "#EFE2BF"];
-
 /** A wish's card, the same in Önska and in Minnas (DB-01, DB-02, MI-16); without `vote` the heart is read-only, and Minnas shows none.
  * Pressing the image area opens Om önskan, where a Commons image is credited (DB-09, DB-15). */
 /** `planned`: the wish is in the plan, marked in a corner of the image area (DB-19); Minnas leaves it out. */
@@ -35,12 +34,12 @@ export function DreamCard({ t, d, i, vote, votes = true, open, planned, children
   const area = <>{pic ? <WishPicture tripId={t.id} file={pic.file} whole={pic.whole} /> : <CatIcon id={categoryIcon(d.category) ?? d.icon} big />}
     {creditMark(d) && <span className="picinfo" aria-hidden="true">i</span> /* DB-09: the credit is under Om önskan */}
     {planned && <PlannedMark />}</>;
-  const bg = { background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : DREAM_BG[i % 3] };
+  const bg = { background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : WISH_BG[i % 3] };
   return (
     <article className="card dream">
       {open && !d.hidden ? <button type="button" className="img open" style={bg} aria-label={planned ? `${sv.wish.more(d.title)}, ${sv.wish.planned}` : sv.wish.more(d.title)} title={creditMark(d) ? sv.wish.credited : undefined} onClick={open}>{area}</button>
         : <div className="img" style={bg}>{area}</div>}
-      {votes && <button className="heart" onClick={vote} aria-label={sv.vote} disabled={!vote}>♥ {d.votes}</button>}
+      {votes && <button className="heart" onClick={vote} aria-label={sv.vote} disabled={!vote}><Icon name="heart" />{d.votes}</button>}
       <div className="in"><h3>{d.hidden ? <HiddenText /> : <><TextEye t={t} texts={[d.title, d.source]} />{d.title}</>}</h3><span className="badge">{d.category}</span><div className="src">{d.source}</div>
         {children}</div>
     </article>

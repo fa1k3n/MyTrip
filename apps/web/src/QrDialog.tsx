@@ -4,6 +4,7 @@ import { IconButton } from "./Icons.tsx";
 import { qr, qrSvgPath } from "./qr.ts";
 import { sv } from "./sv.ts";
 import { svAdmin } from "./sv-admin.ts";
+import { onOutside } from "./outside.ts";
 
 /** AU-31: a link as a QR code, to show on this screen to the one who is invited. Drawn here, so the link stays on the device. */
 export function QrDialog({ url, name, close, children }: { url: string; name: string; close: () => void; children?: ReactNode }) {
@@ -17,10 +18,7 @@ export function QrDialog({ url, name, close, children }: { url: string; name: st
   const { path, box } = qrSvgPath(qr(url));
   return (
     <dialog ref={ref} aria-label={svAdmin.qr.title(name)} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
+      onClick={onOutside(close)}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
       <h3>{svAdmin.qr.title(name)}</h3>
       <svg className="qr" viewBox={`0 0 ${box} ${box}`} role="img" aria-label={svAdmin.qr.label(name)} shapeRendering="crispEdges">

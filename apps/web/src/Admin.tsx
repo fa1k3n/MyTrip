@@ -16,6 +16,7 @@ import type { Run } from "./TripView.tsx";
 import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { svAdmin } from "./sv-admin.ts";
+import { onOutside } from "./outside.ts";
 
 /** Google's answer comes back in the fragment: no account, or the login failed (US-09). Read once and cleared. */
 const googleAnswer = (() => {
@@ -279,10 +280,7 @@ function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["tra
   };
   return (
     <dialog ref={ref} aria-label={svAdmin.people.edit(x.name)} onClose={close}
-      onClick={(e) => { // backdrop clicks land on the dialog itself, outside its box (PL-12)
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.target === e.currentTarget && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close();
-      }}>
+      onClick={onOutside(close)}>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} /></span>
       <form onSubmit={save}>
         <h3>{svAdmin.people.edit(x.name)}</h3>

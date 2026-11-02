@@ -1,5 +1,6 @@
 // Category and vehicle icons (UI-08): Lucide line icons (ISC licence, https://lucide.dev) in round badges tinted with the palette.
 // The shapes are static strings copied from lucide-static 0.460.0, so no icon package is bundled.
+import { ROSE, SAGE, SAND, TAUPE, TERRACOTTA } from "./palette.ts";
 
 const SHAPES: Record<string, string> = {
   bed: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>', // UP-42
@@ -32,17 +33,16 @@ const SHAPES: Record<string, string> = {
   walk: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
 };
 
-const TERRACOTTA = "#C87A53", SAGE = "#7A9A82", SAND = "#D9B26F", TAUPE = "#8C7F73";
 
 /** Icon id -> shape, palette colour and Swedish name. Category ids are the category names. */
 export const ICONS: Record<string, { shape: string; color: string; label: string }> = {
-  Mat: { shape: "utensils", color: TERRACOTTA, label: "Mat" },
+  Mat: { shape: "utensils", color: SAND, label: "Mat" },
   Utsikt: { shape: "binoculars", color: SAGE, label: "Utsikt" },
   Aktivitet: { shape: "ferris", color: SAND, label: "Aktivitet" },
   Avkoppling: { shape: "bath", color: SAGE, label: "Avkoppling" },
   Museum: { shape: "landmark", color: TAUPE, label: "Museum" },
   Bad: { shape: "waves", color: SAGE, label: "Bad" },
-  Shopping: { shape: "bag", color: TERRACOTTA, label: "Shopping" },
+  Shopping: { shape: "bag", color: ROSE, label: "Shopping" },
   Natur: { shape: "trees", color: SAGE, label: "Natur" },
   Resa: { shape: "map", color: SAND, label: "Resa" },
   Klockslag: { shape: "bell", color: TAUPE, label: "Klockslag" },

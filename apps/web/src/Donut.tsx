@@ -6,8 +6,9 @@ import { dayLabel, donutTotalSize, kr } from "./format.ts";
 import { budgetPlan, byDay, money, planSlices, type BudgetPlan } from "./budget.ts";
 import { Icon } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { EXPENSE_COLOUR } from "./palette.ts";
 
-const COL: Record<string, string> = { Transport: "#C87A53", Boende: "#7A9A82", Mat: "#D9B26F", Upplevelse: "#5E8C8A", Shopping: "#B9867C", "Mat/Fritid": "#D9B26F", "Övrigt": "#8C7F73" }; // MI-30
+const COL = EXPENSE_COLOUR; // MI-30, UI-26
 const UNUSED = "var(--line)";
 const colour = (label: string) => COL[label] ?? COL["Övrigt"];
 const whole = (n: number) => kr(Math.round(n)); // an overview: whole kronor keep the rows on one line on a phone

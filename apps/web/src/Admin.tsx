@@ -343,7 +343,7 @@ export function AdminPage({ t, superuser, manager, settings, back, edit, addPers
     <ShareLink t={t} />
     <Inbox t={t} kind="bookings" />
     <Inbox t={t} kind="wishes" />
-    {superuser && settings && <TripAi s={settings} on={t.ai} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
+    {superuser && settings && <TripAi s={settings} on={t.ai} consent={t.aiConsent} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
     {manager && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;
 }

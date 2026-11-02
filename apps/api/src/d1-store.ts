@@ -1,7 +1,7 @@
 // The store on Cloudflare: trips, settings, links, personal links, accounts and trip owners (US-01, US-13), push subscriptions, proposals, the log, cover images and ticket files in D1 (DP-03..DP-06, NT-03, BK-13).
 // Cover images can live in R2 instead, when a bucket is bound.
 import { Settings, Trip } from "@trip/schema";
-import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage } from "./app.ts";
+import { isFileId, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage, type AiUse } from "./app.ts";
 
 // The parts of the D1 and R2 bindings the store uses, so the store needs no Cloudflare types and runs in tests.
 export interface D1Stmt {
@@ -131,6 +131,13 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
     },
     async saveUsage(u) {
       await db.prepare("INSERT OR IGNORE INTO usage (trip_id, who, tab, day) VALUES (?, ?, ?, ?)").bind(u.tripId, u.who, u.tab, u.day).run();
+    },
+    async aiUses(month) { // AI-03
+      const q = month ? db.prepare("SELECT json FROM ai_usage WHERE month = ?").bind(month) : db.prepare("SELECT json FROM ai_usage");
+      return (await q.all<{ json: string }>()).results.map((r) => JSON.parse(r.json) as AiUse).sort((a, b) => a.at.localeCompare(b.at));
+    },
+    async saveAiUse(u) {
+      await db.prepare("INSERT INTO ai_usage (id, month, json) VALUES (?, ?, ?)").bind(u.id, u.month, JSON.stringify(u)).run();
     },
     async owners() { // US-13
       const { results } = await db.prepare("SELECT trip_id, user_id FROM trip_owners").all<{ trip_id: string; user_id: string }>();

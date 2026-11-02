@@ -9,9 +9,13 @@ export const Settings = z.object({
   ai: z.object({
     enabled: z.boolean().default(false),
     areas: z.record(z.enum(AI_AREAS), z.boolean()).default({}),
+    capUsd: z.number().nonnegative().optional(), // the monthly cap for the instance; missing: CAP_USD (AI-03)
+    capAccountUsd: z.number().nonnegative().optional(), // the monthly cap per person; missing: CAP_ACCOUNT_USD
   }).default({}),
 });
 export type Settings = z.infer<typeof Settings>;
+/** The spending caps per month in USD when none is set (AI-03). */
+export const CAP_USD = 10, CAP_ACCOUNT_USD = 3;
 
 /** True when a feature in this area may call the AI service (AI-05, AI-07). */
 export const aiOn = (s: Settings, area: AiArea, serviceConfigured: boolean) =>

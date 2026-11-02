@@ -115,6 +115,7 @@ export const Trip = z.object({
   wishInbox: z.string().email().optional(), // the address whose mail becomes wishes (DB-21)
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
+  aiConsent: z.object({ by: z.string().min(1), at: z.string().datetime() }).optional(), // who agreed to send the trip to the AI service, and when (AI-64)
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)
   access: AccessConfig.optional(), // what each role may see and change; missing: the defaults (AU-20)

@@ -3,7 +3,7 @@
 import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Settings, Trip } from "@trip/schema";
-import { bySubscriber, isFileId, pushMatch, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage } from "./app.ts";
+import { bySubscriber, isFileId, pushMatch, type CacheEntry, type FileMeta, type LogEntry, type PersonLink, type Proposal, type PushSub, type Store, type User, type Feedback, type Usage, type AiUse } from "./app.ts";
 
 const isId = (id: string) => /^[a-z0-9][a-z0-9-]*$/.test(id);
 const missing = (e: unknown) => (e as { code?: string }).code === "ENOENT";
@@ -89,6 +89,8 @@ export function fileStore(dir: string): Store {
     removeUser: (id) => serial(async () => writeJson("users.json", (await readJson<User[]>("users.json", [])).filter((x) => x.id !== id))),
     feedback: () => readJson<Feedback[]>("feedback.json", []), // US-27
     saveFeedback: (f) => serial(async () => writeJson("feedback.json", [...(await readJson<Feedback[]>("feedback.json", [])), f])),
+    aiUses: async (month) => (await readJson<AiUse[]>("ai-usage.json", [])).filter((x) => !month || x.month === month), // AI-03
+    saveAiUse: (u) => serial(async () => writeJson("ai-usage.json", [...(await readJson<AiUse[]>("ai-usage.json", [])), u])),
     usage: () => readJson<Usage[]>("usage.json", []), // US-28
     saveUsage: (u) => serial(async () => {
       const all = await readJson<Usage[]>("usage.json", []);

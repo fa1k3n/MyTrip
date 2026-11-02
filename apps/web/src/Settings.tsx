@@ -1,8 +1,9 @@
 // The app settings under the gear on Drömmar: AI for all trips (AI-06..AI-09), and the API key and image cache for the superuser (MT-13).
 import { useState } from "react";
-import type { AiArea, Settings } from "@trip/schema";
+import { CAP_ACCOUNT_USD, CAP_USD, type AiArea, type Settings } from "@trip/schema";
 import { api, maskedToken } from "./api.ts";
 import { sv } from "./sv.ts";
+import { aiConsentLine, capValue } from "./format.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { Users } from "./Users.tsx";
 import { BetaNotes, BetaUsage } from "./Beta.tsx";
@@ -19,19 +20,20 @@ export function Switch({ id, label, tip, checked, onChange }: { id: string; labe
 }
 
 /** The trip's single AI switch; shown only while AI is on for the instance (AI-62). */
-export function TripAi({ s, on, onChange, openSettings }: { s: Settings; on: boolean; onChange: (on: boolean) => void; openSettings: () => void }) {
+export function TripAi({ s, on, consent, onChange, openSettings }: { s: Settings; on: boolean; consent?: { by: string; at: string }; onChange: (on: boolean) => void; openSettings: () => void }) {
   return (
     <div className="card">
       <h3>{sv.ai}</h3>
       {s.ai.enabled
         ? <Switch id="trip-ai" label={sv.tripAi} tip={sv.tripAiTip} checked={on} onChange={onChange} />
         : <p>{sv.aiOffAll} <button className="place" onClick={openSettings}>{sv.aiOpenSettings}</button></p>}
+      {consent && <p className="ro note">{aiConsentLine(consent)}</p>}
     </div>
   );
 }
 
 export function AiSettings({ s, service, onChange }: { s: Settings; service: boolean; onChange: (next: Settings) => void }) {
-  const set = (enabled: boolean, areas = s.ai.areas) => onChange({ ...s, ai: { enabled, areas } });
+  const set = (enabled: boolean, areas = s.ai.areas) => onChange({ ...s, ai: { ...s.ai, enabled, areas } });
   return (
     <div className="card">
       <h3>{sv.ai}</h3>
@@ -44,10 +46,23 @@ export function AiSettings({ s, service, onChange }: { s: Settings; service: boo
             <Switch key={a} id={a} label={sv.aiAreas[a][0]} tip={sv.aiAreas[a][1]} checked={s.ai.areas[a] !== false}
               onChange={(on) => set(true, { ...s.ai.areas, [a]: on })} />
           ))}
+          <Cap label={sv.aiRun.capUsd} value={s.ai.capUsd} onChange={(capUsd) => onChange({ ...s, ai: { ...s.ai, capUsd } })} />
+          <Cap label={sv.aiRun.capAccountUsd} value={s.ai.capAccountUsd} onChange={(capAccountUsd) => onChange({ ...s, ai: { ...s.ai, capAccountUsd } })} />
+          <p className="ro note">{sv.aiRun.capHint(CAP_USD, CAP_ACCOUNT_USD)}</p>
         </fieldset>
       )}
     </div>
   );
+}
+
+/** A monthly spending cap in USD, saved when the field is left; empty means the default (AI-03). */
+function Cap({ label, value, onChange }: { label: string; value?: number; onChange: (v: number | undefined) => void }) {
+  const [text, setText] = useState(value === undefined ? "" : String(value).replace(".", ","));
+  const v = capValue(text);
+  return <label>{label}
+    <input value={text} inputMode="decimal" aria-invalid={v === null} onChange={(e) => setText(e.target.value)} onBlur={() => { if (v !== null && v !== value) onChange(v); }} />
+    {v === null && <span className="err" role="alert">{sv.aiRun.capInvalid}</span>}
+  </label>;
 }
 
 /** Emptying the image cache of ended trips, for the superuser, with the count and size in the confirmation (DB-13). */

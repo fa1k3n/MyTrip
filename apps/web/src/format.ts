@@ -108,3 +108,21 @@ export const scrollBehavior = (reducedMotion: boolean): ScrollBehavior => (reduc
 
 /** The class of a booking's status badge: green when paid or ready (BK-19). */
 export const statusBadge = (status: string) => (status === "paid" || status === "ready" ? "badge ok" : "badge");
+
+/** What the app says when an AI feature could not run (AI-03, AI-65). */
+export function aiErrorText(r: { error: string; scope?: string }) {
+  const e = sv.aiRun.errors;
+  return r.error === "cap" ? (r.scope === "account" ? e.capAccount : e.capInstance)
+    : r.error === "off" ? e.off : r.error === "refusal" ? e.refusal : r.error === "forbidden" ? e.forbidden : r.error === "network" ? e.network : e.failed;
+}
+/** A spending cap as typed: a number of USD, undefined for the default when empty, null when it is not a valid amount (AI-03). */
+export function capValue(s: string): number | undefined | null {
+  const t = s.trim().replace(",", ".");
+  if (!t) return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+/** One person's AI calls and cost in the usage overview (AI-03). */
+export const aiCostLine = (p: { name: string; calls: number; usd: number }) => sv.aiRun.cost(p.name, p.calls, p.usd.toFixed(2).replace(".", ","));
+/** Who agreed to send the trip to the AI service, and when (AI-64); "user" is the admin password. */
+export const aiConsentLine = (c: { by: string; at: string }) => sv.aiRun.consentBy(c.by === "user" ? sv.aiRun.admin : c.by, shortDate(c.at.slice(0, 10)));

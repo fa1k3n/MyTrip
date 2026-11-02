@@ -156,7 +156,10 @@ export type UserInfo = { id: string; name: string; email: string; superuser: boo
 export type SetupLink = { secret: string; expires: string }; // US-04
 export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string }; // US-27
 export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
-  people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[] }; // US-29
+  people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[]; // US-29
+  ai?: { name: string; calls: number; usd: number }[] }; // AI-03
+/** How an AI feature went: a proposal (or none worth making), or why it did not run (AI-03, AI-64, AI-65). */
+export type AiStart = { ok: true; proposalId: string | null; reason: string } | { ok: false; error: string; scope?: string };
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
@@ -169,6 +172,15 @@ export const api = {
   notes: () => call<FeedbackNote[]>("/api/feedback"),
   seen: (tripId: string, tab: string) => call<void>(`${trip(tripId)}/seen`, { method: "POST", body: JSON.stringify({ tab }) }), // US-28
   usage: () => call<TripUsage[]>("/api/usage"), // US-29
+  ai: async (tripId: string, feature: string): Promise<AiStart> => { // AI-65: the server's reason is kept, unlike call()
+    try {
+      const r = await fetch(`${trip(tripId)}/ai/${encodeURIComponent(feature)}`, { method: "POST", headers: headers() });
+      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; reason?: string; error?: string; scope?: string };
+      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, reason: b.reason ?? "" }
+        : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
+    } catch { return { ok: false, error: "network" }; }
+  },
+  aiConsent: (tripId: string) => call<{ revision: number }>(`${trip(tripId)}/ai/consent`, { method: "POST" }), // AI-64
   users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12
   addUser: (name: string, email: string) => call<{ user: UserInfo; setup: SetupLink }>("/api/users", { method: "POST", body: JSON.stringify({ name, email }) }),
   changeUser: (id: string, patch: Partial<Pick<UserInfo, "disabled" | "superuser" | "ai">>) => call<UserInfo>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),

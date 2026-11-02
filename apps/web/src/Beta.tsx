@@ -1,6 +1,7 @@
 // The superuser's view of the beta (US-27, US-29): the feedback sent with "Tyck till" and how each trip is used.
 import { useEffect, useState } from "react";
 import { api, type FeedbackNote, type TripUsage } from "./api.ts";
+import { aiCostLine } from "./format.ts";
 import { sv } from "./sv.ts";
 
 const when = (iso: string) => new Date(iso).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -31,6 +32,7 @@ export function BetaUsage() {
         <thead><tr><th scope="col">{sv.name}</th>{tabs.map((k) => <th scope="col" key={k}>{sv.tabs[k]}</th>)}<th scope="col">{sv.beta.upDuring}</th><th scope="col">{sv.beta.changes}</th></tr></thead>
         <tbody>{r.people.map((p) => <tr key={p.name}><th scope="row">{p.name}</th>{tabs.map((k) => <td key={k}>{p.days[k]}</td>)}<td>{p.upDuring}</td><td>{p.changes}</td></tr>)}</tbody>
       </table></div>
+      {!!r.ai?.length && <p className="ro note">{sv.aiRun.costTitle}: {r.ai.map(aiCostLine).join(" · ")}</p>}
     </div>)}
   </div>;
 }

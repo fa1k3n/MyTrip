@@ -1,8 +1,10 @@
 import { Hono, type Context } from "hono";
 import { cacheKey, commonsImage, fetchImage, IMAGE_MAX, imageType, type CommonsImage } from "./wishimage.ts";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { Settings, Trip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
+import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
+import { NO_COST, runAi, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
+import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
@@ -12,7 +14,8 @@ export type { User } from "./users.ts";
 
 export type Proposal = {
   id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
-  source?: { kind: "mail"; from: string; subject: string; at: string }; // a mail to the trip's inbox (BK-15)
+  source?: { kind: "mail"; from: string; subject: string; at: string } // a mail to the trip's inbox (BK-15)
+    | { kind: "ai"; feature: string; by: string; at: string }; // an AI feature in the app (AI-01, AI-65)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
 };
 /** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
@@ -26,6 +29,8 @@ export type Feedback = { id: string; at: string; who: string; name: string; text
 /** That a consenting user opened one of the four pages of a trip on a day, in the trip's time zone (US-28). */
 export type Usage = { tripId: string; who: string; tab: "dr" | "nala" | "up" | "mi"; day: string };
 export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
+/** One call to the AI service and what it cost; who is an account id, a traveler id of a link, or "admin" (AI-03). */
+export type AiUse = { id: string; at: string; month: string; tripId: string; who: string; feature: string; usd: number; result: "proposal" | "nothing" | "error" };
 
 export interface Store {
   list(): Promise<Trip[]>;
@@ -69,6 +74,9 @@ export interface Store {
   saveFeedback(f: Feedback): Promise<void>;
   usage(): Promise<Usage[]>;
   saveUsage(u: Usage): Promise<void>;
+  /** The AI calls of a month, "YYYY-MM", or of every month without one (AI-03). */
+  aiUses(month?: string): Promise<AiUse[]>;
+  saveAiUse(u: AiUse): Promise<void>;
 }
 /** A Commons lookup: the stored file with its credit and size, or nothing found (DB-11). */
 export type CacheEntry = { key: string; at: string; found?: { file: string; page: string; author?: string; licence: string; licenceUrl?: string; size: number } };
@@ -92,13 +100,15 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   let subs: PushSub[] = [];
   const files = new Map<string, FileMeta & { bytes: Uint8Array<ArrayBuffer> }>();
   const cache = new Map<string, CacheEntry>();
-  let users: User[] = [], owners: Record<string, string> = {}, notes: Feedback[] = [], seen: Usage[] = [];
+  let users: User[] = [], owners: Record<string, string> = {}, notes: Feedback[] = [], seen: Usage[] = [], ais: AiUse[] = [];
   const sameUse = (a: Usage, b: Usage) => a.tripId === b.tripId && a.who === b.who && a.tab === b.tab && a.day === b.day;
   return {
     feedback: async () => structuredClone(notes),
     saveFeedback: async (f) => { notes = [...notes, structuredClone(f)]; },
     usage: async () => structuredClone(seen),
     saveUsage: async (u) => { if (!seen.some((x) => sameUse(x, u))) seen = [...seen, { ...u }]; },
+    aiUses: async (month) => structuredClone(ais.filter((x) => !month || x.month === month)),
+    saveAiUse: async (u) => { ais = [...ais, { ...u }]; },
     users: async () => structuredClone(users).sort((a, b) => a.id.localeCompare(b.id)),
     saveUser: async (u) => { users = [...users.filter((x) => x.id !== u.id), structuredClone(u)]; },
     removeUser: async (id) => { users = users.filter((x) => x.id !== id); },
@@ -282,7 +292,10 @@ type Env = { Variables: { role: Role; tripId?: string; travelerId?: string; user
 export const bySubscriber = (a: PushSub, b: PushSub) => a.who.localeCompare(b.who) || a.endpoint.localeCompare(b.endpoint);
 export const pushMatch = (x: PushSub, m: { endpoint?: string; who?: string }) => (!m.endpoint || x.endpoint === m.endpoint) && (!m.who || x.who === m.who);
 
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; auth?: Auth; vapidKey?: string; inboxDomain?: string } & TrafficOpts = {}) {
+/** The AI service and the features it runs; tests give their own (AI-65). */
+export type AiOpts = { call: AiCall; features?: Record<string, AiFeature> };
+
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; ai?: AiOpts; auth?: Auth; vapidKey?: string; inboxDomain?: string } & TrafficOpts = {}) {
   const app = new Hono<Env>();
   const { adminPassword, sessionKey, google } = opts.auth ?? {};
   const fails = new Map<string, { n: number; since: number }>(); // per address and per account, in memory (AU-05, US-08)
@@ -876,10 +889,42 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     }
     const t = await load(p.tripId);
     if (t.revision !== p.baseRevision) return c.json({ error: "conflict", revision: t.revision }, 409);
-    const r = await apply(t, p.ops, "llm", p.reason, { c, who: "admin" });
+    const r = await apply(t, p.ops, p.source?.kind === "ai" ? "ai" : "llm", p.reason, { c, who: "admin" });
     if ("conflict" in r) return c.json({ error: "conflict" }, 409);
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
+  });
+
+  // AI-64: someone who plans the trip agrees, once per trip, before any of it is sent to the AI service.
+  app.post("/api/trips/:id/ai/consent", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id")), actor = actorName(c, t);
+    const r = await apply(t, [{ op: "set", path: "aiConsent", value: { by: actor, at: clock().toISOString() } }], actor, "ai consent");
+    return "revision" in r ? c.json(r) : c.json({ error: "conflict" }, 409);
+  });
+  // AI-65: one AI feature on the trip, stored as a proposal (AI-01) within the spending caps (AI-03).
+  app.post("/api/trips/:id/ai/:feature", async (c) => {
+    const name = c.req.param("feature"), f = opts.ai && (opts.ai.features ?? FEATURES)[name];
+    if (!opts.ai || !f || !Object.hasOwn(opts.ai.features ?? FEATURES, name)) return c.json({ error: "not found" }, 404);
+    const u = c.get("user");
+    if (!manager(c) || (u && !u.superuser && !u.ai)) return c.json({ error: "forbidden" }, 403); // US-16
+    const t = await load(c.req.param("id")), s = await store.loadSettings();
+    if (!aiOnForTrip(s, f.area, true, t) || (f.web && !aiOn(s, "web", true))) return c.json({ error: "off" }, 409); // AI-07, AI-62
+    if (!t.aiConsent) return c.json({ error: "consent" }, 409);
+    const who = u?.id ?? whoOf(c), now = clock(), month = now.toISOString().slice(0, 7);
+    const uses = await store.aiUses(month), spent = (xs: AiUse[]) => xs.reduce((n, x) => n + x.usd, 0);
+    if (spent(uses) >= (s.ai.capUsd ?? CAP_USD)) return c.json({ error: "cap", scope: "instance" }, 429);
+    if (spent(uses.filter((x) => x.who === who)) >= (s.ai.capAccountUsd ?? CAP_ACCOUNT_USD)) return c.json({ error: "cap", scope: "account" }, 429);
+    let r: AiResult;
+    try { r = await runAi(opts.ai.call, f, t); } catch { r = { error: "failed", cost: NO_COST }; }
+    const result = "error" in r ? "error" : r.ops.length ? "proposal" : "nothing";
+    await store.saveAiUse({ id: crypto.randomUUID(), at: now.toISOString(), month, tripId: t.id, who, feature: name, usd: r.cost.usd, result });
+    if ("error" in r) return c.json({ error: r.error }, 502);
+    if (!r.ops.length) return c.json({ proposalId: null, reason: r.reason });
+    const p: Proposal = { id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: r.ops, reason: r.reason, status: "pending", at: now.toISOString(),
+      source: { kind: "ai", feature: name, by: actorName(c, t), at: now.toISOString() } };
+    await store.saveProposal(p);
+    return c.json({ proposalId: p.id, reason: r.reason }, 202);
   });
 
   // US-02, US-03, US-04, US-12: the superuser manages the accounts; the admin password acts as the first superuser (US-18).
@@ -968,19 +1013,21 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   // US-29: per trip, who is active, Uppleva during the trip and Minnas, for the superuser.
   app.get("/api/usage", async (c) => {
     if (c.get("role") !== "admin" || scoped(c)) return c.json({ error: "forbidden" }, 403);
-    const [trips, users, owners, seen, log] = await Promise.all([store.list(), store.users(), store.owners(), store.usage(), store.log()]);
+    const [trips, users, owners, seen, log, ais] = await Promise.all([store.list(), store.users(), store.owners(), store.usage(), store.log(), store.aiUses()]);
     const name = (id: string) => users.find((u) => u.id === id)?.name ?? id;
     const first = firstSuper(users)?.id;
     return c.json(trips.map((t) => {
       const dates = t.days.map((d) => d.date).sort(), from = dates[0], to = dates.at(-1);
       const mine = seen.filter((x) => x.tripId === t.id), changes = log.filter((e) => e.tripId === t.id && e.reason !== "create");
-      const names = [...new Set([...mine.map((x) => name(x.who)), ...changes.map((e) => e.actor).filter((a) => a !== "user" && a !== "llm" && a !== "mejl")])];
+      const names = [...new Set([...mine.map((x) => name(x.who)), ...changes.map((e) => e.actor).filter((a) => a !== "user" && a !== "llm" && a !== "ai" && a !== "mejl")])];
+      const aiOf = ais.filter((x) => x.tripId === t.id), whoName = (id: string) => users.find((u) => u.id === id)?.name ?? t.travelers.find((x) => x.id === id)?.name ?? id;
+      const ai = [...new Set(aiOf.map((x) => x.who))].map((w) => { const own = aiOf.filter((x) => x.who === w); return { name: whoName(w), calls: own.length, usd: own.reduce((n, x) => n + x.usd, 0) }; }); // AI-03
       const people = names.map((n) => {
         const own = mine.filter((x) => name(x.who) === n), days = (tab: Usage["tab"]) => own.filter((x) => x.tab === tab).length;
         return { name: n, days: { dr: days("dr"), nala: days("nala"), up: days("up"), mi: days("mi") },
           upDuring: own.filter((x) => x.tab === "up" && from && to && x.day >= from && x.day <= to).length, changes: changes.filter((e) => e.actor === n).length };
       });
-      return { tripId: t.id, title: t.title, owner: name(owners[t.id] ?? first ?? ""), ...(from ? { from, to } : {}), memories: t.memories.length, people };
+      return { tripId: t.id, title: t.title, owner: name(owners[t.id] ?? first ?? ""), ...(from ? { from, to } : {}), memories: t.memories.length, people, ai };
     }));
   });
   return app;

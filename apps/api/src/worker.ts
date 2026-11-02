@@ -5,6 +5,7 @@ import { createApp } from "./app.ts";
 import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
 import { receiveMail } from "./mail.ts";
 import { googleOf } from "./users.ts";
+import { anthropicCall } from "./ai.ts";
 
 export type WorkerEnv = {
   DB: D1Like; IMAGES?: R2Like; ASSETS?: { fetch(r: Request): Promise<Response> };
@@ -32,7 +33,7 @@ const appFor = (env: WorkerEnv) => {
   if (!app) {
     const tokens = { read: env.TRIP_READ_TOKEN ?? "", propose: env.TRIP_PROPOSE_TOKEN ?? "", admin: env.TRIP_ADMIN_TOKEN ?? "" };
     app = createApp(d1Store(env.DB, env.IMAGES), tokens, {
-      aiService: !!env.AI_API_KEY, routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
+      aiService: !!env.AI_API_KEY, ...(env.AI_API_KEY ? { ai: { call: anthropicCall(env.AI_API_KEY) } } : {}), routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
       auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY, google: googleOf(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET) }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN,
     });
     apps.set(env, app);

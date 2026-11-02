@@ -10,6 +10,7 @@ import { Icon, IconButton } from "./Icons.tsx";
 import { BudgetDonut, LimitIcon, limitClass } from "./Donut.tsx";
 import { atLeast } from "@trip/schema/src/rules.ts";
 import { emergencyFor } from "./emergency.ts";
+import { wayUrl } from "./transport.ts";
 import { ActivityText, TravelRow, Emergency, Eye, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, Weather, type TripViewProps } from "./TripView.tsx";
 import { dayIcons } from "./categories.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
@@ -157,7 +158,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
           </span>
         </span>
       </li>;
-      const way = a.travel && <TravelRow key={`way-${a.id}`} travel={a.travel} li />; // TR-20
+      const way = a.travel && <TravelRow key={`way-${a.id}`} travel={a.travel} li href={wayUrl(t, day.id, a.id)} />; // TR-20, TR-21
       return i === at ? [line, way, card] : [way, card];
     })}
     {at === day.activities.length && line}

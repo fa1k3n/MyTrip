@@ -74,6 +74,7 @@ export const sv = {
     title: "Nödnummer", eu: "112 fungerar i hela EU.", call: (label: string, n: string) => `${label}: ring ${n}`,
     kinds: { all: "Larm", police: "Polis", ambulance: "Ambulans", fire: "Brand", policeLow: "Polis, ej akut", advice: "Sjukvårdsrådgivning" },
   },
+  showWay: "Visa resvägen", // TR-21
   travelHere: "Resväg hit", noTravel: "Ingen", travelMin: "Restid (minuter)", // TR-20
   travelVehicles: { walk: "Till fots", transit: "Kollektivt", car: "Bil", train: "Tåg", ferry: "Färja" } as Record<string, string>,
   travelRow: (vehicle: string, time: string) => `${vehicle}, ${time}`,

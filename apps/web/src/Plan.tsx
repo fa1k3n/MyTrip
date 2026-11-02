@@ -2,7 +2,7 @@
 import { Fragment, useState, type DragEvent, type KeyboardEvent } from "react";
 import type { Trip } from "@trip/schema";
 import { moveActivity, planWish, scheduleRows, WISH_DRAG } from "./schedule.ts";
-import { fmtDuration } from "./transport.ts";
+import { fmtDuration, wayUrl } from "./transport.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { hiddenFromIn } from "@trip/schema/src/hidden.ts";
 import { ActivityText, ActivityWhen, AiKeep, TravelRow, type Activity, type Run } from "./TripView.tsx";
@@ -57,7 +57,7 @@ export default function PlanActivities({ t, x, onPlace, edit, run }: { t: Trip; 
           </div>
         );
         const a = r.a, i = ++n, miss = missing(a);
-        return (<Fragment key={a.id}><TravelRow travel={a.travel} />
+        return (<Fragment key={a.id}><TravelRow travel={a.travel} href={wayUrl(t, x.id, a.id)} />
           <div className={`act drag ${a.pinned ? "pinned" : ""} ${who.has(a.id) ? "hiddenrow" : ""} ${over === i ? "over-top" : ""} ${over === i + 1 && i === x.activities.length - 1 ? "over-bottom" : ""}`}
             draggable={!a.pinned} onDragStart={(e) => { dragging = { dayId: x.id, id: a.id }; e.dataTransfer.setData(DRAG_TYPE, a.id); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => { dragging = null; setOver(null); }}

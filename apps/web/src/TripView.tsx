@@ -13,7 +13,7 @@ import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
 import { api } from "./api.ts";
 import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
 import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
-import { fmtDuration } from "./transport.ts";
+import { fmtDuration, wayUrl } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
@@ -125,9 +125,10 @@ function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (
 }
 
 /** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. */
-export const TravelRow = ({ travel, li }: { travel?: Activity["travel"]; li?: boolean }) => {
+export const TravelRow = ({ travel, li, href }: { travel?: Activity["travel"]; li?: boolean; href?: string }) => {
   if (!travel) return null;
-  const row = <><CatIcon id={travel.vehicle} /><span>{fmtDuration(travel.durationMin)}</span></>;
+  const row = <><CatIcon id={travel.vehicle} /><span>{fmtDuration(travel.durationMin)}</span>
+    {href && <a className="btn ghost icon bare tip-right" href={href} target="_blank" rel="noopener noreferrer" aria-label={sv.showWay} data-tip={sv.showWay}><Icon name="compass" /></a> /* TR-21 */}</>;
   return li ? <li className="travel">{row}</li> : <div className="travel">{row}</div>;
 };
 
@@ -146,7 +147,7 @@ export const PinMark = () => <span className="pinmark" role="img" aria-label={sv
 
 export function Activities({ t, x, onPlace, edit, run }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void; run?: Run }) {
   const who = hiddenFromIn(x);
-  return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} />
+  return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} href={wayUrl(t, x.id, a.id)} />
     <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`}>
       <ActivityWhen a={a} />{a.pinned && <PinMark />}
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />

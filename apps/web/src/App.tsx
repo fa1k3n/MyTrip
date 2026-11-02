@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendWaiting, type AiAdded, type Me } from "./api.ts";
-import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withWaiting, type Expense, type Waiting } from "./offline.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
+import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
@@ -151,12 +151,15 @@ export function App() {
   /** The pages shown: Önska, Uppleva and Minnas in the app on the home screen (PW-24). */
   const pagePerms = (x: { id?: string; access?: Trip["access"] }) => (installed ? forInstalled(perms(x)) : perms(x));
   const [waiting, setWaiting] = useState<Waiting[]>([]); // expenses on the phone that the server does not have yet (PW-06)
+  const [verdicts, setVerdicts] = useState(verdictQueue.load); // verdicts given without a network (UP-53)
+  useEffect(() => verdictQueue.listen(() => setVerdicts(verdictQueue.load())), []);
   const [sending, setSending] = useState(0); // sends going on: "Skickar…" on the waiting rows (PW-19)
   const flushWaiting = useCallback(async () => {
     if (!me) return;
     const tripId = sendTrip(me, linkKey()); // also when logged in as admin with a link on the phone (PW-20); an account's carry their trip (PW-22)
     setSending((n) => n + 1);
     try { if (await sendWaiting(tripId)) load(); } finally { setSending((n) => n - 1); } // PW-07
+    if (verdictQueue.load().length && await sendVerdicts()) load(); // UP-53
     setWaiting(queue.load());
   }, [me, load]);
   const changeWaiting = (next: Waiting[]) => { queue.save(next); setWaiting(next); flushWaiting(); }; // PW-09: try again, remove
@@ -477,7 +480,7 @@ export function App() {
   );
   else page = (
     <TripView
-      t={withWaiting(t, waiting) as Trip} waiting={waitingFor(waiting, t.id)} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
+      t={withVerdicts(withWaiting(t, waiting) as Trip, verdicts)} waiting={waitingFor(waiting, t.id)} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
       cover={covers[t.id]} tab={tab} open={open} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
       jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} openDays={(ids) => { setOpen(Object.fromEntries(ids.map((id) => [id, true]))); if (ids[0]) setScrollTo(ids[0]); }}

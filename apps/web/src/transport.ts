@@ -2,7 +2,7 @@
 import type { Trip } from "@trip/schema";
 import { sv } from "./sv.ts";
 
-import { routeOf, type Route } from "@trip/schema/src/route.ts";
+import { routeOf, wayEnds, type Route } from "@trip/schema/src/route.ts";
 export { routeOf, type Route };
 
 /** The API's answer for a day's traffic check (TR-09..TR-16). */
@@ -51,13 +51,20 @@ export function directionsUrl(r: Route) {
 const MODES: Record<string, string> = { transit: "transit", train: "transit", walk: "walking", car: "driving", ferry: "driving" };
 /** The way to an activity in Google Maps: from the place before it on the day, else the stay of the night before, else where the phone is (TR-21). */
 export function wayUrl(t: Trip, dayId: string, activityId: string): string | undefined {
-  const day = t.days.find((d) => d.id === dayId), i = day?.activities.findIndex((a) => a.id === activityId) ?? -1;
-  const a = day?.activities[i], text = (id?: string) => { const p = id && t.places.find((x) => x.id === id); return p ? `${p.name}, ${p.address}` : undefined; };
-  const to = text(a?.placeIds[0]);
-  if (!day || !a || !to) return undefined;
-  const before = day.activities.slice(0, i).reverse().find((x) => x.placeIds.length)?.placeIds[0];
-  const stay = t.bookings.find((b) => b.kind === "stay" && b.status !== "cancelled" && b.placeId && b.from < day.date && b.to >= day.date)?.placeId;
-  const from = text(before) ?? text(stay);
-  const q = new URLSearchParams({ api: "1", ...(from ? { origin: from } : {}), destination: to, travelmode: MODES[a.travel?.vehicle ?? ""] ?? "transit" });
+  const w = wayEnds(t, dayId, activityId);
+  if (!w) return undefined;
+  const q = new URLSearchParams({ api: "1", ...(w.from ? { origin: w.from } : {}), destination: w.to, travelmode: MODES[w.vehicle ?? ""] ?? "transit" });
   return `https://www.google.com/maps/dir/?${q}`;
 }
+
+/** A step of the trip by public transport, as the server sends it (TR-23). */
+export type TransitStep = { kind: "walk"; min: number } | { kind: "ride"; line: string; vehicle: string; headsign?: string; from: string; to: string; dep?: string; arr?: string; stops?: number };
+const clock = (t?: string) => (t ? `${t.replace(":", ".")} ` : "");
+/** A step as one short line: "Gå 4 min", "Tunnelbana U2 mot Ruhleben: 10.02 A – 10.17 B, 9 hållplatser" (TR-23). */
+export function stepText(s: TransitStep) {
+  if (s.kind === "walk") return sv.transit.walk(s.min);
+  const head = [sv.transit.kinds[s.vehicle] ?? sv.transit.kinds.other, s.line, s.headsign && sv.transit.toward(s.headsign)].filter(Boolean).join(" ");
+  return `${head}: ${clock(s.dep)}${s.from} – ${clock(s.arr)}${s.to}${s.stops ? `, ${sv.transit.stops(s.stops)}` : ""}`;
+}
+/** The icon of a step, among the means of transport the app draws. */
+export const stepIcon = (s: TransitStep) => (s.kind === "walk" ? "walk" : s.vehicle === "train" || s.vehicle === "ferry" ? s.vehicle : "transit");

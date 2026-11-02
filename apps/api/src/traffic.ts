@@ -7,7 +7,7 @@ export type Traffic =
 type RouteResult = { duration: string; staticDuration: string; speedReadingIntervals?: { speed?: string }[]; travelAdvisory?: unknown };
 
 /** UTC instant of a wall-clock time in a time zone. */
-function zoned(date: string, time: string, timeZone: string) {
+export function zoned(date: string, time: string, timeZone: string) {
   const [y, m, d] = date.split("-").map(Number), [h, mi] = time.split(":").map(Number);
   const guess = Date.UTC(y, m - 1, d, h, mi);
   const offset = (at: number) => {

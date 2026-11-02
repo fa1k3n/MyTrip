@@ -77,6 +77,12 @@ export const sv = {
     kinds: { all: "Larm", police: "Polis", ambulance: "Ambulans", fire: "Brand", policeLow: "Polis, ej akut", advice: "Sjukvårdsrådgivning" },
   },
   showWay: "Visa resvägen", // TR-21
+  transit: { // TR-23
+    show: "Visa linjer", hide: "Dölj linjer", asking: "Söker resa…", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.", failed: "Kunde inte hämta linjerna just nu.",
+    walk: (min: number) => `Gå ${min} min`, toward: (h: string) => `mot ${h}`, stops: (n: number) => (n === 1 ? "1 hållplats" : `${n} hållplatser`),
+    kinds: { bus: "Buss", tram: "Spårvagn", metro: "Tunnelbana", train: "Tåg", ferry: "Färja", other: "Linje" } as Record<string, string>,
+    label: "Resan med kollektivtrafik",
+  },
   travelHere: "Resväg hit", noTravel: "Ingen", travelMin: "Restid (minuter)", // TR-20
   travelVehicles: { walk: "Till fots", transit: "Kollektivt", car: "Bil", train: "Tåg", ferry: "Färja" } as Record<string, string>,
   travelRow: (vehicle: string, time: string) => `${vehicle}, ${time}`,

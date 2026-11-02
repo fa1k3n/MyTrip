@@ -3,6 +3,7 @@ import { cacheKey, commonsImage, fetchImage, IMAGE_MAX, imageType, type CommonsI
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part, type WishReading } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
+import { checkTransit } from "./transit.ts";
 import { NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
 import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
@@ -594,6 +595,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const t = view(await load(c.req.param("id")), c.get("role"), c.get("travelerId")); // a hidden route is not checked (AU-28)
     const day = t.days.find((d) => d.id === c.req.param("dayId"));
     return day ? c.json(await checkTraffic(t, day, opts)) : c.json({ error: "not found" }, 404);
+  });
+  // TR-23: public transport to an activity, asked for when the button is pressed; a hidden route is not asked for (AU-28).
+  app.get("/api/trips/:id/days/:dayId/activities/:aid/transit", async (c) => {
+    const t = view(await load(c.req.param("id")), c.get("role"), c.get("travelerId"));
+    const day = t.days.find((d) => d.id === c.req.param("dayId"));
+    if (!day) return c.json({ error: "not found" }, 404);
+    return c.json(day.hiddenRoute ? { status: "none" } : await checkTransit(t, day.id, c.req.param("aid"), opts));
   });
   app.get("/api/trips/:id/check", async (c) => c.json({ problems: checkTrip(await load(c.req.param("id"))) }));
   app.get("/api/trips/:id/proposals", async (c) => (["link", "traveler"].includes(c.get("role")) ? c.json({ error: "forbidden" }, 403) : c.json(await store.proposals(c.req.param("id")))));

@@ -10,10 +10,10 @@ import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
 import type { Transfer } from "./money.ts";
 import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
-import { api } from "./api.ts";
+import { api, isOffline } from "./api.ts";
 import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
 import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
-import { fmtDuration, wayUrl } from "./transport.ts";
+import { fmtDuration, stepIcon, stepText, wayUrl, type TransitStep } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
@@ -128,11 +128,25 @@ function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (
   </div>;
 }
 
-/** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. */
-export const TravelRow = ({ travel, li, href }: { travel?: Activity["travel"]; li?: boolean; href?: string }) => {
+/** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. In Uppleva, a way by
+ * public transport also gets "Visa linjer", which asks the server only when pressed (TR-23). */
+export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["travel"]; li?: boolean; href?: string; lines?: { tripId: string; dayId: string; aid: string } }) => {
+  const [open, setOpen] = useState(false), [got, setGot] = useState<TransitStep[] | "asking" | "none" | "failed" | null>(null);
   if (!travel) return null;
+  const transit = !!lines && !!href && (travel.vehicle === "transit" || travel.vehicle === "train");
+  const toggle = () => {
+    setOpen(!open);
+    if (open || (got && got !== "failed")) return;
+    setGot("asking");
+    api.transit(lines!.tripId, lines!.dayId, lines!.aid).then((r) => setGot(r.status === "ok" ? r.steps : r.status === "error" ? "failed" : "none"), () => setGot("failed"));
+  };
   const row = <><CatIcon id={travel.vehicle} /><span>{fmtDuration(travel.durationMin)}</span>
-    {href && <a className="btn ghost icon bare tip-right" href={href} target="_blank" rel="noopener noreferrer" aria-label={sv.showWay} data-tip={sv.showWay}><Icon name="compass" /></a> /* TR-21 */}</>;
+    {href && <a className="btn ghost icon bare tip-right" href={href} target="_blank" rel="noopener noreferrer" aria-label={sv.showWay} data-tip={sv.showWay}><Icon name="compass" /></a> /* TR-21 */}
+    {transit && (open || !isOffline()) && <IconButton icon="list" look="bare" tip="right" pressed={open} label={open ? sv.transit.hide : sv.transit.show} onClick={toggle} />}
+    {transit && open && <div className="steps" role="status" aria-label={sv.transit.label}>
+      {got === "asking" ? <p>{sv.transit.asking}</p> : got === "none" ? <p>{sv.transit.none}</p> : got === "failed" ? <p>{sv.transit.failed}</p>
+        : got && <ol>{got.map((x, i) => <li key={i} className={x.kind}><CatIcon id={stepIcon(x)} /><span>{stepText(x)}</span></li>)}</ol>}
+    </div>}</>;
   return li ? <li className="travel">{row}</li> : <div className="travel">{row}</div>;
 };
 

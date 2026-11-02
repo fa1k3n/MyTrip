@@ -1,6 +1,7 @@
 // What the phone keeps for working offline: the last fetched trip per link (PW-03, PW-05, PW-17). Pure, so it runs under node --test.
 import { sv } from "./sv.ts";
 import { tripOfLink } from "./access.ts";
+import type { Op } from "@trip/schema";
 
 /** Local storage, or a stand-in in the tests. */
 export type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void; key(i: number): string | null; readonly length: number };
@@ -18,11 +19,11 @@ export function saveCopy(s: Store, link: string, part: Pick<Copy, "me" | "trips"
   try { s.setItem(PREFIX + link, JSON.stringify({ ...old, ...part, ...stamp })); } catch { /* storage full or blocked: online only */ }
 }
 /** A link leaves the phone with its copy and its waiting expenses (PW-17). */
-export const dropCopy = (s: Store, link: string) => { s.removeItem(PREFIX + link); s.removeItem(QUEUE + link); };
+export const dropCopy = (s: Store, link: string) => { s.removeItem(PREFIX + link); s.removeItem(QUEUE + link); s.removeItem(VERDICTS_KEY + link); }; // UP-53: its verdicts too
 /** #admin removes every link and so every copy and queue (PW-17), but not the account's (PW-22). */
 export function dropAllCopies(s: Store) {
   const keys = Array.from({ length: s.length }, (_, i) => s.key(i))
-    .filter((k): k is string => !!k && [PREFIX, QUEUE].some((p) => k.startsWith(p) && !k.startsWith(p + "@")));
+    .filter((k): k is string => !!k && [PREFIX, QUEUE, VERDICTS_KEY].some((p) => k.startsWith(p) && !k.startsWith(p + "@")));
   for (const k of keys) s.removeItem(k);
 }
 
@@ -150,3 +151,36 @@ export const triedAt = (why: string, at: Date) =>
  * logged in as admin (PW-20). Nothing before the login is known. */
 export const sendTrip = (me: { role: string; tripId?: string } | null | undefined, key: string | null) =>
   !me ? undefined : me.tripId ?? (key ? tripOfLink(key) : undefined);
+
+/** A verdict given without a network: the traveler's chosen verdict on a wish, or none when taken back (UP-53). */
+export type WaitingVerdict = { tripId: string; dreamId: string; by: string; verdict: "again" | "ok" | "never" | null };
+type Mem = { id: string; dreamId: string; by: string; verdict?: "again" | "ok" | "never"; note?: string };
+const same = (a: WaitingVerdict, b: WaitingVerdict) => a.tripId === b.tripId && a.dreamId === b.dreamId && a.by === b.by;
+/** The latest verdict replaces a waiting one on the same wish by the same traveler (UP-53). */
+export const queueVerdict = (q: WaitingVerdict[], v: WaitingVerdict) => [...q.filter((x) => !same(x, v)), v];
+/** The memory as it becomes with the verdict, its comment kept; null when nothing is left of it. */
+const memoryWith = (was: Mem | undefined, v: WaitingVerdict): Mem | null =>
+  !v.verdict && !was?.note ? null : { id: was?.id ?? `m-${v.dreamId}-${v.by}`, dreamId: v.dreamId, by: v.by, ...(v.verdict ? { verdict: v.verdict } : {}), ...(was?.note ? { note: was.note } : {}) };
+/** The change from the latest trip to the waiting verdict; none when the trip already has it (UP-53). */
+export function verdictOps(t: { memories: Mem[] }, v: WaitingVerdict): Op[] {
+  const i = t.memories.findIndex((m) => m.dreamId === v.dreamId && m.by === v.by), was = t.memories[i], next = memoryWith(was, v);
+  if (!next) return was ? [{ op: "remove", path: `memories/${i}` }] : [];
+  if (was && was.verdict === next.verdict) return [];
+  return [was ? { op: "set", path: `memories/${i}`, value: next } : { op: "add", path: "memories/-", value: next }];
+}
+/** The trip shown with its waiting verdicts, so the buttons and counts show them at once (UP-53). */
+export function withVerdicts<T extends { id?: string; memories: Mem[] }>(t: T, q: WaitingVerdict[]): T {
+  let memories = t.memories;
+  for (const v of q.filter((x) => x.tripId === t.id)) {
+    const was = memories.find((m) => m.dreamId === v.dreamId && m.by === v.by), next = memoryWith(was, v);
+    memories = next ? (was ? memories.map((m) => (m === was ? next : m)) : [...memories, next]) : memories.filter((m) => m !== was);
+  }
+  return memories === t.memories ? t : { ...t, memories };
+}
+const VERDICTS_KEY = "mytrip.verdicts.";
+export function loadVerdicts(s: Store, slot: string): WaitingVerdict[] {
+  try { return (JSON.parse(s.getItem(VERDICTS_KEY + slot) ?? "[]") as WaitingVerdict[]) ?? []; } catch { return []; }
+}
+export function saveVerdicts(s: Store, slot: string, q: WaitingVerdict[]) {
+  try { if (q.length) s.setItem(VERDICTS_KEY + slot, JSON.stringify(q)); else s.removeItem(VERDICTS_KEY + slot); } catch { /* storage blocked */ }
+}

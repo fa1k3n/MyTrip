@@ -1,7 +1,7 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
-import type { Traffic } from "./transport.ts";
+import type { TransitStep, Traffic } from "./transport.ts";
 
-import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, useCopy, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
+import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, useCopy, loadVerdicts, saveVerdicts, verdictOps, type WaitingVerdict, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
 import { addLink, authHeader, cookieLinks, linkCookie, linkForTrip, linkHash, linksCookie, parseLinkHash, parseSetupHash, removeLink, type Me } from "./access.ts";
 export type { Me } from "./access.ts";
@@ -144,6 +144,32 @@ const sendQueue = serial(async () => {
   queue.save(queue.load().filter((x) => !sent.includes(x.expense.id)).map((x) => after.find((a) => a.expense.id === x.expense.id) ?? x));
   return sent.length > 0;
 });
+/** Verdicts given without a network, kept for the link or account (UP-53); listeners hear every change. */
+const verdictListeners = new Set<() => void>();
+export const verdictQueue = {
+  load: (): WaitingVerdict[] => { const k = slot(); try { return k ? loadVerdicts(localStorage, k) : []; } catch { return []; } },
+  save: (q: WaitingVerdict[]) => { const k = slot(); try { if (k) saveVerdicts(localStorage, k, q); } catch { /* blocked */ } verdictListeners.forEach((f) => f()); },
+  listen: (f: () => void) => { verdictListeners.add(f); return () => { verdictListeners.delete(f); }; },
+};
+/** True without a network, or while the server cannot be reached (PW-04, PW-26). */
+export const isOffline = () => !navigator.onLine || offline !== null;
+/** Sends the waiting verdicts, each as the change from the latest trip (UP-53). A conflict, a server error or no network waits for
+ * the next try; any other refusal drops it. True when the server got at least one. */
+export const sendVerdicts = serial(async () => {
+  let sent = false;
+  for (const v of verdictQueue.load()) {
+    let trips: Trip[];
+    try { trips = await call<Trip[]>("/api/trips"); } catch { break; }
+    const t = trips.find((x) => x.id === v.tripId), ops = t ? verdictOps(t, v) : [];
+    try {
+      if (t && ops.length) { await call(`${trip(t.id)}/changes`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops, reason: `verdict ${v.verdict ?? "none"}` }) }); sent = true; }
+    } catch (x) {
+      if (!(x instanceof ApiError) || x.status === 409 || x.status >= 500) break;
+    }
+    verdictQueue.save(verdictQueue.load().filter((y) => !(y.tripId === v.tripId && y.dreamId === v.dreamId && y.by === v.by && y.verdict === v.verdict))); // a newer one stays
+  }
+  return sent;
+});
 export function sendWaiting(tripId = ""): Promise<boolean> {
   sendingTo = tripId;
   return sendQueue();
@@ -238,6 +264,8 @@ export const api = {
   subscribe: (tripId: string, sub: PushSubscriptionJSON) => call<void>(`${trip(tripId)}/push`, { method: "PUT", body: JSON.stringify(sub) }),
   unsubscribe: (tripId: string, endpoint: string, key = link) => call<void>(`${trip(tripId)}/push`, { method: "DELETE", body: JSON.stringify({ endpoint }) }, key),
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
+  transit: (tripId: string, dayId: string, aid: string) => // TR-23
+    call<{ status: "off" | "none" | "error" } | { status: "ok"; steps: TransitStep[] }>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(aid)}/transit`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
   // BK-09, BK-10: ticket files go up and come down as they are, with the link's credentials.

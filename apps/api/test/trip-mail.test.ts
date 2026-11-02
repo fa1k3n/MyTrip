@@ -34,7 +34,7 @@ test("BK-26 the trip's address is made when asked for", async () => {
   const store = memoryStore([trip()]), a = app(store);
   assert.equal((await json(call(a, "/api/trips/berlin", "a"))).inbox, undefined, "not made before it is asked for");
   const { address } = await json(call(a, "/api/trips/berlin/inbox", "a", "POST"));
-  assert.match(address, /^resa-[a-z2-7]{16,}@resa\.example\.org$/);
+  assert.match(address, /^inkorg-[a-z2-7]{16,}@resa\.example\.org$/);
   assert.ok(!address.includes("berlin"));
   assert.equal((await json(call(a, "/api/trips/berlin/inbox", "a", "POST"))).address, address, "asking again gives the same");
   assert.equal((await store.load("berlin"))!.inbox, address);
@@ -69,7 +69,7 @@ test("BK-26 replacing the address", async () => {
   const traveler = await person(a, "anna", "traveler");
   assert.equal((await call(a, "/api/trips/berlin/inbox/replace", traveler, "POST")).status, 403, "only a Planerare or the superuser");
   const { address } = await json(call(a, "/api/trips/berlin/inbox/replace", "a", "POST"));
-  assert.match(address, /^resa-/);
+  assert.match(address, /^inkorg-/);
   for (const old of ["berlin-gammal1234@resa.example.org", "berlin-onska-gammal5678@resa.example.org"])
     assert.deepEqual(await receiveMail(store, wish(old), old), { error: "unknown address" }, old);
   assert.equal((await store.load("berlin"))!.wishInbox, undefined);

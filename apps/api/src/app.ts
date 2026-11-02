@@ -792,7 +792,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   app.post("/api/image-cache/ended", async (c) => (need(c, "admin") ? c.json(await endedCache(true)) : c.json({ error: "forbidden" }, 403)));
   /** BK-26: who may have the trip's address: those who manage it, and a Resenär whose role sees wishes. */
   const mayMail = (c: Context<Env>, t: Trip) => manager(c) || (c.get("role") === "traveler" && accessFor(t, "traveler").parts.dreams !== "hidden");
-  const newAddress = () => `resa-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
+  const newAddress = () => `inkorg-${inboxSecret()}@${opts.inboxDomain}`.toLowerCase();
   // BK-27: whether mail import is set up, for those who may have the address, so the app shows its mail buttons; nothing is made here.
   app.get("/api/trips/:id/inbox", async (c) => {
     const t = await load(c.req.param("id"));

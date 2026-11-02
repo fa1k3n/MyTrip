@@ -22,7 +22,7 @@ export const svAdmin = {
     accountTaken: "Adressen används redan av en annan resenär i resan.", accountBad: "Det där är ingen mejladress.",
   },
   inbox: { // BK-26
-    title: "Mejla in till resan", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
+    title: "Resans inkorg", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",
     hint: "Planerare och resenärer som ser önskningar kan mejla hit. Bokningsbekräftelser blir förslag under Bokningar i Nåla, andra mejl blir önskningar i Önska. Den som har adressen kan skicka, så byt den om den har spridits.",
     off: "Mejlimport är inte inställd på servern: den behöver en egen domän (INBOX_DOMAIN).",
     confirmReplace: "Byta adress? Mejl till den gamla adressen kommer inte längre fram, och alla behöver den nya.",

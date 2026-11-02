@@ -216,9 +216,10 @@ a.film:hover{border-color:var(--acc)}a.film:focus-visible{outline:3px solid var(
     <h2>Det här gör AI:n</h2>
     <ul class="does">
       <li>Gör ett utkast av resan från er beskrivning: namn, datum, resenärer, dagar och rutt. Det läggs in direkt och kan ångras.</li>
-      <li>Letar upp det som är bra att veta inför resan, som miljödekaler, vägtullar och dokument, med en källa att kolla.</li>
-      <li>Föreslår det som ska bokas, och riktiga platser som passar er, var och en på en dag där den passar.</li>
-      <li>Föreslår bara. Ni tar med det ni vill ha, och resenärernas namn byts mot ålder innan något skickas.</li>
+      <li>Letar upp det som är bra att veta inför resan, som miljödekaler, vägtullar och dokument, med en källa att kolla, och lägger parkering och hur man köper biljett till kollektivtrafiken under Praktiskt.</li>
+      <li>Lägger in det som ska bokas, och riktiga platser som passar er, var och en på en dag där den passar. Dagarna får namn efter det de innehåller.</li>
+      <li>Allt som läggs in när resan skapas är märkt som AI. Ni behåller det ni vill ha och tar bort resten, och Ångra tar tillbaka allt. Senare förslag läggs inte in förrän någon tar med dem.</li>
+      <li>Resenärernas namn byts mot ålder innan något skickas, och bokningsnummer, mejl och telefonnummer skickas aldrig.</li>
     </ul>
   </section>
   <section class="plus">
@@ -332,32 +333,34 @@ const SCENES = [
         <text class="t" x="322" y="332" style="fill:#fff">Utkastet är inlagt</text>
         <rect x="502" y="310" width="82" height="32" rx="10" style="fill:none;stroke:#fff;stroke-width:1.5;opacity:.7"/><text class="t" x="520" y="331" style="fill:#fff">Ångra</text></g>` },
   { chap: "Bra att veta", title: "Det som är lätt att missa",
-    text: "Samtidigt letar AI:n på webben upp det som är lätt att missa längs vägen: miljödekalen till bilen i Tyskland och EU-kortet. Hotellet med pool hamnar under Bokningar, som att boka. Allt har en källa att kolla.",
+    text: "Samtidigt letar AI:n på webben upp det som är lätt att missa längs vägen: miljödekalen till bilen i Tyskland och EU-kortet. Hotellet med pool hamnar under Bokningar, som att boka, och under Praktiskt står var ni kan parkera och hur man köper bussbiljett i Hamburg. Allt har en källa att kolla.",
     svg: () => `${ground}
       <g class="rise">${card(40, 40, 360, 250)}<text class="mid" x="62" y="80">Att göra</text>${spark(352, 60, 1)}
         ${sug(60, 100, 320, "", "Beställ miljödekal till bilen", .5)}${sug(60, 150, 320, "", "Beställ EU-kort för alla", .9)}${sug(60, 200, 320, "", "Ta med lite euro i kontanter", 1.3)}
         <text class="tm rise" style="animation-delay:1.7s;fill:var(--acct)" x="62" y="268">Kolla källan</text></g>
-      <g class="rise" style="animation-delay:1.9s">${card(430, 40, 330, 170)}<text class="mid" x="452" y="80">Bokningar</text>
-        ${sug(450, 100, 290, "", "Hotell med pool", 2.3)}
-        <g class="pop" style="animation-delay:2.8s"><rect x="452" y="152" width="82" height="26" rx="8" style="fill:var(--acc);opacity:.22"/><text class="tm" x="464" y="170" style="fill:var(--acct)">att boka</text></g>
-        <text class="tm" x="548" y="170" style="fill:var(--acct)">Boka</text></g>
-      ${fig(560, 392, { name: "Erik", c: "--sage", act: "phone" })}${fig(650, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+      <g class="rise" style="animation-delay:1.9s">${card(430, 40, 330, 150)}<text class="mid" x="452" y="78">Bokningar</text>
+        ${sug(450, 94, 290, "", "Hotell med pool", 2.3)}
+        <g class="pop" style="animation-delay:2.8s"><rect x="452" y="144" width="82" height="26" rx="8" style="fill:var(--acc);opacity:.22"/><text class="tm" x="464" y="162" style="fill:var(--acct)">att boka</text></g>
+        <text class="tm" x="548" y="162" style="fill:var(--acct)">Boka</text></g>
+      <g class="rise" style="animation-delay:3.4s">${card(430, 202, 330, 150)}<text class="mid" x="452" y="240">Praktiskt</text>${spark(712, 222, 1, 3.6)}
+        ${sug(450, 254, 290, "", "Parkering vid hotellet", 3.8)}${sug(450, 302, 290, "", "Bussbiljett i Hamburg", 4.3)}</g>
+      ${fig(150, 392, { name: "Erik", c: "--sage", act: "phone" })}${fig(250, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
   { chap: "Aktiviteter", title: "Förslag som passar er",
-    text: "Barnen älskar djur och båtar, så AI:n föreslår Tierpark Hagenbeck och en hamnrundtur, var och en på en dag där den passar. Erik tar med det han gillar med en bock, och det han avvisar föreslås inte igen.",
+    text: "Barnen älskar djur och båtar, så AI:n lägger in Tierpark Hagenbeck och en hamnrundtur, var och en på en dag där den passar, och dagen får ett namn efter det den innehåller. Allt är märkt som AI, och Erik behåller det han gillar och tar bort resten med ett tryck.",
     svg: () => `${ground}${fig(130, 392, { name: "Erik", c: "--sage", act: "phone" })}
-      ${card(230, 40, 380, 270)}<text class="t" x="254" y="76">Tis 26 okt</text><text class="mid" x="254" y="106">Hamburg</text>
+      ${card(230, 40, 380, 270)}<text class="t" x="254" y="76">Tis 26 okt</text><text class="mid" x="254" y="106">Hagenbeck och hamnrundtur</text>
       ${sug(250, 128, 340, "10.00", "Tierpark Hagenbeck", .5)}${sug(250, 180, 340, "15.30", "Hamnrundtur med båt", 1)}
-      ${doneMark(566, 148, 2.4, 13)}${doneMark(566, 200, 3.6, 13)}
-      <g class="pop" style="animation-delay:4.4s"><rect x="250" y="240" width="340" height="40" rx="10" style="fill:var(--card);stroke:var(--line);stroke-width:2"/>
-        <text class="tm" x="262" y="265">Nu i planen och i Önska</text></g>
+      ${doneMark(566, 148, 3.4, 13)}${doneMark(566, 200, 4.4, 13)}
+      <g class="pop" style="animation-delay:5.2s"><rect x="250" y="240" width="340" height="40" rx="10" style="fill:var(--card);stroke:var(--line);stroke-width:2"/>
+        <text class="tm" x="262" y="265">Behållet, AI-märket är borttaget</text></g>
       ${fig(680, 392, { name: "Olle", s: .72, c: "--acct", act: "cheer" })}${fig(745, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
   { chap: "Ni bestämmer", title: "AI:n föreslår, ni bestämmer",
-    text: "AI:n föreslår, ni bestämmer. Inget förslag läggs till förrän någon tar med det. Resenärernas namn byts mot ålder, och bokningsnummer, mejl och telefonnummer skickas aldrig till AI-tjänsten.",
+    text: "Ni bestämmer. Det AI:n lägger in när resan skapas är märkt och kan tas bort, och Ångra tar tillbaka allt. Senare förslag läggs inte in förrän någon tar med dem. Resenärernas namn byts mot ålder, och bokningsnummer, mejl och telefonnummer skickas aldrig till AI-tjänsten.",
     svg: () => `${ground}${fig(110, 392, { name: "Anna", act: "point" })}${fig(700, 392, { name: "Erik", c: "--sage", wave: true })}
-      ${doneMark(300, 120, .5, 40)}<text class="t rise" style="animation-delay:.8s" x="300" y="190" text-anchor="middle">Ta med</text>
+      ${doneMark(300, 120, .5, 40)}<text class="t rise" style="animation-delay:.8s" x="300" y="190" text-anchor="middle">Behåll</text>
       <g transform="translate(500 120)"><g class="pop" style="animation-delay:1s"><circle r="40" style="fill:var(--card);stroke:var(--line);stroke-width:2.5"/>
         <path d="M-14 -14 L14 14 M14 -14 L-14 14" style="stroke:var(--mute)" stroke-width="4" stroke-linecap="round"/></g></g>
-      <text class="t rise" style="animation-delay:1.3s" x="500" y="190" text-anchor="middle">Avvisa</text>
+      <text class="t rise" style="animation-delay:1.3s" x="500" y="190" text-anchor="middle">Ta bort</text>
       <g class="rise" style="animation-delay:2s">${card(230, 240, 340, 96)}
         <rect x="252" y="270" width="96" height="36" rx="18" style="fill:var(--acc);opacity:.22"/><text class="t" x="300" y="294" text-anchor="middle">Olle</text>
         <path class="dash" d="M362 288 h50"/><path d="M412 280 l12 8 l-12 8" fill="none" style="stroke:var(--mute)" stroke-width="2.5"/>

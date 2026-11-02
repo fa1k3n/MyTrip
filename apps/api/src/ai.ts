@@ -34,7 +34,7 @@ export type AiHelper = {
   known(t: Trip): string[]; // what the trip already has, never suggested again
   textOf(op: Op): string; // a suggestion's text, to compare with what is known
   finish(op: Op): Op; // the suggestion as stored, e.g. marked as AI-generated
-  group?(ops: Op[]): Op[][]; // the changes that make one suggestion, its main change first (AI-77); one each when missing
+  group?(ops: Op[], t?: Trip): Op[][]; // the changes that make one suggestion, its main change first (AI-77); one each when missing
 };
 export type AiCost = { inputTokens: number; outputTokens: number; searches: number; usd: number };
 export type AiResult = ({ ops: Op[]; reason: string } | { error: "refusal" | "no proposal" | "failed" }) & { cost: AiCost };
@@ -62,7 +62,7 @@ export function aiView(t: Trip) {
     title: txt(t.title), purpose: txt(t.purpose), timezone: t.timezone, currency: t.currency,
     travelers: t.travelers.map((x, i) => ({ ref: `r${i + 1}`, who: label(x) })),
     days: t.days.map((d) => ({
-      id: d.id, date: d.date, title: txt(d.title), summary: txt(d.summary), location: txt(d.location), country: d.country, start: d.start, end: d.end,
+      id: d.id, date: d.date, title: txt(d.title), aiTitle: d.aiTitle, summary: txt(d.summary), location: txt(d.location), country: d.country, start: d.start, end: d.end,
       legs: d.legs.map((l) => ({ vehicle: l.vehicle, origin: txt(l.origin), destination: txt(l.destination), departure: l.departure, durationMin: l.durationMin })),
       activities: d.activities.map((a) => ({
         id: a.id, text: txt(a.text), note: txt(a.note), start: a.start, end: a.end, durationMin: a.durationMin, category: a.category,

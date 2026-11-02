@@ -89,6 +89,7 @@ export function saveDay(t: Trip, input: DayInput, id?: string): Result {
     date: input.date, title: input.title.trim(), summary: input.summary.trim(), icons,
     start: input.start, end: input.end, estimated: false,
     startEstimated: input.startEstimated, endEstimated: input.endEstimated, location,
+    aiTitle: old?.aiTitle && old.title === input.title.trim() ? true : undefined, // a changed title is the person's own (AI-86)
     weather: input.weather === undefined ? old?.weather : input.weather ?? undefined,
     country: input.country === undefined ? old?.country : input.country ?? undefined,
   });

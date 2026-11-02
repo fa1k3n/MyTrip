@@ -34,6 +34,7 @@ export const Day = z.object({
   estimated: z.boolean().default(false), // both ends; startEstimated/endEstimated mark one end (TM-06)
   startEstimated: z.boolean().optional(), endEstimated: z.boolean().optional(),
   location: z.string().optional(), // where the day is mostly spent (WX-01)
+  aiTitle: z.boolean().optional(), // the title is the AI service's and may be replaced by it, until a person changes it (AI-86)
   weather: z.object({ lat: z.number(), lon: z.number() }).optional(),
   country: z.string().regex(/^[A-Z]{2}$/).optional(), // from the same lookup as `weather`, for the currency of expenses (UP-24)
   legs: z.array(Leg).default([]),

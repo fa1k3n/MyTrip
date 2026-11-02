@@ -42,7 +42,7 @@ const tidyDay = (o: Op): Op => {
   const v = valueOf(o), legs = Array.isArray(v.legs) ? (v.legs as { vehicle?: unknown }[]) : [];
   const icons = (Array.isArray(v.icons) ? v.icons : []).map(String).filter((x) => DAY_ICONS.includes(x)).slice(0, 2);
   const fallback = legs.map((l) => String(l.vehicle)).find((x) => DAY_ICONS.includes(x)) ?? "Resa";
-  return { ...o, value: { ...v, icons: icons.length ? icons : [fallback] } };
+  return { ...o, value: { ...v, icons: icons.length ? icons : [fallback], aiTitle: true } }; // AI-86
 };
 
 /** A draft of a new trip from "Beskriv din dröm", the trip's purpose: title, travelers and days, as one proposal (AI-10). */
@@ -56,7 +56,8 @@ Add one day per date with where it is spent, and the legs between places with th
 Respect limits the description gives, such as hours of driving per day, and mention them in the day's summary.
 Do not add activities, bookings or wishes: the family adds those themselves.`,
   task: `Propose the draft: set title; add travelers/- for each traveler as { id, name, age?, packing: [] };
-add days/- for each day as { id, date: "YYYY-MM-DD", title, summary (one Swedish sentence without clock times),
+add days/- for each day as { id, date: "YYYY-MM-DD", title (a short Swedish title of at most 40 characters saying what the day holds, its travel and
+what it is about, for example "Färjan till Rostock" or "Lugn dag vid Alster"; never only the town's name or "Transport mot <town>"), summary (one Swedish sentence without clock times),
 icons (one or two of exactly these ids, never emoji: ${DAY_ICONS.join(", ")}; the means of transport on travel days, otherwise what the day is mostly about, or Resa),
 start: "09:00", end: "18:00", location (the town), legs: [{ vehicle: car|ferry|train|transit|walk, origin, destination, durationMin? }], activities: [] };
 and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place.`,
@@ -66,7 +67,7 @@ and add stops/- for the timeline as { label (the town), sub (a few words), dayId
 };
 
 const WISH_CATEGORIES = ["Mat", "Utsikt", "Aktivitet", "Avkoppling", "Museum", "Bad", "Shopping", "Natur"];
-const ON_DAY = /^days\/\d+\/activities\/-$/;
+const ON_DAY = /^days\/\d+\/activities\/-$/, TITLE = /^days\/(\d+)\/title$/;
 /** Förslag på önskningar: real places that suit the trip, each with an activity on a day that fits it (AI-71, AI-77). */
 const wishes: AiFeature = {
   area: "suggestions", web: true,
@@ -81,8 +82,10 @@ then add days/<index>/activities/- on the day it fits, with { id, text (a short 
 category (the same), start (HH:MM, estimated), durationMin (a sensible length), travel: { vehicle: walk|transit|car|train|ferry, durationMin } };
 then add places/- with { id, name, address (street, postcode and town), website (its official page), phone (when found),
 notes (opening hours on those dates and other practical facts in one or two Swedish sentences, when found) }.
-List the day's suggestions in the order of their start times.`,
-  allows: (o) => o.op === "add" && (o.path === "dreams/-" || o.path === "places/-" || ON_DAY.test(o.path)),
+List the day's suggestions in the order of their start times.
+For each day you put activities on whose aiTitle is true, also set days/<index>/title to a short Swedish title of at most 40 characters that sums up
+the day's activities and travel, for example "Hagenbeck och hamnrundtur"; never only the town's name.`,
+  allows: (o) => (o.op === "add" && (o.path === "dreams/-" || o.path === "places/-" || ON_DAY.test(o.path))) || (o.op === "set" && TITLE.test(o.path)),
   tidy: (o) => (o.path === "dreams/-" ? { ...o, value: { source: "AI-hjälpen", icon: "✨", votes: 0, ...valueOf(o) } }
     : ON_DAY.test(o.path) ? { ...o, value: { estimated: true, ...valueOf(o) } } : o),
   helper: {
@@ -94,11 +97,21 @@ List the day's suggestions in the order of their start times.`,
     textOf: (o) => String(valueOf(o).title ?? valueOf(o).text ?? ""),
     finish: (o) => (o.path === "dreams/-" ? { ...o, value: { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } }
       : ON_DAY.test(o.path) ? { ...o, value: { ...valueOf(o), estimated: true, ai: true } } : o),
-    group: (ops) => ops.filter((o) => o.path === "dreams/-").flatMap((w) => { // a wish without its activity is no whole suggestion; its place goes with it (AI-81)
-      const a = ops.find((o) => ON_DAY.test(o.path) && valueOf(o).dreamId === valueOf(w).id);
-      const ids = (a && Array.isArray(valueOf(a).placeIds) ? valueOf(a).placeIds as unknown[] : []).map(String);
-      return a ? [[w, a, ...ops.filter((o) => o.path === "places/-" && ids.includes(String(valueOf(o).id)))]] : [];
-    }),
+    group: (ops, t) => {
+      const titled = new Set<string>(); // a day's new title goes with its first suggestion, only for a day with an AI title (AI-86)
+      const title = (a: Op) => {
+        const day = /^days\/(\d+)\//.exec(a.path)![1]!, o = ops.find((x) => TITLE.exec(x.path)?.[1] === day);
+        const v = typeof o?.value === "string" ? o.value.trim() : "";
+        if (!o || titled.has(day) || !t?.days[Number(day)]?.aiTitle || !v || v.length > 40) return [];
+        titled.add(day);
+        return [{ ...o, value: v }];
+      };
+      return ops.filter((o) => o.path === "dreams/-").flatMap((w) => { // a wish without its activity is no whole suggestion; its place goes with it (AI-81)
+        const a = ops.find((o) => ON_DAY.test(o.path) && valueOf(o).dreamId === valueOf(w).id);
+        const ids = (a && Array.isArray(valueOf(a).placeIds) ? valueOf(a).placeIds as unknown[] : []).map(String);
+        return a ? [[w, a, ...ops.filter((o) => o.path === "places/-" && ids.includes(String(valueOf(o).id))), ...title(a)]] : [];
+      });
+    },
   },
 };
 

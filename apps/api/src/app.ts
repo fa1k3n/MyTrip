@@ -971,12 +971,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (h) { // AI-70: nothing the trip has or the travelers rejected, each suggestion with ids of its own; AI-77: a wish and its activity together
       const taken = new Set([...allIds(t), ...own.flatMap((p) => p.ops.map((o) => String((o.value as { id?: unknown })?.id)))]);
       const textOf = (g: Op[]) => h.textOf(g[0]!);
-      groups = (h.group ?? ((xs: Op[]) => xs.map((o) => [o])))(ops.map(h.finish))
+      groups = (h.group ?? ((xs: Op[]) => xs.map((o) => [o])))(ops.map(h.finish), t)
         .filter((g, i, all) => !avoid.some((x) => sameSuggestion(x, textOf(g))) && all.findIndex((y) => sameSuggestion(textOf(y), textOf(g))) === i)
         .map((g) => {
           const ids = new Map<string, string>();
-          for (const o of g) { const v = o.value as { id: string }; let id = v.id; for (let n = 2; taken.has(id); n++) id = `${v.id}-${n}`; taken.add(id); ids.set(v.id, id); }
-          return g.map((o) => { const v = o.value as { id: string; dreamId?: string; placeIds?: string[] }; // the links inside a suggestion follow its new ids (AI-77, AI-81)
+          const own = (o: Op) => !!o.value && typeof o.value === "object" && "id" in o.value; // not a set title (AI-86)
+          for (const o of g.filter(own)) { const v = o.value as { id: string }; let id = v.id; for (let n = 2; taken.has(id); n++) id = `${v.id}-${n}`; taken.add(id); ids.set(v.id, id); }
+          return g.map((o) => { if (!own(o)) return o; const v = o.value as { id: string; dreamId?: string; placeIds?: string[] }; // the links inside a suggestion follow its new ids (AI-77, AI-81)
             return { ...o, value: { ...v, id: ids.get(v.id)!, ...(v.dreamId && ids.has(v.dreamId) ? { dreamId: ids.get(v.dreamId) } : {}),
               ...(Array.isArray(v.placeIds) ? { placeIds: v.placeIds.map((x) => ids.get(x) ?? x) } : {}) } }; });
         });

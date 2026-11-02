@@ -4,11 +4,15 @@ import { tripChanges, type Change } from "./changes.ts";
 import { sv } from "./sv.ts";
 export { previewMarks, tripChanges, type Change, type Mark } from "./changes.ts";
 
-export type Pending = { id: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string; source?: { kind: string } };
+export type Pending = { id: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string; source?: { kind: string; feature?: string; item?: boolean } };
+type Sourced = { status: string; source?: { kind: string; feature?: string; item?: boolean } };
 
-/** The pending proposals to review in Nåla; mail stays under Bokningar (MC-15, BK-17). */
-export const llmProposals = <P extends { status: string; source?: { kind: string } }>(list: P[]) =>
-  list.filter((p) => p.status === "pending" && p.source?.kind !== "mail");
+/** The pending proposals to review in Nåla; mail stays under Bokningar, a helper's suggestions in their list (MC-15, BK-17, AI-70). */
+export const llmProposals = <P extends Sourced>(list: P[]) =>
+  list.filter((p) => p.status === "pending" && p.source?.kind !== "mail" && !p.source?.item);
+/** A helper's pending suggestions, one proposal each (AI-70). */
+export const aiSuggestions = <P extends Sourced>(list: P[], feature: string) =>
+  list.filter((p) => p.status === "pending" && p.source?.kind === "ai" && p.source.item && p.source.feature === feature);
 
 /** A proposal applied to the trip as it is now: the result, its problems (schema and checkTrip) and its changes (MC-16, MC-18). */
 export function readProposal(t: Trip, p: Pending): { stale: boolean; problems: string[]; next?: Trip; changes: Change[] } {

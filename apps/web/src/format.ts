@@ -126,3 +126,16 @@ export function capValue(s: string): number | undefined | null {
 export const aiCostLine = (p: { name: string; calls: number; usd: number }) => sv.aiRun.cost(p.name, p.calls, p.usd.toFixed(2).replace(".", ","));
 /** Who agreed to send the trip to the AI service, and when (AI-64); "user" is the admin password. */
 export const aiConsentLine = (c: { by: string; at: string }) => sv.aiRun.consentBy(c.by === "user" ? sv.aiRun.admin : c.by, shortDate(c.at.slice(0, 10)));
+
+/** Next to a helper's switch: its latest run in the trip's time zone, and about how many runs are left (AI-68, AI-72). */
+export function helperLine(s: { at?: string; result?: string; remaining: number }, tz: string) {
+  const r = sv.aiRun;
+  if (s.result === "cap" || s.remaining <= 0) return r.capped;
+  const left = r.left(s.remaining);
+  if (!s.at) return `${r.never} · ${left}`;
+  const d = new Date(s.at);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const time = new Intl.DateTimeFormat("sv-SE", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(d);
+  const when = `${dayMonth(day)} ${time}`;
+  return `${s.result === "error" ? r.failed(when) : r.last(when) + (s.result === "nothing" ? r.nothing : "")} · ${left}`;
+}

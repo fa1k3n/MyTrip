@@ -57,7 +57,11 @@ export const Booking = z.object({
   placeId: Id.optional(), note: z.string().optional(),
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)
 });
-export const Task = z.object({ id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional(), hidden: z.boolean().optional() }); // hidden: AU-30
+export const Task = z.object({
+  id: Id, text: z.string().min(1), done: z.boolean(), due: Date_.optional(), placeId: Id.optional(), hidden: z.boolean().optional(), // hidden: AU-30
+  url: z.string().url().regex(/^https?:\/\//).optional(), // where the rule or fact comes from (AI-70)
+  ai: z.boolean().optional(), // suggested by the AI service: shown as such, with the note to verify it (AI-02, PI-04)
+});
 export const Traveler = z.object({
   id: Id, name: z.string().min(1), age: z.number().int().optional(), packing: z.array(z.string()),
   shares: z.boolean().optional(), // false: not among those who share an expense shared by all, e.g. a child (MI-38)
@@ -115,6 +119,7 @@ export const Trip = z.object({
   wishInbox: z.string().email().optional(), // the address whose mail becomes wishes (DB-21)
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
+  aiHelpers: z.record(z.string(), z.boolean()).optional(), // the AI helpers turned on for the trip, e.g. { prep: true } (AI-68)
   aiConsent: z.object({ by: z.string().min(1), at: z.string().datetime() }).optional(), // who agreed to send the trip to the AI service, and when (AI-64)
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)

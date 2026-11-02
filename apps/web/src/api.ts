@@ -158,8 +158,10 @@ export type FeedbackNote = { id: string; at: string; name: string; text: string;
 export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
   people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[]; // US-29
   ai?: { name: string; calls: number; usd: number }[] }; // AI-03
+/** A helper on a trip: whether it can run and is on, its latest run and about how many runs are left (AI-68, AI-72). */
+export type HelperStatus = { available: boolean; on: boolean; at?: string; result?: string; remaining: number };
 /** How an AI feature went: a proposal (or none worth making), or why it did not run (AI-03, AI-64, AI-65). */
-export type AiStart = { ok: true; proposalId: string | null; reason: string } | { ok: false; error: string; scope?: string };
+export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string } | { ok: false; error: string; scope?: string };
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
@@ -175,12 +177,13 @@ export const api = {
   ai: async (tripId: string, feature: string): Promise<AiStart> => { // AI-65: the server's reason is kept, unlike call()
     try {
       const r = await fetch(`${trip(tripId)}/ai/${encodeURIComponent(feature)}`, { method: "POST", headers: headers() });
-      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; reason?: string; error?: string; scope?: string };
-      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, reason: b.reason ?? "" }
+      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; proposalIds?: string[]; reason?: string; error?: string; scope?: string };
+      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, proposalIds: b.proposalIds ?? (b.proposalId ? [b.proposalId] : []), reason: b.reason ?? "" }
         : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
     } catch { return { ok: false, error: "network" }; }
   },
-  aiConsent: (tripId: string) => call<{ revision: number }>(`${trip(tripId)}/ai/consent`, { method: "POST" }), // AI-64
+  aiStatus: (tripId: string) => call<{ consent: boolean; helpers: Record<string, HelperStatus> }>(`${trip(tripId)}/ai`), // AI-68, AI-72
+  aiConsent: (tripId: string, helper?: string) => call<{ revision: number }>(`${trip(tripId)}/ai/consent`, { method: "POST", body: JSON.stringify(helper ? { helper } : {}) }), // AI-64, AI-68
   users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12
   addUser: (name: string, email: string) => call<{ user: UserInfo; setup: SetupLink }>("/api/users", { method: "POST", body: JSON.stringify({ name, email }) }),
   changeUser: (id: string, patch: Partial<Pick<UserInfo, "disabled" | "superuser" | "ai">>) => call<UserInfo>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),

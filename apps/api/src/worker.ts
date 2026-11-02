@@ -5,18 +5,25 @@ import { createApp } from "./app.ts";
 import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
 import { receiveMail } from "./mail.ts";
 import { googleOf } from "./users.ts";
-import { anthropicCall } from "./ai.ts";
+import { anthropicCall, CLOCK_DELAY_MS } from "./ai.ts";
+// The entry module exports only handlers and Durable Object classes; the runtime rejects anything else.
 
 export type WorkerEnv = {
   DB: D1Like; IMAGES?: R2Like; ASSETS?: { fetch(r: Request): Promise<Response> };
   // Secrets (wrangler secret put …), never in the configuration or a repository (DP-07).
   TRIP_READ_TOKEN?: string; TRIP_PROPOSE_TOKEN?: string; TRIP_ADMIN_TOKEN?: string;
   ADMIN_PASSWORD?: string; SESSION_KEY?: string; ROUTES_API_KEY?: string; AI_API_KEY?: string;
+  AI_GATEWAY_TOKEN?: string; // Cloudflare AI Gateway with Unified Billing (AI-73); the gateway's address is AI_GATEWAY_URL
+  AI_GATEWAY_URL?: string; // https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/anthropic
+  AI_CLOCK?: ClockNamespace; // one timer per trip for the AI helpers (AI-69), the Durable Object AiClock
   GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; // Google login (US-10)
   VAPID_KEY?: string; // the private VAPID key as a JWK, for notices (NT-05)
   TRAFFIC_DELAY_MIN?: string;
   INBOX_DOMAIN?: string; // the domain whose mail Cloudflare Email Routing sends to this Worker (BK-14)
 };
+/** The parts of a Durable Object namespace and state the timer uses. */
+type ClockNamespace = { idFromName(name: string): unknown; get(id: unknown): { fetch(r: Request | string, init?: RequestInit): Promise<Response> } };
+type ClockState = { storage: { get<T>(key: string): Promise<T | undefined>; put(key: string, value: unknown): Promise<void>; setAlarm(at: number): Promise<void> } };
 /** The parts of an incoming mail the Worker uses (Cloudflare Email Routing). */
 export type IncomingMail = { to: string; raw: ReadableStream; setReject(reason: string): void };
 
@@ -26,6 +33,10 @@ const REJECT = {
   "no title": "The mail needs a subject", invalid: "The mail could not be added",
 };
 
+/** The AI service: through the gateway when it is configured (AI-73), else with an Anthropic key (AI-03). */
+const aiOf = (env: WorkerEnv) => (env.AI_GATEWAY_URL && env.AI_GATEWAY_TOKEN ? anthropicCall({ gateway: { url: env.AI_GATEWAY_URL, token: env.AI_GATEWAY_TOKEN } })
+  : env.AI_API_KEY ? anthropicCall({ apiKey: env.AI_API_KEY }) : undefined);
+
 // One app per set of bindings, kept while the Worker instance lives; state that must last is in D1.
 const apps = new WeakMap<WorkerEnv, ReturnType<typeof createApp>>();
 const appFor = (env: WorkerEnv) => {
@@ -33,13 +44,32 @@ const appFor = (env: WorkerEnv) => {
   if (!app) {
     const tokens = { read: env.TRIP_READ_TOKEN ?? "", propose: env.TRIP_PROPOSE_TOKEN ?? "", admin: env.TRIP_ADMIN_TOKEN ?? "" };
     app = createApp(d1Store(env.DB, env.IMAGES), tokens, {
-      aiService: !!env.AI_API_KEY, ...(env.AI_API_KEY ? { ai: { call: anthropicCall(env.AI_API_KEY) } } : {}), routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
+      aiService: !!aiOf(env), ...(aiOf(env) ? { ai: { call: aiOf(env)! } } : {}), routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
       auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY, google: googleOf(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET) }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN,
+      onChange: env.AI_CLOCK ? async (id) => { // AI-69: move the trip's timer
+        const ns = env.AI_CLOCK!;
+        await ns.get(ns.idFromName(id)).fetch(`https://clock/${encodeURIComponent(id)}`, { method: "POST" });
+      } : undefined,
     });
     apps.set(env, app);
   }
   return app;
 };
+
+/** One per trip: each change moves the alarm ahead, and the alarm runs the trip's AI helpers (AI-69). */
+export class AiClock {
+  state: ClockState; env: WorkerEnv;
+  constructor(state: ClockState, env: WorkerEnv) { this.state = state; this.env = env; }
+  async fetch(req: Request): Promise<Response> {
+    await this.state.storage.put("trip", decodeURIComponent(new URL(req.url).pathname.slice(1)));
+    await this.state.storage.setAlarm(Date.now() + CLOCK_DELAY_MS);
+    return new Response(null, { status: 204 });
+  }
+  async alarm(): Promise<void> {
+    const id = await this.state.storage.get<string>("trip");
+    if (id) await appFor(this.env).aiTick(id);
+  }
+}
 
 export default {
   fetch(req: Request, env: WorkerEnv, ctx?: Parameters<ReturnType<typeof createApp>["fetch"]>[2]): Promise<Response> | Response {

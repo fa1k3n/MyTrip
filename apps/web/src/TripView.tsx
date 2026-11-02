@@ -229,7 +229,7 @@ export function TripView(p: TripViewProps) {
           editing={!preview && perms.view.nala.plan === "write"} />
       ))}</div>
       <div><Suspense fallback={null}>
-        <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} parts={perms.view.nala} wishes={perms.view.dr.dreams !== "hidden"} />
+        <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} parts={perms.view.nala} wishes={perms.view.dr.dreams !== "hidden"} review={reviews ? p.review : undefined} />
       </Suspense></div>
     </div>
   </>;

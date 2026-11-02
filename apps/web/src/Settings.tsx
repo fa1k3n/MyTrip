@@ -1,9 +1,11 @@
 // The app settings under the gear on Drömmar: AI for all trips (AI-06..AI-09), and the API key and image cache for the superuser (MT-13).
-import { useState } from "react";
-import { CAP_ACCOUNT_USD, CAP_USD, type AiArea, type Settings } from "@trip/schema";
-import { api, maskedToken } from "./api.ts";
+import { useEffect, useState } from "react";
+import { CAP_ACCOUNT_USD, CAP_USD, type AiArea, type Op, type Settings, type Trip } from "@trip/schema";
+import { api, maskedToken, type HelperStatus } from "./api.ts";
+import { IconButton } from "./Icons.tsx";
+import { startAi } from "./aiStart.ts";
 import { sv } from "./sv.ts";
-import { aiConsentLine, capValue } from "./format.ts";
+import { aiConsentLine, capValue, helperLine } from "./format.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { Users } from "./Users.tsx";
 import { BetaNotes, BetaUsage } from "./Beta.tsx";
@@ -30,6 +32,40 @@ export function TripAi({ s, on, consent, onChange, openSettings }: { s: Settings
       {consent && <p className="ro note">{aiConsentLine(consent)}</p>}
     </div>
   );
+}
+
+/** The trip's AI helpers for those who plan it: a switch each, a "Kör nu" button, the latest run and the runs left (AI-68, AI-72).
+ * Turning one on asks for the agreement first when the trip has none (AI-64). */
+export function AiHelpers({ t, change, reload }: { t: Trip; change: (ops: Op[], reason: string) => void | Promise<unknown>; reload: () => void | Promise<unknown> }) {
+  const [st, setSt] = useState<Record<string, HelperStatus> | null>(null);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const refresh = () => api.aiStatus(t.id).then((r) => setSt(r.helpers), () => setSt(null));
+  useEffect(() => { void refresh(); }, [t.id, t.revision]); // eslint-disable-line react-hooks/exhaustive-deps -- again after each change
+  const shown = Object.entries(st ?? {}).filter(([, h]) => h.available);
+  if (!shown.length) return null;
+  const runNow = async (name: string) => {
+    setBusy(name); setMsg("");
+    const r = await startAi(t.id, name);
+    if (r) setMsg("message" in r ? r.message : sv.aiRun.ran(r.proposalIds.length));
+    setBusy(""); void refresh();
+  };
+  const flip = async (name: string, on: boolean) => {
+    setMsg("");
+    if (on && !t.aiConsent) {
+      if (!(await ask(sv.aiRun.consentAsk, { ok: sv.aiRun.consentOk, details: sv.aiRun.consentDetails }))) return;
+      try { await api.aiConsent(t.id, name); } catch { setMsg(sv.aiRun.errors.network); return; }
+      await reload(); // the agreement and the switch came in one change
+    } else await change([{ op: "set", path: "aiHelpers", value: { ...t.aiHelpers, [name]: on } }], `ai helper ${name} ${on ? "on" : "off"}`);
+    if (on) await runNow(name);
+  };
+  return <div className="card"><h3>{sv.aiRun.helpersTitle}</h3><p className="ro note">{sv.aiRun.helpersLead}</p>
+    {shown.map(([name, h]) => { const [label, tip] = sv.aiRun.helpers[name] ?? [name, ""]; return <div key={name}>
+      <div className="row mid"><Switch id={`helper-${name}`} label={label} tip={tip} checked={h.on} onChange={(on) => void flip(name, on)} />
+        <IconButton icon="refresh" look="bare" tip="left" label={sv.aiRun.runNow(label)} disabled={!!busy} onClick={() => void runNow(name)} /></div>
+      <p className="ro note" role="status">{busy === name ? sv.loading : helperLine(h, t.timezone)}</p></div>; })}
+    {msg && <p className="ro note" role="status">{msg}</p>}
+  </div>;
 }
 
 export function AiSettings({ s, service, onChange }: { s: Settings; service: boolean; onChange: (next: Settings) => void }) {

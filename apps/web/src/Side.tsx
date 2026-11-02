@@ -13,6 +13,10 @@ import { Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
+import { aiSuggestions, type Pending } from "./proposals.ts";
+
+/** Approving and rejecting proposals, for those who review them (MC-18, AI-70). */
+type Review = { approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void> };
 import { categoryIcon } from "./categories.ts";
 import { CatIcon } from "./CatIcon.tsx";
 import { byVotes, plannedWishes } from "./wishes.ts";
@@ -113,10 +117,38 @@ function Bookings({ t, edit, onPlace, part }: { part: MayOf; t: Trip; edit: (d: 
   );
 }
 
-function Tasks({ t, today, edit, run, onPlace, part, tick }: { part: MayOf; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void; tick: boolean }) {
+/** A helper's pending suggestions, read again after each change of the trip (AI-70). */
+function useAiSuggestions(t: Trip, may: boolean, feature: string) {
+  const [list, setList] = useState<Pending[]>([]);
+  useEffect(() => {
+    if (!may) { setList([]); return; }
+    let live = true;
+    api.proposals(t.id).then((ps) => { if (live) setList(aiSuggestions(ps as unknown as Pending[], feature)); }, () => {});
+    return () => { live = false; };
+  }, [t, may, feature]);
+  return list;
+}
+
+/** AI-70: a suggested task, marked as AI, with its source, to take into the tasks or reject. */
+function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (err: string | null) => void }) {
+  const v = (p.ops[0]?.value ?? {}) as { text?: string; due?: string; url?: string };
+  const text = v.text ?? "";
+  return <div className="row mid todo">
+    <span><span className="badge">{sv.aiRun.suggestion}</span>{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
+      {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}</span>
+    <span className="end">
+      <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => done(await review.approve(p.id))} />
+      <IconButton icon="close" look="bare" tip="left" label={sv.aiRun.reject(text)} onClick={async () => { await review.reject(p.id); done(null); }} />
+    </span>
+  </div>;
+}
+
+function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: MayOf; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void; tick: boolean; review?: Review }) {
+  const suggested = useAiSuggestions(t, !!review && part("tasks"), "prep");
+  const [err, setErr] = useState<string | null>(null);
   return (
     <Section title={sv.todo} may={part("tasks")}>
-      {!t.tasks.length && <p className="ro">{sv.noTasks}</p>}
+      {!t.tasks.length && !suggested.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
           <label className="check">
@@ -124,11 +156,15 @@ function Tasks({ t, today, edit, run, onPlace, part, tick }: { part: MayOf; t: T
             <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
+              {k.ai && <small className="ro"> · {sv.aiRun.verify}</small>}
+              {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}
               {isOverdue(k, today) && <> <span className="badge late">{sv.overdue}</span></>}</span>
           </label>
           {!k.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${k.text}`} onClick={() => edit({ kind: "task", id: k.id })} mut />}
         </div>
       ))}
+      {review && suggested.map((p) => <Suggestion key={p.id} p={p} review={review} done={setErr} />)}
+      {err && <p className="err" role="alert">{err}</p>}
       <p className="ro note">{sv.tasksShared}</p>
       <div className="add"><IconButton icon="plus" label={sv.addTask} onClick={() => edit({ kind: "task" })} mut tip="right" /></div>
     </Section>
@@ -188,7 +224,8 @@ function Packing({ t, run, part, tick }: { part: MayOf; t: Trip; run: Run; tick:
 }
 
 /** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
-export default function Side({ t, today, edit, run, onPlace, parts, wishes }: {
+export default function Side({ t, today, edit, run, onPlace, parts, wishes, review }: {
+  review?: Review; // AI-70: for those who review proposals
   parts: Record<string, Level>; // the role's levels on Nåla's components (AU-20)
   wishes: boolean; // the role sees the wishes (DB-16)
   t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void;
@@ -198,7 +235,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes }: {
     {wishes && parts.plan === "write" && <Wishes t={t} edit={edit} />}
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
-    {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} />}
+    {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
     {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}
     {parts.packing !== "hidden" && <Packing part={part} t={t} run={run} tick={atLeast(parts.packing, "check")} />}
   </>;

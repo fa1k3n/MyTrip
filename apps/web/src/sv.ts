@@ -163,6 +163,14 @@ export const sv = {
     capHint: (all: number, one: number) => `När ett tak nås slutar appen fråga AI-tjänsten till nästa månad. Tomt fält: ${all} USD för appen, ${one} USD per person.`,
     capInvalid: "Skriv ett belopp, till exempel 5 eller 2,5.",
     cost: (name: string, calls: number, usd: string) => `${name}: ${calls} AI-anrop, ${usd} USD`, costTitle: "AI",
+    auto: "AI-hjälpen", // AI-69: who an automatic run is made by
+    helpersTitle: "AI-hjälp", helpersLead: "Påslagen hjälp körs av sig själv en stund efter att resan ändrats. Förslagen dyker upp i listan och läggs till först när du tar med dem.",
+    helpers: { prep: ["Bra att veta inför resan", "Föreslår regler, dokument och sånt som ska beställas i förväg längs hela resvägen, som uppgifter i Att göra."] } as Record<string, [string, string]>,
+    runNow: (name: string) => `Kör nu: ${name}`, ran: (n: number) => (n ? `${n} nya förslag.` : "Inget nytt att föreslå."),
+    never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
+    left: (n: number) => `ca ${n} ${n === 1 ? "körning" : "körningar"} kvar`, capped: "Taket för månaden är nått",
+    suggestion: "AI-förslag", take: (text: string) => `Lägg till: ${text}`, reject: (text: string) => `Avvisa: ${text}`,
+    verify: "AI · kontrollera", source: "Källa",
   },
   aiNoService: "Ingen AI-tjänst är kopplad till den här instansen. Inställningarna börjar gälla när en nyckel finns.",
   aiAreas: {

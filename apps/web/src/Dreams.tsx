@@ -3,9 +3,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
 import { categoryIcon } from "./categories.ts";
 import { sv } from "./sv.ts";
-import { IconButton, PlannedMark } from "./Icons.tsx";
+import { AiMark, IconButton, PlannedMark } from "./Icons.tsx";
 import { CatIcon, ICONS } from "./CatIcon.tsx";
-import { HiddenText, TextEye } from "./TripView.tsx";
+import { HiddenText, SuggestionActions, TextEye, type TripViewProps } from "./TripView.tsx";
+import type { WishSuggestion } from "./aiWishes.ts";
+import { dayLabel } from "./format.ts";
 import { api } from "./api.ts";
 import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
 
@@ -59,12 +61,30 @@ export function WishView({ t, id }: { t: Trip; id: string }) {
   </>;
 }
 
-export default function Dreams({ t, write, vote, addDream, editImage, open }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void }) {
+/** AI-71: the wish helper's suggestions in their own row, apart from the travelers' wishes: each with the day of its activity (AI-77),
+ * its source and buttons to take or reject it. */
+function Suggested({ t, list, review }: { t: Trip; list: WishSuggestion[]; review: NonNullable<TripViewProps["review"]> }) {
+  if (!list.length) return null;
+  return <section className="sugrow" aria-labelledby="sugrow-h">
+    <h2 id="sugrow-h"><AiMark />{sv.aiRun.wishRow}</h2>
+    <p className="ro note">{sv.aiRun.wishRowHint}</p>
+    <div className="dreams">{list.map((s, i) => { const day = t.days.find((d) => d.id === s.day); return (
+      <DreamCard key={s.id} t={t} d={s.wish} i={i} votes={false}>
+        <div className="sugmeta">{day && <small className="ro">{sv.aiRun.onDay(dayLabel(day.date))}</small>}
+          {s.wish.url && <small><a className="place" href={s.wish.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}</div>
+        <SuggestionActions id={s.id} text={s.wish.title} review={review} />
+      </DreamCard>); })}</div>
+  </section>;
+}
+
+export default function Dreams({ t, write, vote, addDream, editImage, open, suggestions = [], review }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void;
+  suggestions?: WishSuggestion[]; review?: TripViewProps["review"] }) {
   const planned = plannedWishes(t); // DB-19
   const [mail, setMail] = useState(false);
   return <>
     {t.wishInbox && <div className="dreambar"><IconButton icon="mail" look="bare" tip="left" label={sv.wish.mail.open} onClick={() => setMail(true)} /></div> /* DB-22 */}
     {mail && t.wishInbox && <WishMail address={t.wishInbox} close={() => setMail(false)} />}
+    {review && <Suggested t={t} list={suggestions} review={review} />}
     <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} planned={!d.hidden && planned.has(d.id)} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
       {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} /></div> /* DB-10 */}
     </DreamCard>)}</div>

@@ -31,7 +31,6 @@ const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login }
 const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
 const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
 const NewTripDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.NewTripDialog }))); // AI-10
-const DraftDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.DraftDialog }))); // AI-75
 const SetupPassword = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.SetupPassword }))); // US-05
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
@@ -41,10 +40,11 @@ import { CATEGORIES } from "./categories.ts";
 import { sv } from "./sv.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { newWish, toFill } from "./wishes.ts";
+import type { Drafted } from "./NewTrip.tsx";
 
 const filling = new Set<string>(); // wishes already sent for an automatic image on this page (DB-07)
 
-type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }; payer?: boolean; choices?: Choice[]; guess?: string } } | { kind: "payment" } | { kind: "person" } | { kind: "notices" } | { kind: "wishImage"; id: string } | EditDlg;
+type Dlg = null | { kind: "place"; id: string } | { kind: "transport"; dayId: string } | { kind: "dream" } | { kind: "expense"; short: { currency: string; activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }; payer?: boolean; choices?: Choice[]; guess?: string } } | { kind: "payment" } | { kind: "person"; id?: string } | { kind: "notices" } | { kind: "wishImage"; id: string } | EditDlg;
 const dlgTitle = { wishImage: sv.wish.find, dream: sv.newDream, expense: sv.newExpense, payment: sv.newPayment, person: sv.newPerson, notices: sv.notice.title };
 const ADDER_KEY = "mytrip.adder";
 const HINT_KEY = "mytrip.installHint";
@@ -97,7 +97,7 @@ export function App() {
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
   const [newOpen, setNewOpen] = useState(false); // AI-10: "Beskriv din dröm"
-  const [draft, setDraft] = useState<{ tripId: string; pid: string } | null>(null); // AI-75
+  const aiRun = useRef<{ tripId: string; ids: string[]; undone: boolean } | null>(null); // AI-79: the helpers' suggestions after a draft, rejected with its Ångra
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -110,7 +110,7 @@ export function App() {
   const [upDay, setUpDay] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
-  const [undo, setUndo] = useState<{ text: string; before: Trip; after: Trip } | null>(null); // ED-22: for 10 seconds after a change
+  const [undo, setUndo] = useState<{ text: string; before: Trip; after: Trip; draft?: boolean } | null>(null); // ED-22: for 10 seconds after a change; 30 for a draft (AI-78)
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
   const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -172,7 +172,7 @@ export function App() {
     return () => clearInterval(id);
   }, [load, me]);
   useEffect(() => { if (!notice) return; const id = setTimeout(() => setNotice(""), 6000); return () => clearTimeout(id); }, [notice]);
-  useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), 10000); return () => clearTimeout(id); }, [undo]);
+  useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), undo.draft ? 30000 : 10000); return () => clearTimeout(id); }, [undo]);
   const saveSettings = (next: Settings) => {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
     api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
@@ -228,13 +228,20 @@ export function App() {
   const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
   const newTrip = () => setNewOpen(true);
-  /** AI-10: with a draft the trip opens on Nåla with the draft in a dialog (AI-75). */
-  const created = async (id: string, msg?: string, pid?: string) => {
+  /** AI-10: a trip with its draft opens on Nåla with Ångra for the draft (AI-78); one without, on Drömmar. */
+  const created = async (id: string, msg?: string, drafted?: Drafted) => {
     setNewOpen(false);
     await load();
-    openTrip(id, pid ? "nala" : "dr");
-    if (pid) setDraft({ tripId: id, pid });
+    openTrip(id, drafted ? "nala" : "dr");
+    if (drafted) setUndo({ text: sv.newTripAi.drafted, ...drafted, draft: true });
     if (msg) setNotice(msg);
+  };
+  /** AI-79: a helper's suggestions after a draft are shown when they come, or rejected when the draft was undone meanwhile. */
+  const helperDone = (tripId: string, ids: string[]) => {
+    const r = aiRun.current?.tripId === tripId ? aiRun.current : (aiRun.current = { tripId, ids: [], undone: false });
+    if (r.undone) { ids.forEach((id) => void api.rejectMail(tripId, id).catch(() => {})); return; }
+    r.ids.push(...ids);
+    void load();
   };
   /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
   const draftAi = !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas.changes !== false;
@@ -270,7 +277,12 @@ export function App() {
     const u = undo;
     setUndo(null);
     if (!u) return;
-    try { await api.change(u.after, undoOps(u.before, u.after), "undo"); } catch { setNotice(sv.undo.failed); }
+    try { await api.change(u.after, undoOps(u.before, u.after), "undo"); } catch { setNotice(sv.undo.failed); await load(); return; }
+    if (u.draft) { // AI-78: the helpers' suggestions on the draft go with it, also those still to come (AI-79)
+      const r = aiRun.current?.tripId === u.after.id ? aiRun.current : (aiRun.current = { tripId: u.after.id, ids: [], undone: false });
+      r.undone = true;
+      await Promise.all(r.ids.splice(0).map((id) => api.rejectMail(u.after.id, id).catch(() => {})));
+    }
     await load();
   };
   /** Edits from the Nåla forms: the error text or null (ED-10). */
@@ -303,7 +315,7 @@ export function App() {
       await load();
       return r.result.problems?.length ? [sv.couldNotSave, ...r.result.problems].join(" ") : null;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) { await load(); return sv.proposal.stale; }
+      if (e instanceof ApiError && e.status === 409) { await load(); return e.problems.includes("day gone") ? sv.aiRun.dayGone : sv.proposal.stale; } // AI-77
       return [sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" ");
     }
   };
@@ -337,8 +349,8 @@ export function App() {
   const saveForm = async (kind: "expense" | "payment" | "person", form: HTMLFormElement) => {
     const f = new FormData(form), str = (k: string) => String(f.get(k) ?? "").trim();
     if (kind === "person") {
-      const name = str("name"); // the same traveler from Summera and the settings (MI-01, AU-26)
-      import("./edit.ts").then((m) => run((x) => m.addTraveler(x, name), "add traveler"));
+      const name = str("name"), id = dlg?.kind === "person" ? dlg.id : undefined; // the same traveler from Summera and the settings (MI-01, AU-26); a new name (AU-32)
+      import("./edit.ts").then((m) => run((x) => (id ? m.renameTraveler(x, id, name) : m.addTraveler(x, name)), id ? "rename traveler" : "add traveler"));
     } else if (kind === "expense") {
       const short = dlg?.kind === "expense" ? dlg.short : undefined, activity = short?.activity; // the short form (UP-22, UP-30, MI-13)
       const payer = self ?? (short?.payer ? str("paidBy") : adder()); // a personal link pays and adds in its own name; the superuser picks who paid in Summera (UP-13, AU-13)
@@ -417,7 +429,7 @@ export function App() {
   </>;
   else if (view === "admin") page = (
     <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      <AdminPage t={t} superuser={perms(t).superuser} manager={perms(t).manager} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} reload={load} run={run} removeTrip={removeTrip}
+      <AdminPage t={t} superuser={perms(t).superuser} manager={perms(t).manager} back={() => setView("trip")} edit={setDlg} addPerson={(id?: string) => setDlg({ kind: "person", id })} change={change} reload={load} run={run} removeTrip={removeTrip}
         openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
     </Suspense>
   );
@@ -447,9 +459,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
-    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, pid) => void created(id, msg, pid)} close={() => setNewOpen(false)} /></Suspense>}
-    {draft && view === "trip" && t?.id === draft.tripId && <Suspense fallback={null}><DraftDialog t={t} pid={draft.pid} approve={approveProposal} reject={rejectMail}
-      close={(later) => { setDraft(null); if (later) setNotice(sv.newTripAi.draftLater); }} /></Suspense>}
+    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} close={() => setNewOpen(false)} /></Suspense>}
     {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog
@@ -489,8 +499,8 @@ export function App() {
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
         <form key={JSON.stringify(dlg)} onSubmit={(e) => { e.preventDefault(); saveForm(dlg.kind, e.currentTarget); }}>
           {dlg.kind === "expense" && !dlg.short.activity && <small className="kicker">{sv.up.sheetKicker}</small> /* UP-42 */}
-          <h3>{dlg.kind === "expense" && dlg.short.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlgTitle[dlg.kind]}</h3>
-          {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus /></label>}
+          <h3>{dlg.kind === "expense" && dlg.short.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlg.kind === "person" && dlg.id ? sv.renamePerson : dlgTitle[dlg.kind]}</h3>
+          {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus defaultValue={dlg.id ? t?.travelers.find((x) => x.id === dlg.id)?.name : undefined} /></label>}
           {dlg.kind === "expense" && dlg.short.activity && <> {/* an activity's expense: amount, currency and a short description (UP-22, UP-30) */}
             <div className="two">
               <label>{sv.amount.replace(" (kr)", "")}<input name="amount" inputMode="decimal" autoFocus /></label>

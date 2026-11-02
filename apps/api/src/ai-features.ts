@@ -4,7 +4,9 @@ import type { AiFeature } from "./ai.ts";
 
 const valueOf = (o: Op) => (o.value && typeof o.value === "object" ? (o.value as Record<string, unknown>) : {});
 
-/** Bra att veta inför resan: rules, documents and things to order before the trip, as tasks (AI-70). */
+const isBooking = (o: Op) => o.path === "bookings/-";
+
+/** Bra att veta inför resan: rules, documents and things to order before the trip, as tasks (AI-70); what must be booked, as bookings to book (BK-21). */
 const prep: AiFeature = {
   area: "suggestions", web: true,
   instructions: `Your job: list what this family must know or do before this trip that is easy to miss.
@@ -12,19 +14,23 @@ Cover the whole route, including every country driven through: environmental zon
 road tolls, vignettes, bridge and tunnel fees, mandatory car equipment, ferry rules; documents (passports or id cards for children,
 consent for travelling with only one parent, the European health insurance card); things that must be booked or ordered in advance;
 and practical matters such as power plugs, currency and cash. Use web search to check current rules and give each one its official or best source.
-Leave out what does not apply to this trip, its means of transport or its travelers' ages. At most 10 tasks, the most important first.`,
+Leave out what does not apply to this trip, its means of transport or its travelers' ages. At most 10 tasks, the most important first.
+What must be booked ahead and is not among the trip's bookings yet (a hotel the description asks for, tickets, a ferry crossing, a table)
+is a booking to book, not a task: at most 4, only what the trip clearly needs.`,
   task: `Propose the tasks with add operations on tasks/-. Each task: { id, text, done: false, url, due? }. text: one short Swedish sentence
 saying what to do, for example "Beställ miljödekal (Umweltplakette) till bilen". url: the source. due: the last sensible day (YYYY-MM-DD)
-when it must be ordered or booked ahead, counted back from the trip's first day; leave it out otherwise.`,
-  allows: (o) => o.op === "add" && o.path === "tasks/-",
+when it must be ordered or booked ahead, counted back from the trip's first day; leave it out otherwise.
+Propose each booking to book with an add operation on bookings/-: { id, name (short Swedish name, for example "Hotell med pool i Hamburg"),
+kind: stay|ticket|transport|other, from and to (YYYY-MM-DD, days of the trip it is for), status: "tobook", url (where it is booked) }.`,
+  allows: (o) => o.op === "add" && (o.path === "tasks/-" || isBooking(o)),
   helper: {
     fingerprint: (t: Trip) => JSON.stringify({
       purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null),
       days: t.days.map((d) => [d.date, d.location ?? "", d.country ?? "", d.legs.map((l) => [l.vehicle, l.origin, l.destination])]),
     }),
-    known: (t: Trip) => t.tasks.map((k) => k.text),
-    textOf: (o) => String(valueOf(o).text ?? ""),
-    finish: (o) => ({ ...o, value: { ...valueOf(o), done: false, ai: true } }),
+    known: (t: Trip) => [...t.tasks.map((k) => k.text), ...t.bookings.map((b) => b.name)],
+    textOf: (o) => String(valueOf(o).text ?? valueOf(o).name ?? ""),
+    finish: (o) => ({ ...o, value: isBooking(o) ? { ...valueOf(o), status: "tobook", ai: true } : { ...valueOf(o), done: false, ai: true } }),
   },
 };
 
@@ -56,6 +62,36 @@ start: "09:00", end: "18:00", location (the town), legs: [{ vehicle: car|ferry|t
 and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place.`,
   allows: (o) => (o.op === "set" && o.path === "title") || (o.op === "add" && ["travelers/-", "days/-", "stops/-"].includes(o.path)),
   tidy: tidyDay,
+  applyToNew: true, // AI-78
 };
 
-export const FEATURES: Record<string, AiFeature> = { prep, draft };
+const WISH_CATEGORIES = ["Mat", "Utsikt", "Aktivitet", "Avkoppling", "Museum", "Bad", "Shopping", "Natur"];
+const ON_DAY = /^days\/\d+\/activities\/-$/;
+/** Förslag på önskningar: real places that suit the trip, each with an activity on a day that fits it (AI-71, AI-77). */
+const wishes: AiFeature = {
+  area: "suggestions", web: true,
+  instructions: `Your job: suggest 5 to 8 real places or activities that this family would love on this trip: follow what the purpose says they love,
+the places where the days are spent and the travelers' ages. Use web search to find real places that are open at the time of the trip, each with its official page.
+Put each on a day spent in or near the place, fitting the day's pace: nothing on a long travel day, at most two on a day, and not on a day that is already full.`,
+  task: `For each suggestion add two operations, the wish first:
+add dreams/- with { id, title (the place's name, short), category (one of ${WISH_CATEGORIES.join(", ")}), url (its official page) };
+then add days/<index>/activities/- on the day it fits, with { id, text (a short Swedish title), dreamId (the wish's id), category (the same),
+durationMin (a sensible length), start (HH:MM, only when the time matters, for example a show) }.`,
+  allows: (o) => o.op === "add" && (o.path === "dreams/-" || ON_DAY.test(o.path)),
+  tidy: (o) => (o.path === "dreams/-" ? { ...o, value: { source: "AI-hjälpen", icon: "✨", votes: 0, ...valueOf(o) } } : { ...o, value: { estimated: true, ...valueOf(o) } }),
+  helper: {
+    fingerprint: (t: Trip) => JSON.stringify({
+      purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null), places: t.places.map((p) => p.name),
+      days: t.days.map((d) => [d.date, d.location ?? ""]),
+    }),
+    known: (t: Trip) => t.dreams.map((w) => w.title),
+    textOf: (o) => String(valueOf(o).title ?? valueOf(o).text ?? ""),
+    finish: (o) => ({ ...o, value: o.path === "dreams/-" ? { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } : { ...valueOf(o), estimated: true } }),
+    group: (ops) => ops.filter((o) => o.path === "dreams/-").flatMap((w) => { // a wish without its activity is no whole suggestion
+      const a = ops.find((o) => ON_DAY.test(o.path) && valueOf(o).dreamId === valueOf(w).id);
+      return a ? [[w, a]] : [];
+    }),
+  },
+};
+
+export const FEATURES: Record<string, AiFeature> = { prep, wishes, draft };

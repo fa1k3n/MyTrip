@@ -64,7 +64,7 @@ export const sv = {
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
   payments: "Inbetalningar", addPayment: "Registrera inbetalning", newPayment: "Ny inbetalning", noPayments: "Inga inbetalningar ännu.",
   from: "Från", to: "Till", note: "Notering",
-  addPerson: "Lägg till person", newPerson: "Ny person", name: "Namn", noPeople: "Lägg till personerna som delar på kostnaderna.",
+  addPerson: "Lägg till person", newPerson: "Ny person", renamePerson: "Byt namn", renameTraveler: (n: string) => `Byt namn på ${n}`, name: "Namn", noPeople: "Lägg till personerna som delar på kostnaderna.",
   of: "av", badAmount: "Ange ett belopp större än noll, t.ex. 640,50.",
   budgetCategories: ["Boende", "Transport", "Mat", "Upplevelse", "Shopping", "Övrigt"], // MI-30
   expandAll: "Visa alla dagar", collapseAll: "Fäll ihop alla", travelTime: "restid på dagen",
@@ -144,13 +144,14 @@ export const sv = {
   newTripAi: { // AI-10
     title: "Ny resa", label: "Beskriv din dröm",
     example: "Vi vill åka till Hamburg på höstlovet med barnen, som är 7 och 10 år. Vi tar bilen och vill inte köra mer än fyra timmar om dagen. Barnen älskar djur och båtar, och vi vuxna vill äta gott och hinna med något museum. Gärna ett hotell med pool.",
-    aiNote: "Texten sparas som resans syfte. Den skickas som den är till AI-tjänsten Claude från Anthropic, som föreslår namn, datum, resenärer och dagar. Inget läggs in förrän du godkänner förslaget i Nåla.",
+    aiNote: "Texten sparas som resans syfte. Den skickas som den är till AI-tjänsten Claude från Anthropic, som lägger in namn, datum, resenärer och dagar och sedan föreslår aktiviteter och sånt som är bra att veta. Utkastet kan ångras, och förslagen tar du med eller avvisar.",
     note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
     makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI",
     working: "Skapar din resa…", busy: "AI-tjänsten gör ett utkast utifrån din beskrivning. Det tar upp till en minut.", seconds: (n: number) => `${n} s`, // AI-76
-    vehicles: { car: "bil", ferry: "färja", train: "tåg", transit: "kollektivt", walk: "till fots" } as Record<string, string>, // AI-75
-    draftTitle: "Utkast till resan", draftLead: "Så här föreslår AI-tjänsten att resan börjar. Du kan ändra allt efteråt.",
-    draftTravelers: "Resenärer", draftDays: "Dagar", useDraft: "Använd utkastet", emptyDraft: "Börja från tomt",
+    steps: { draft: "Skapar resa och rutt", prep: "Letar upp bra att veta inför resan", wishes: "Föreslår aktiviteter som passar" } as Record<string, string>,
+    stepState: { run: "pågår", done: "klart", failed: "misslyckades" },
+    background: "Resan är klar att öppna. Förslagen blir klara medan du tittar, de hamnar i Nåla och Önska.", goTrip: "Gå till resan",
+    drafted: "Utkastet är inlagt", // AI-78: with Ångra
     draftLater: "Utkastet ligger kvar under Förslag i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",
   },
   aiRun: { // AI-03, AI-64, AI-65
@@ -158,7 +159,7 @@ export const sv = {
     consentDetails: [
       "Resans syfte, dagar, rutt, platser, bokningar utan nummer, uppgifter och önskningar skickas till AI-tjänsten Claude från Anthropic.",
       "Namn byts mot ålder, till exempel \"barn, 9 år\". Bokningsnummer, telefonnummer, mejladresser, betaluppgifter, utlägg och biljetter skickas inte.",
-      "Det AI-tjänsten föreslår blir ett förslag. Inget ändras förrän en Planerare godkänner det.",
+      "Det AI-tjänsten föreslår blir ett förslag. Inget ändras förrän en Planerare godkänner det. Undantaget är utkastet till en ny, tom resa, som läggs in direkt och kan ångras.",
       "Du godkänner för hela resan. AI stängs av för resan under Resans inställningar.",
     ],
     consentBy: (by: string, date: string) => `${by} godkände att resan skickas till AI-tjänsten ${date}.`, admin: "Administratören",
@@ -177,19 +178,27 @@ export const sv = {
     cost: (name: string, calls: number, usd: string) => `${name}: ${calls} AI-anrop, ${usd} USD`, costTitle: "AI",
     auto: "AI-hjälpen", // AI-69: who an automatic run is made by
     helpersTitle: "AI-hjälp",
-    helpers: { prep: ["Bra att veta inför resan", "Föreslår regler, dokument och sånt som ska beställas i förväg längs hela resvägen, som uppgifter i Att göra."] } as Record<string, [string, string]>,
+    helpers: {
+      prep: ["Bra att veta inför resan", "Föreslår regler och dokument längs hela resvägen som uppgifter i Att göra, och det som måste bokas under Bokningar."],
+      wishes: ["Förslag på önskningar", "Föreslår riktiga platser som passar resan, var och en med en aktivitet på en dag där den passar."], // AI-71, AI-77
+    } as Record<string, [string, string]>,
     info: (name: string) => `Om ${name}`, // AI-74
     about: { prep: [
       "Letar upp sånt som är lätt att missa inför resan: regler längs hela resvägen som miljödekaler, vägtullar och vinjetter, dokument som pass och EU-kort, och sånt som måste bokas eller beställas i förväg.",
       "Hjälpen körs av sig själv tio minuter efter att resans datum, platser, rutt, resenärer eller syfte ändrats. Med Kör nu körs den direkt.",
-      "Förslagen hamnar under Att göra i Nåla, märkta AI-förslag och med en källa. Inget läggs till förrän du tar med det, och det du avvisar föreslås inte igen.",
+      "Förslagen hamnar under Att göra i Nåla, och det som måste bokas under Bokningar med statusen Att boka. De är märkta AI-förslag och har en källa. Inget läggs till förrän du tar med det, och det du avvisar föreslås inte igen.",
       "Kontrollera reglerna via källan, de kan ha ändrats. Varje körning kostar en liten summa, därför visas ungefär hur många körningar som är kvar i månaden.",
+    ], wishes: [
+      "Letar på webben upp 5 till 8 riktiga platser och aktiviteter som passar det ni skrivit i syftet, platserna på resan och resenärernas åldrar.",
+      "Varje förslag blir en önskan under Förslag i Önska och en aktivitet på en dag där den passar, märkt med AI-stjärnan i Nålas dagkort. Tar du med förslaget kommer båda in, avvisar du det försvinner båda.",
+      "Hjälpen körs av sig själv tio minuter efter att resans syfte, platser eller resenärer ändrats. Med Kör nu körs den direkt. Varje körning kostar en liten summa.",
     ] } as Record<string, string[]>,
     runNow: (name: string) => `Kör nu: ${name}`, ran: (n: number) => (n ? `${n} nya förslag.` : "Inget nytt att föreslå."),
     never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
     left: (n: number) => `ca ${n} ${n === 1 ? "körning" : "körningar"} kvar`, capped: "Taket för månaden är nått",
     suggestion: "AI-förslag", take: (text: string) => `Lägg till: ${text}`, reject: (text: string) => `Avvisa: ${text}`,
-    aiMade: "Föreslagen av AI", checkSource: "Kolla källan", // AI-70: check the rule at its source (PI-04)
+    aiMade: "Föreslagen av AI", checkSource: "Kolla källan", dayGone: "Dagen finns inte längre, så förslaget passar inte. Det är borttaget.", // AI-77
+    wishRow: "Förslag", wishRowHint: "Förslag från AI-hjälpen. Tar du med ett kommer önskan och en aktivitet på dagen in.", onDay: (d: string) => `Förslag för ${d}`, // AI-71 // AI-70: check the rule at its source (PI-04)
   },
   aiNoService: "Ingen AI-tjänst är kopplad till den här instansen. Inställningarna börjar gälla när en nyckel finns.",
   aiAreas: {
@@ -235,9 +244,10 @@ export const sv = {
   start: "Start", end: "Slut", estimate: "ca", location: "Ort (för vädret)", time: "Tid", what: "Vad",
   placeLabel: "Plats", noPlace: "Ingen plats", newPlace: "Ny plats…", placeName: "Platsens namn", address: "Adress",
   firstDate: "Första datum", lastDate: "Sista datum", status: "Status", reference: "Bokningsnummer",
-  statuses: { paid: "Betald", ready: "Klar", cancelled: "Avbokad" }, paidMark: "Betald", owner: "Ansvarig",
+  statuses: { tobook: "Att boka", paid: "Betald", ready: "Klar", cancelled: "Avbokad" }, paidMark: "Betald", owner: "Ansvarig",
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
-  badge: { paid: "betald", ready: "klar", cancelled: "avbokad" },
+  marks: { suggestions: (n: number) => `${n} AI-förslag väntar`, toBook: (n: number) => `${n} ${n === 1 ? "bokning" : "bokningar"} att boka` }, // UI-22
+  badge: { tobook: "att boka", paid: "betald", ready: "klar", cancelled: "avbokad" }, bookIt: "Boka", // BK-20
   tickets: { // BK-09, BK-10
     title: "Biljetter", show: "Visa biljett", add: "Lägg till biljett", remove: (n: string) => `Ta bort ${n}`, confirmRemove: "Ta bort biljetten?",
     uploading: "Laddar upp…", tooBig: "PDF:en är större än 2 MB.", badType: "Bara PDF, PNG eller JPEG går att lägga till.", badImage: "Bilden gick inte att göra mindre än 2 MB.",
@@ -275,7 +285,7 @@ export const sv = {
     summary: "Skriv en kort sammanfattning av dagen.", icons: "Ange en eller två ikoner, t.ex. 🚗🏛️.",
     time: "Ange start- och sluttid.", endBeforeStart: "Sluttiden kan inte vara före starttiden.", day: "Dagen finns inte längre.",
     text: "Beskriv aktiviteten.", activityTime: "Ange tiden som TT:MM.", place: "Ange namn och adress för den nya platsen.",
-    name: "Ange ett namn.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
+    name: "Ange ett namn.", person: "Personen finns inte längre.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
     expenseText: "Beskriv utlägget.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
     taskText: "Beskriv uppgiften.", url: "Webbadressen ser inte ut att stämma, t.ex. www.exempel.se.", item: "Skriv vad som ska packas.",
     tooLong: "En resa kan vara högst 60 dagar.", activityDate: "Aktiviteten ligger inte på bokningens första datum.",

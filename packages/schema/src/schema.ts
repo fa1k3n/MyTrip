@@ -51,7 +51,9 @@ export const Booking = z.object({
   checkIn: Time.optional(), checkOut: Time.optional(), start: Time.optional(), // Boende; Biljett (BK-07)
   activityId: Id.optional(), // the activity a Biljett is for, on its first date (BK-08)
   files: z.array(TicketFile).optional(), // BK-09
-  status: z.enum(["ready", "paid", "cancelled"]),
+  status: z.enum(["tobook", "ready", "paid", "cancelled"]), // tobook: Att boka, still to be booked (BK-20)
+  url: z.string().url().regex(/^https?:\/\//).optional(), // where it is booked (BK-20)
+  ai: z.boolean().optional(), // suggested by the AI service (AI-02, BK-21)
   reference: z.string().optional(), // sensitive: removed for read-only tokens
   amount: z.object({ value: z.number(), currency: z.string().length(3) }).optional(),
   placeId: Id.optional(), note: z.string().optional(),
@@ -78,6 +80,7 @@ export const Dream = z.object({
   imageTried: z.boolean().optional(), // no image found automatically, or the user removed it: not tried again automatically (DB-07)
   hidden: z.boolean().optional(), // AU-30
   mailedAt: z.string().datetime().optional(), // came by mail to the wish address, and when (DB-23, DB-25)
+  ai: z.boolean().optional(), // suggested by the AI service (AI-02, AI-71)
 });
 export const Expense = z.object({
   id: Id, text: z.string().min(1), category: z.string().min(1), amount: z.number().positive(),

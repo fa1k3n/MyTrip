@@ -161,7 +161,7 @@ export type TripUsage = { tripId: string; title: string; owner: string; from?: s
 /** A helper on a trip: whether it can run and is on, its latest run and about how many runs are left (AI-68, AI-72). */
 export type HelperStatus = { available: boolean; on: boolean; at?: string; result?: string; remaining: number };
 /** How an AI feature went: a proposal (or none worth making), or why it did not run (AI-03, AI-64, AI-65). */
-export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string } | { ok: false; error: string; scope?: string };
+export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string; applied?: boolean } | { ok: false; error: string; scope?: string };
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
@@ -177,8 +177,8 @@ export const api = {
   ai: async (tripId: string, feature: string): Promise<AiStart> => { // AI-65: the server's reason is kept, unlike call()
     try {
       const r = await fetch(`${trip(tripId)}/ai/${encodeURIComponent(feature)}`, { method: "POST", headers: headers() });
-      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; proposalIds?: string[]; reason?: string; error?: string; scope?: string };
-      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, proposalIds: b.proposalIds ?? (b.proposalId ? [b.proposalId] : []), reason: b.reason ?? "" }
+      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; proposalIds?: string[]; reason?: string; error?: string; scope?: string; applied?: boolean };
+      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, proposalIds: b.proposalIds ?? (b.proposalId ? [b.proposalId] : []), reason: b.reason ?? "", ...(b.applied ? { applied: true } : {}) } // applied: the draft of a new trip (AI-78)
         : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
     } catch { return { ok: false, error: "network" }; }
   },

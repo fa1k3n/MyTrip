@@ -40,6 +40,14 @@ export function addTraveler(t: Trip, input: string): Result {
   return ok([{ op: "add", path: "travelers/-", value: { id: uniqueId(name, allIds(t)), name, packing: [], packed: [] } }]);
 }
 
+/** A new name for a traveler; the id stays, so links, accounts, expenses and packing lists are kept (AU-32). */
+export function renameTraveler(t: Trip, id: string, input: string): Result {
+  const name = input.trim(), i = t.travelers.findIndex((x) => x.id === id);
+  if (!name) return fail(sv.errors.name);
+  if (i < 0) return fail(sv.errors.person);
+  return ok(t.travelers[i]!.name === name ? [] : [{ op: "set", path: `travelers/${i}/name`, value: name }]);
+}
+
 export const splitIcons = (s: string) =>
   [...new Intl.Segmenter("sv", { granularity: "grapheme" }).segment(s.replace(/\s+/g, ""))].map((x) => x.segment);
 
@@ -219,7 +227,7 @@ export function togglePin(t: Trip, dayId: string, id: string): Result {
 }
 
 export type BookingInput = {
-  name: string; from: string; to: string; status: "paid" | "ready" | "cancelled"; reference: string; placeId: string;
+  name: string; from: string; to: string; status: "tobook" | "paid" | "ready" | "cancelled"; reference: string; placeId: string;
   note?: string; // undefined: keep, "": remove (BK-06)
   kind?: "stay" | "ticket" | "other" | "transport"; checkIn?: string; checkOut?: string; start?: string; activityId?: string; // undefined: keep (BK-07, BK-08)
   files?: TicketFile[]; // undefined: keep (BK-09)

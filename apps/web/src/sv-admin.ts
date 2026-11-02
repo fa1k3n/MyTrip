@@ -13,7 +13,8 @@ export const svAdmin = {
     hint: "Ett utlägg som delas av alla delas bara av dem som delar. Intryckt knapp betyder att personen delar. Släpp den för till exempel barn. För ett enskilt utlägg kan du ändå välja vem som delar, under Pengar." }, // MI-38
   people: { // AU-11
     title: "Personliga länkar", role: "Behörighet", roles: { traveler: "Resenär", planner: "Planerare" }, follower: "Följare",
-    hint: "Varje resenär har en egen länk. Resenär: läsa, bocka av och lägga till egna utlägg. Planerare: dessutom ändra allt för resan.",
+    roleOf: (role: string, n: string) => `${role}: ${n}`, // AU-33
+    hint: "Varje resenär har en egen länk. Välj behörighet med knapparna: resväskan är Resenär (läsa, bocka av och lägga till egna utlägg), kompassen är Planerare (dessutom ändra allt för resan). Pennan byter namn.",
     copy: (n: string) => `Kopiera länken för ${n}`, replace: (n: string) => `Byt länk för ${n}`,
     copied: (n: string) => `Länken för ${n} är kopierad.`, noTravelers: "Inga resenärer än. Lägg till dem med plusknappen.",
     account: (n: string) => `Konto för ${n} (mejladress)`, accountPlaceholder: "Konto (mejladress)", // US-21
@@ -46,8 +47,9 @@ export const svAdmin = {
     hint: "Låt den andra skanna koden med kameran i sin telefon.",
   },
   perms: { // AU-20
-    title: "Behörigheter", hint: "Vad varje roll får se och ändra i den här resan. Du som administratör kan alltid allt.",
-    roles: { follower: "Följare", traveler: "Resenär", planner: "Planerare" }, shown: "Synlig", page: "Sidan", off: "Sidan är dold",
+    title: "Behörigheter", hint: "Vad varje roll får se och ändra i den här resan.",
+    roles: { follower: "Följare", traveler: "Resenär", planner: "Planerare" }, shown: "Synlig",
+    legend: { follower: "Följare", traveler: "Resenär", planner: "Planerare", admin: "Du som administratör kan alltid allt" }, page: "Sidan", off: "Sidan är dold", // AU-34: legend
     part: {
       dr: { dreams: "Önskningar" },
       nala: { plan: "Dagar och aktiviteter", bookings: "Bokningar", budget: "Budget", tasks: "Att göra", info: "Praktiskt", packing: "Packlista" },

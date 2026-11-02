@@ -107,7 +107,9 @@ export const jumpTo = (id: string): Open => ({ [id]: true });
 export const scrollBehavior = (reducedMotion: boolean): ScrollBehavior => (reducedMotion ? "auto" : "smooth");
 
 /** The class of a booking's status badge: green when paid or ready (BK-19). */
-export const statusBadge = (status: string) => (status === "paid" || status === "ready" ? "badge ok" : "badge");
+/** How many bookings are still to book (BK-20, UI-22). */
+export const toBook = (t: { bookings: { status: string }[] }) => t.bookings.filter((b) => b.status === "tobook").length;
+export const statusBadge = (status: string) => (status === "paid" || status === "ready" ? "badge ok" : status === "tobook" ? "badge tobook" : "badge"); // BK-19, BK-20
 
 /** What the app says when an AI feature could not run (AI-03, AI-65). */
 export function aiErrorText(r: { error: string; scope?: string }) {

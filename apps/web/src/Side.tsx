@@ -2,7 +2,7 @@
 // Loaded on demand with the Nåla tab to keep the page under 200 KB (PF-01).
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
-import { bookingDates, bookingTimes, kr, shortDate, statusBadge } from "./format.ts";
+import { bookingDates, bookingTimes, kr, shortDate, statusBadge, toBook } from "./format.ts";
 import { api, type MailProposal } from "./api.ts";
 import { BudgetPlanView, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText } from "./budget.ts";
@@ -13,7 +13,7 @@ import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
-import { aiSuggestions, type Pending } from "./proposals.ts";
+import { suggestionsAt, type Pending } from "./proposals.ts";
 
 /** Approving and rejecting proposals, for those who review them (MC-18, AI-70). */
 type Review = { approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void> };
@@ -23,6 +23,10 @@ import { byVotes, plannedWishes } from "./wishes.ts";
 import { WISH_DRAG } from "./schedule.ts";
 
 type MayOf = (id: string) => boolean; // whether the role may change that section (AU-21)
+
+/** A calm count in a section's heading, seen also when it is closed: AI suggestions waiting, bookings to book (UI-22). Not a warning. */
+const CountMark = ({ icon, n, label }: { icon: "sparkle" | "ticket"; n: number; label: string }) =>
+  n > 0 ? <span className="secmark" role="img" aria-label={label} title={label}><Icon name={icon} />{n}</span> : null;
 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02). It has no lock: its editing controls show
  * when the role may change it, and a section it may only read shows none (ED-21, AU-21). */
@@ -88,9 +92,12 @@ function useMailProposals(t: Trip, may: boolean) {
   return list;
 }
 
-function Bookings({ t, edit, onPlace, part }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void }) {
+function Bookings({ t, edit, onPlace, part, review }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review }) {
   const mails = useMailProposals(t, part("bookings"));
-  const flag = mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>;
+  const suggested = useAiSuggestions(t, !!review && part("bookings"), "prep", "bookings/-"); // BK-21
+  const [err, setErr] = useState<string | null>(null);
+  const flag = <>{mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>}
+    <CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} /><CountMark icon="ticket" n={toBook(t)} label={sv.marks.toBook(toBook(t))} /></>;
   return (
     <Section title={sv.bookings} may={part("bookings")} flag={flag}>
       {mails.length > 0 && <div className="mails">{/* not an editing control: reviewing is the point (BK-17) */}
@@ -105,37 +112,41 @@ function Bookings({ t, edit, onPlace, part }: { part: MayOf; t: Trip; edit: (d: 
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>
           <span><KindIcon kind={b.kind} />{b.hidden ? <HiddenText /> : <><TextEye t={t} texts={[b.name, b.note]} placeId={b.placeId} /><PlaceLink t={t} id={b.placeId} text={b.name} onPlace={onPlace} /></>}<br />
-            <small className="ro">{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}</small>
+            <small className="ro">{b.ai && <AiMark label={sv.aiRun.aiMade} />}{bookingDates(b)}{bookingTimes(b) ? ` · ${bookingTimes(b)}` : ""}{b.reference ? ` · ${b.reference}` : ""}</small>
+            {b.url && b.status === "tobook" && <small> · <a className="place" href={b.url} target="_blank" rel="noopener noreferrer">{sv.bookIt}</a></small>}
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
           <span className="end"><span className={statusBadge(b.status)}>{sv.badge[b.status]}</span>
             <TicketButton b={b} edit={edit} />
             {!b.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut />}</span>
         </div>
       ))}
+      {review && suggested.map((p) => <Suggestion key={p.id} p={p} review={review} done={setErr} />)}
+      {err && <p className="err" role="alert">{err}</p>}
       <div className="add"><IconButton icon="plus" label={sv.addBooking} onClick={() => edit({ kind: "booking" })} mut tip="right" /></div>
     </Section>
   );
 }
 
-/** A helper's pending suggestions, read again after each change of the trip (AI-70). */
-function useAiSuggestions(t: Trip, may: boolean, feature: string) {
+/** A helper's pending suggestions of one kind, read again after each change of the trip (AI-70, BK-21). */
+function useAiSuggestions(t: Trip, may: boolean, feature: string, path: string) {
   const [list, setList] = useState<Pending[]>([]);
   useEffect(() => {
     if (!may) { setList([]); return; }
     let live = true;
-    api.proposals(t.id).then((ps) => { if (live) setList(aiSuggestions(ps as unknown as Pending[], feature)); }, () => {});
+    api.proposals(t.id).then((ps) => { if (live) setList(suggestionsAt(ps as unknown as Pending[], feature, path)); }, () => {});
     return () => { live = false; };
-  }, [t, may, feature]);
+  }, [t, may, feature, path]);
   return list;
 }
 
-/** AI-70: a suggested task, marked as AI, with its source, to take into the tasks or reject. */
+/** AI-70, BK-21: a suggested task or booking to book, marked as AI, with its source, to take or reject. */
 function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (err: string | null) => void }) {
-  const v = (p.ops[0]?.value ?? {}) as { text?: string; due?: string; url?: string };
-  const text = v.text ?? "";
+  const v = (p.ops[0]?.value ?? {}) as { text?: string; name?: string; due?: string; url?: string; from?: string; to?: string };
+  const text = v.text ?? v.name ?? "";
   return <div className="row mid todo">
     <span><AiMark />{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
-      {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}</span>
+      {v.from && <small className="ro"> · {bookingDates({ from: v.from, to: v.to ?? v.from })}</small>}
+      {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{v.from ? sv.bookIt : sv.aiRun.checkSource}</a></small>}</span>
     <span className="end">
       <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => done(await review.approve(p.id))} />
       <IconButton icon="close" look="bare" tip="left" label={sv.aiRun.reject(text)} onClick={async () => { await review.reject(p.id); done(null); }} />
@@ -144,10 +155,10 @@ function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (er
 }
 
 function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: MayOf; t: Trip; today: string; edit: (d: EditDlg) => void; run: Run; onPlace: (id: string) => void; tick: boolean; review?: Review }) {
-  const suggested = useAiSuggestions(t, !!review && part("tasks"), "prep");
+  const suggested = useAiSuggestions(t, !!review && part("tasks"), "prep", "tasks/-");
   const [err, setErr] = useState<string | null>(null);
   return (
-    <Section title={sv.todo} may={part("tasks")}>
+    <Section title={sv.todo} may={part("tasks")} flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
       {!t.tasks.length && !suggested.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
@@ -232,7 +243,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
   const part = (id: string) => parts[id] === "write";
   return <>
     {wishes && parts.plan === "write" && <Wishes t={t} edit={edit} />}
-    {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} />}
+    {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
     {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}

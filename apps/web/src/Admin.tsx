@@ -8,7 +8,7 @@ import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
-import { IconButton } from "./Icons.tsx";
+import { Icon, IconButton } from "./Icons.tsx";
 import { QrDialog } from "./QrDialog.tsx";
 import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
@@ -201,8 +201,9 @@ function Inbox({ t, kind }: { t: Trip; kind: "bookings" | "wishes" }) {
   );
 }
 
-/** AU-11: a personal link per traveler, created with the permission Resenär when missing; the permission is picked in a dropdown. */
-function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
+/** AU-11: a personal link per traveler, created with the permission Resenär when missing; the permission is two toggle buttons (AU-33),
+ * and the pencil renames the traveler (AU-32). */
+function PeopleLinks({ t, add }: { t: Trip; add: (id?: string) => void }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
   const [copied, setCopied] = useState(""), [showQr, setShowQr] = useState<{ url: string; name: string } | null>(null);
   useEffect(() => {
@@ -231,14 +232,13 @@ function PeopleLinks({ t, add }: { t: Trip; add: () => void }) {
         const l = links.find((y) => y.travelerId === x.id);
         return (
           <div className="row mid" key={x.id}>
-            <span>{x.name}</span>
+            <span className="pname">{x.name}<IconButton icon="edit" look="bare" tip="right" label={sv.renameTraveler(x.name)} onClick={() => add(x.id)} /></span>
             <span className="end">
               {l && <>
-                <span className={`rolepick ${l.role}`}>
-                  <select aria-label={`${svAdmin.people.role}, ${x.name}`} value={l.role}
-                    onChange={async (e) => put(await api.setPerson(t.id, x.id, e.target.value as PersonLinkInfo["role"]))}>
-                    {(["traveler", "planner"] as const).map((r) => <option key={r} value={r}>{svAdmin.people.roles[r]}</option>)}
-                  </select>
+                <span className="roletoggle" role="group" aria-label={`${svAdmin.people.role}, ${x.name}`}>
+                  {(["traveler", "planner"] as const).map((r) => <span key={r} className={`rt ${r}`}>
+                    <IconButton icon={ROLE_ICON[r]} look="bare" tip="left" pressed={l.role === r} label={svAdmin.people.roleOf(svAdmin.people.roles[r], x.name)}
+                      onClick={async () => { if (l.role !== r) put(await api.setPerson(t.id, x.id, r)); }} /></span>)}
                 </span>
                 <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(x.name)}
                   onClick={() => setShowQr({ url: personUrl(location.origin, t.id, l.travelerId, l.secret), name: x.name })} />
@@ -280,6 +280,8 @@ function Sharing({ t, run }: { t: Trip; run: Run }) {
 }
 
 const ROLES = ["follower", "traveler", "planner"] as const;
+/** The role icons of US-23, with an eye for Följare and the crown for the superuser (AU-33, AU-34). */
+const ROLE_ICON = { follower: "eye", traveler: "luggage", planner: "compass", admin: "crown" } as const;
 type ARole = (typeof ROLES)[number];
 /** AU-20: a matrix with a column per role and the pages as groups: whether each page is visible, and the level of each component
  * on it. Each choice is saved at once, built on the latest trip so a change made meanwhile is kept. */
@@ -301,9 +303,11 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
     <div className="card perms">
       <h3>{svAdmin.perms.title}</h3>
       <p className="ro note">{svAdmin.perms.hint}</p>
+      <p className="ro note plegend">{(["follower", "traveler", "planner", "admin"] as const).map((r) => /* AU-34: what each icon means */
+        <span key={r}><span className={`rolemark ${r}`} aria-hidden="true"><Icon name={ROLE_ICON[r]} /></span>{svAdmin.perms.legend[r]}</span>)}</p>
       <div className="pgrid" role="table" aria-label={svAdmin.perms.title}>
         <div className="prow phead" role="row"><span role="columnheader" />
-          {ROLES.map((r) => <span key={r} role="columnheader" className={`who ${r === "follower" ? "follower" : r}`}>{svAdmin.perms.roles[r]}
+          {ROLES.map((r) => <span key={r} role="columnheader" className={`who ${r}`}><span className={`rolemark ${r}`} role="img" aria-label={svAdmin.perms.roles[r]} title={svAdmin.perms.roles[r]}><Icon name={ROLE_ICON[r]} /></span>
             {t.access?.[r] && <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.perms.reset(svAdmin.perms.roles[r])} onClick={() => save(r, "up", null)} />}</span>)}
         </div>
         {PAGES.map((pg) => <div key={pg} className="pgroup" role="rowgroup">

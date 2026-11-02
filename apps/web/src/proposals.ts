@@ -2,8 +2,6 @@
 import { applyOps, checkTrip, pinBreaks, Trip, type Op } from "@trip/schema";
 import { tripChanges, type Change } from "./changes.ts";
 import { sv } from "./sv.ts";
-import { dayLabel } from "./format.ts";
-import { fmtDuration } from "./transport.ts";
 export { previewMarks, tripChanges, type Change, type Mark } from "./changes.ts";
 
 export type Pending = { id: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string; source?: { kind: string; feature?: string; item?: boolean } };
@@ -26,15 +24,6 @@ export function readProposal(t: Trip, p: Pending): { stale: boolean; problems: s
   return { stale, problems: [...checkTrip(next), ...pinBreaks(t, next).map(sv.proposal.pin)], next, changes: tripChanges(t, next) }; // MC-20
 }
 
-/** A draft trip in words for its dialog: the title, the travelers with ages and one line per day with its legs (AI-75). */
-export function draftSummary(next: Trip) {
-  const legs = (d: Trip["days"][number]) => d.legs.map((l) => { // the route only when the day's title does not already say it
-    const route = `${l.origin}–${l.destination}`;
-    return [sv.newTripAi.vehicles[l.vehicle], d.title === route ? "" : route, l.durationMin ? fmtDuration(l.durationMin) : ""].filter(Boolean).join(" ");
-  });
-  return {
-    title: next.title,
-    travelers: next.travelers.map((x) => (x.age !== undefined && !x.name.includes(String(x.age)) ? `${x.name}, ${x.age} år` : x.name)),
-    days: [...next.days].sort((a, b) => a.date.localeCompare(b.date)).map((d) => [dayLabel(d.date), d.title, ...legs(d)].join(" · ")),
-  };
-}
+/** A helper's pending suggestions of one kind, by the path of their main change: tasks/- or bookings/- for prep (AI-70, BK-21, UI-22). */
+export const suggestionsAt = <P extends Sourced & { ops: Op[] }>(list: P[], feature: string, path: string) =>
+  aiSuggestions(list, feature).filter((p) => p.ops[0]?.path === path);

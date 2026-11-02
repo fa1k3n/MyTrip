@@ -15,7 +15,7 @@ export type { User } from "./users.ts";
 export type Proposal = {
   id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
   source?: { kind: "mail"; from: string; subject: string; at: string } // a mail to the trip's inbox (BK-15)
-    | { kind: "ai"; feature: string; by: string; at: string; item?: boolean }; // an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70)
+    | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string }; // an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
 };
 /** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
@@ -901,7 +901,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const t = await load(p.tripId);
     const item = p.source?.kind === "ai" && p.source.item; // AI-70: one added suggestion goes onto the trip as it is now
     if (t.revision !== p.baseRevision && !item) return c.json({ error: "conflict", revision: t.revision }, 409);
-    const r = await apply(t, p.ops, p.source?.kind === "ai" ? "ai" : "llm", p.reason, { c, who: "admin" });
+    let ops = p.ops;
+    if (p.source?.kind === "ai" && p.source.day) { // AI-77: the activity goes onto its day wherever that day is now
+      const i = t.days.findIndex((d) => d.id === (p.source as { day: string }).day);
+      if (i < 0) { p.status = "rejected"; await store.saveProposal(p); return c.json({ error: "day gone", problems: ["day gone"] }, 409); }
+      ops = ops.map((o) => ({ ...o, path: o.path.replace(/^days\/\d+\//, `days/${i}/`) }));
+    }
+    const r = await apply(t, ops, p.source?.kind === "ai" ? "ai" : "llm", p.reason, { c, who: "admin" });
     if ("conflict" in r) return c.json({ error: "conflict" }, 409);
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
@@ -949,19 +955,29 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       console.error(`AI ${name} on ${t.id} failed:`, e instanceof Error ? e.message : e); // shows in the Worker's logs
       r = { error: "failed", cost: NO_COST };
     }
-    let ops = "error" in r ? [] : r.ops;
-    if (h) { // AI-70: nothing the trip has or the travelers rejected, each with an id of its own
-      const taken = new Set([...t.tasks.map((k) => k.id), ...t.dreams.map((w) => w.id), ...own.flatMap((p) => p.ops.map((o) => String((o.value as { id?: unknown })?.id)))]);
-      ops = ops.map(h.finish).filter((o, i, all) => !avoid.some((x) => sameSuggestion(x, h.textOf(o))) && all.findIndex((y) => sameSuggestion(h.textOf(y), h.textOf(o))) === i)
-        .map((o) => { const v = o.value as { id: string }; let id = v.id; for (let n = 2; taken.has(id); n++) id = `${v.id}-${n}`; taken.add(id); return { ...o, value: { ...v, id } }; });
+    const ops = "error" in r ? [] : r.ops;
+    let groups: Op[][] = ops.length ? [ops] : [];
+    if (h) { // AI-70: nothing the trip has or the travelers rejected, each suggestion with ids of its own; AI-77: a wish and its activity together
+      const taken = new Set([...allIds(t), ...own.flatMap((p) => p.ops.map((o) => String((o.value as { id?: unknown })?.id)))]);
+      const textOf = (g: Op[]) => h.textOf(g[0]!);
+      groups = (h.group ?? ((xs: Op[]) => xs.map((o) => [o])))(ops.map(h.finish))
+        .filter((g, i, all) => !avoid.some((x) => sameSuggestion(x, textOf(g))) && all.findIndex((y) => sameSuggestion(textOf(y), textOf(g))) === i)
+        .map((g) => {
+          const ids = new Map<string, string>();
+          for (const o of g) { const v = o.value as { id: string }; let id = v.id; for (let n = 2; taken.has(id); n++) id = `${v.id}-${n}`; taken.add(id); ids.set(v.id, id); }
+          return g.map((o) => { const v = o.value as { id: string; dreamId?: string };
+            return { ...o, value: { ...v, id: ids.get(v.id)!, ...(v.dreamId && ids.has(v.dreamId) ? { dreamId: ids.get(v.dreamId) } : {}) } }; });
+        });
     }
-    const result = "error" in r ? "error" : ops.length ? "proposal" : "nothing";
+    const result = "error" in r ? "error" : groups.length ? "proposal" : "nothing";
     await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who, feature: name, usd: r.cost.usd, result });
     if (h) await store.saveAiHelper(t.id, name, { ...("error" in r ? {} : { fingerprint }), at, result });
     if ("error" in r) return { error: r.error };
     const source = { kind: "ai" as const, feature: name, by: actor, at, ...(h ? { item: true } : {}) };
-    const proposals: Proposal[] = (h ? ops.map((o) => [o]) : ops.length ? [ops] : []).map((x) => ({
-      id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: x, reason: r.reason, status: "pending", at, source }));
+    const dayOf = (g: Op[]) => { const m = h && g.map((o) => /^days\/(\d+)\//.exec(o.path)).find(Boolean); return m ? t.days[Number(m[1])]?.id : undefined; }; // AI-77
+    const proposals: Proposal[] = groups.map((x) => ({
+      id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: x, reason: r.reason, status: "pending", at,
+      source: { ...source, ...(dayOf(x) ? { day: dayOf(x) } : {}) } }));
     for (const p of proposals) await store.saveProposal(p);
     return { proposalIds: proposals.map((p) => p.id), reason: r.reason };
   }
@@ -977,6 +993,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       await runFeature(t, name, f, owner, sv.aiRun.auto);
     }
   }
+  /** Every id in the trip, so a suggestion gets one of its own (DM-09). */
+  const allIds = (t: Trip) => [...t.days, ...t.places, ...t.bookings, ...t.tasks, ...t.travelers, ...t.dreams, ...t.budget, ...t.expenses, ...t.payments, ...t.info,
+    ...t.days.flatMap((d) => d.activities)].map((x) => x.id);
+  /** A trip with nothing in it yet but its title and purpose, which an AI draft may fill at once (AI-78). */
+  const isEmptyTrip = (t: Trip) => [t.travelers, t.days, t.stops, t.bookings, t.tasks, t.dreams, t.expenses, t.places].every((x) => !x.length);
   /** Who may start AI on a trip: those who plan it, with AI allowed for their account (AI-65, US-16). */
   const mayStart = (c: Context<Env>) => { const u = c.get("user"); return manager(c) && (!u || u.superuser || u.ai); };
   // AI-68, AI-72: the trip's helpers: whether each can run and is on, its latest run and about how many runs are left.
@@ -1002,6 +1023,16 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!t.aiConsent) return c.json({ error: "consent" }, 409); // AI-64
     const r = await runFeature(t, name, f, c.get("user")?.id ?? whoOf(c), actorName(c, t));
     if ("error" in r) return r.error === "cap" ? c.json({ error: "cap", scope: r.scope }, 429) : c.json({ error: r.error }, 502);
+    const [pid] = r.proposalIds;
+    if (f.applyToNew && pid && isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip
+      const p = (await store.proposals(t.id)).find((x) => x.id === pid)!;
+      const done = await apply(t, p.ops, `ai (${actorName(c, t)})`, p.reason || "ai draft");
+      if ("revision" in done) {
+        p.status = "approved";
+        await store.saveProposal(p);
+        return c.json({ applied: true, revision: done.revision, proposalId: pid, proposalIds: r.proposalIds, reason: r.reason });
+      }
+    }
     return c.json({ proposalId: r.proposalIds[0] ?? null, proposalIds: r.proposalIds, reason: r.reason }, r.proposalIds.length ? 202 : 200);
   });
 

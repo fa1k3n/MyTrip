@@ -9,7 +9,10 @@ import type { Result } from "./edit.ts";
 import { categoryIcon, dayIcons } from "./categories.ts";
 import { sv } from "./sv.ts";
 import type { Transfer } from "./money.ts";
-import { BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
+import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
+import { api } from "./api.ts";
+import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
+import { fmtDuration } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
@@ -124,7 +127,30 @@ export function Weather({ forecast, big }: { forecast?: Forecast; big?: boolean 
   );
 }
 
-function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, run, marks }: {
+/** Take or reject an AI suggestion; a reason shows when taking fails, for example when its day is gone (AI-71, AI-77). */
+export function SuggestionActions({ id, text, review }: { id: string; text: string; review: Review }) {
+  const [err, setErr] = useState<string | null>(null);
+  return <span className="end">
+    <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => setErr(await review.approve(id))} />
+    <IconButton icon="close" look="bare" tip="left" label={sv.aiRun.reject(text)} onClick={() => void review.reject(id)} />
+    {err && <span className="err" role="alert">{err}</span>}
+  </span>;
+}
+
+/** AI-77: the activities the wish helper suggests for a day, marked as AI, each taken or rejected together with its wish. */
+function DaySuggestions({ list, review }: { list: WishSuggestion[]; review: Review }) {
+  return <>{list.map((s) => { const a = s.activity!; return (
+    <div className="act sug" key={s.id}>
+      <span className="when">{a.start ?? ""}</span>
+      <span className="what-col"><span><AiMark />{a.text}</span>
+        <small className="ro">{[a.durationMin && fmtDuration(a.durationMin), s.wish.url && <a key="u" className="place" href={s.wish.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a>].filter(Boolean).map((x, i) => <span key={i}>{i > 0 && " · "}{x}</span>)}</small></span>
+      <SuggestionActions id={s.id} text={a.text} review={review} />
+    </div>); })}</>;
+}
+
+type Review = NonNullable<TripViewProps["review"]>;
+function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, edit, editing, run, marks, suggested = [], review }: {
+  suggested?: WishSuggestion[]; review?: Review; // AI-77: the wish helper's activities for the day
   marks?: DayMarks | null; // set: the day as a proposal would leave it, read only; null: unchanged by it (MC-17)
   t: Trip; x: Day; today: boolean; open: boolean; forecast?: Forecast; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
   editing: boolean; run: Run; // editing: the role may change the plan, with no lock (ED-21, AU-21)
@@ -152,7 +178,8 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
         <div className="txt">
           {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
           <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button>
-            {titleWho.length > 0 && <Eye t={t} who={titleWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</h3>
+            {titleWho.length > 0 && <Eye t={t} who={titleWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}
+            {!open && review && suggested.length > 0 && <AiMark label={sv.marks.suggestions(suggested.length)} /> /* AI-77: seen on a closed card too */}</h3>
           <div className="sum">{x.hiddenSummary ? <HiddenText /> : x.summary}{sumWho.length > 0 && <Eye t={t} who={sumWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
         </div>
@@ -169,6 +196,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
           : editing
           ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} edit={edit} />}><PlanActivities t={t} x={x} onPlace={onPlace} edit={edit} run={run} /></Suspense>
           : <Activities t={t} x={x} onPlace={onPlace} edit={edit} />}
+        {marks === undefined && review && suggested.length > 0 && <DaySuggestions list={suggested} review={review} />}
         <div className="add"><IconButton icon="plus" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut tip="right" /></div> {/* UI-09 */}
         {vehicles.length > 0 && <p><button className="badge linkish" onClick={onTransport}><CatIcons ids={vehicles} /> {sv.travelTime}</button></p>}
       </div>
@@ -213,8 +241,16 @@ export function TripView(p: TripViewProps) {
   const reviews = !!p.review && (perms.manager || p.who?.role === "planner"); // MC-19, US-14
   const days = [...(preview?.next ?? t).days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
+  const [wishSugs, setWishSugs] = useState<WishSuggestion[]>([]); // AI-71, AI-77: read again after each change of the trip
+  useEffect(() => {
+    if (!reviews || (tab !== "dr" && tab !== "nala")) { setWishSugs([]); return; }
+    let live = true;
+    api.proposals(t.id).then((ps) => { if (live) setWishSugs(wishSuggestions(ps as unknown as WishProposal[])); }, () => {});
+    return () => { live = false; };
+  }, [t, reviews, tab]);
   let main;
-  if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })} /></Suspense>;
+  if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })}
+    suggestions={reviews ? wishSugs : []} review={p.review} /></Suspense>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
       <button className="stop" key={`${s.dayId}-${i}`} aria-current={s.dayId === now ? "date" : undefined} onClick={() => p.jump(s.dayId)}><b>{stopLabel(s)}</b><small>{s.sub}</small></button>
@@ -227,7 +263,7 @@ export function TripView(p: TripViewProps) {
       <div>{days.map((x) => (
         <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} forecast={p.forecast[x.id]} onToggle={() => p.toggleDay(x.id)}
           onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run} marks={preview ? preview.marks.get(x.id) ?? null : undefined}
-          editing={!preview && perms.view.nala.plan === "write"} />
+          editing={!preview && perms.view.nala.plan === "write"} suggested={wishSugs.filter((s) => s.day === x.id && s.activity)} review={reviews ? p.review : undefined} />
       ))}</div>
       <div><Suspense fallback={null}>
         <Side t={t} today={p.today} edit={p.edit} run={p.run} onPlace={p.place} parts={perms.view.nala} wishes={perms.view.dr.dreams !== "hidden"} review={reviews ? p.review : undefined} />

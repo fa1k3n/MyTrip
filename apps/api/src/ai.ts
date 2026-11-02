@@ -26,6 +26,7 @@ export type AiFeature = {
   allows(op: Op): boolean; // the kinds of change the feature may propose
   tidy?(op: Op): Op; // puts a change into the form the app needs before it is checked, e.g. a day's icons
   helper?: AiHelper; // runs by itself behind a switch, with one proposal per suggestion (AI-68..AI-70)
+  applyToNew?: boolean; // applied at once to a new, empty trip: pressing the button is the approval (AI-78)
 };
 /** What a helper needs beyond a feature (AI-69, AI-70). */
 export type AiHelper = {
@@ -33,6 +34,7 @@ export type AiHelper = {
   known(t: Trip): string[]; // what the trip already has, never suggested again
   textOf(op: Op): string; // a suggestion's text, to compare with what is known
   finish(op: Op): Op; // the suggestion as stored, e.g. marked as AI-generated
+  group?(ops: Op[]): Op[][]; // the changes that make one suggestion, its main change first (AI-77); one each when missing
 };
 export type AiCost = { inputTokens: number; outputTokens: number; searches: number; usd: number };
 export type AiResult = ({ ops: Op[]; reason: string } | { error: "refusal" | "no proposal" | "failed" }) & { cost: AiCost };

@@ -912,10 +912,16 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if ("revision" in r) { p.status = "approved"; await store.saveProposal(p); }
     return c.json({ proposal: p, result: r });
   });
-  /** AI-77: a suggestion's activity goes onto its day wherever that day is now; undefined when the day is gone. */
+  /** AI-77: a suggestion's activity goes onto its day wherever that day is now, in the order of start times; undefined when the day is gone. */
   const onItsDay = (t: Trip, p: Proposal) => {
     const day = p.source?.kind === "ai" ? p.source.day : undefined, i = day ? t.days.findIndex((d) => d.id === day) : -1;
-    return !day ? p.ops : i < 0 ? undefined : p.ops.map((o) => ({ ...o, path: o.path.replace(/^days\/\d+\//, `days/${i}/`) }));
+    if (!day) return p.ops;
+    if (i < 0) return undefined;
+    return p.ops.map((o) => {
+      if (!/^days\/\d+\/activities\/-$/.test(o.path)) return { ...o, path: o.path.replace(/^days\/\d+\//, `days/${i}/`) };
+      const start = (o.value as { start?: string }).start, at = start ? t.days[i]!.activities.findIndex((a) => !!a.start && a.start > start) : -1;
+      return { ...o, path: `days/${i}/activities/${at < 0 ? "-" : at}` }; // before the first that starts later
+    });
   };
 
   const features = () => opts.ai?.features ?? FEATURES;
@@ -1042,7 +1048,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
         if (!("revision" in done)) continue;
         p.status = "approved"; await store.saveProposal(p);
         for (const o of ops) {
-          if (/^days\/\d+\/activities\/-$/.test(o.path)) applied.activities++;
+          if (/^days\/\d+\/activities\/(\d+|-)$/.test(o.path)) applied.activities++;
           else if (o.path === "tasks/-") applied.tasks++;
           else if (o.path === "bookings/-") applied.bookings++;
           else if (o.path === "dreams/-") applied.wishes++;

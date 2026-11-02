@@ -135,3 +135,13 @@ test("BK-21 bookings to book from the prep helper", async () => {
   assert.equal((await call(app, `/api/trips/hh/proposals/${b.id}/approve`, "a", "POST")).status, 200);
   assert.equal((await json(call(app, "/api/trips/hh", "a"))).bookings[0].status, "tobook");
 });
+
+// REQ: AI-77 a suggested activity goes into its day in the order of start times, not last
+test("AI-77 the activity is placed by its start time", async () => {
+  const at = (id: string, start: string) => ({ op: "add", path: "days/1/activities/-", value: { id: `a-${id}`, text: id, dreamId: id, category: "Aktivitet", start, durationMin: 60 } });
+  const app = await withDays([wish("hamn", "Hamnen"), at("hamn", "11:45"), wish("museum", "Museet"), at("museum", "10:00"), wish("fika", "Fika"), at("fika", "15:00")]);
+  await call(app, "/api/trips/hh/ai/wishes", "a", "POST");
+  for (const p of await pending(app)) await call(app, `/api/trips/hh/proposals/${p.id}/approve`, "a", "POST");
+  const t = await json(call(app, "/api/trips/hh", "a"));
+  assert.deepEqual(t.days[1].activities.map((a: { start: string }) => a.start), ["10:00", "11:45", "15:00"]);
+});

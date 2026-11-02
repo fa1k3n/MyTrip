@@ -284,7 +284,7 @@ export function App() {
     try { after = { ...applyOps(before, ops), revision: before.revision + 1 }; } catch { return; }
     if (!canUndo(before, after)) return;
     const c = tripChanges(before, after)[0];
-    setUndo({ text: c ? `${sv.undo.kinds[c.kind]} ${c.text}` : reason, before, after });
+    setUndo({ text: reason === "keep ai" ? sv.aiReview.kept : c ? `${sv.undo.kinds[c.kind]} ${c.text}` : reason, before, after }); // AI-83: keeping changes no text
   };
   const runUndo = async () => {
     const u = undo;
@@ -446,7 +446,7 @@ export function App() {
       t={withWaiting(t, waiting) as Trip} waiting={waiting} sending={sending > 0} retryWaiting={(id) => changeWaiting(retry(queue.load(), id))} removeWaiting={(id) => changeWaiting(dequeue(queue.load(), id))}
       cover={covers[t.id]} tab={tab} open={open} forecast={forecast} forecastAt={forecastAt}
       setTab={setTab} toggleDay={(id) => setOpen((o) => toggleOne(o, id))} toggleAll={() => setOpen((o) => toggleAll(o, t.days.map((d) => d.id)))}
-      jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }}
+      jump={(id) => { setOpen(jumpTo(id)); setScrollTo(id); }} openDays={(ids) => { setOpen(Object.fromEntries(ids.map((id) => [id, true]))); if (ids[0]) setScrollTo(ids[0]); }}
       place={(id) => setDlg({ kind: "place", id })} transport={(dayId) => setDlg({ kind: "transport", dayId })} run={run}
       vote={(i) => change([{ op: "set", path: `dreams/${i}/votes`, value: t.dreams[i].votes + 1 }], "vote")}
       addDream={() => setDlg({ kind: "dream" })} editImage={(id) => setDlg({ kind: "wishImage", id })} back={() => setView("portal")} toChooser={perms(t).scoped && deviceLinks().length > 1 ? () => pick(null) : undefined} admin={() => setView("admin")}

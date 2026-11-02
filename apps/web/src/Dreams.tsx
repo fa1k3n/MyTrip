@@ -5,7 +5,7 @@ import { categoryIcon } from "./categories.ts";
 import { sv } from "./sv.ts";
 import { AiMark, IconButton, PlannedMark } from "./Icons.tsx";
 import { CatIcon, ICONS } from "./CatIcon.tsx";
-import { HiddenText, SuggestionActions, TextEye, type TripViewProps } from "./TripView.tsx";
+import { AiKeep, HiddenText, SuggestionActions, TextEye, type Run, type TripViewProps } from "./TripView.tsx";
 import type { WishSuggestion } from "./aiWishes.ts";
 import { dayLabel } from "./format.ts";
 import { api } from "./api.ts";
@@ -77,8 +77,8 @@ function Suggested({ t, list, review }: { t: Trip; list: WishSuggestion[]; revie
   </section>;
 }
 
-export default function Dreams({ t, write, vote, addDream, editImage, open, suggestions = [], review }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void;
-  suggestions?: WishSuggestion[]; review?: TripViewProps["review"] }) {
+export default function Dreams({ t, write, vote, addDream, editImage, open, suggestions = [], review, run }: { t: Trip; write: boolean; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; open: (id: string) => void;
+  suggestions?: WishSuggestion[]; review?: TripViewProps["review"]; run: Run }) {
   const planned = plannedWishes(t); // DB-19
   const [mail, setMail] = useState(false);
   return <>
@@ -86,7 +86,8 @@ export default function Dreams({ t, write, vote, addDream, editImage, open, sugg
     {mail && t.wishInbox && <WishMail address={t.wishInbox} close={() => setMail(false)} />}
     {review && <Suggested t={t} list={suggestions} review={review} />}
     <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} planned={!d.hidden && planned.has(d.id)} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
-      {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} /></div> /* DB-10 */}
+      {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} />
+        {d.ai && <AiKeep item={{ kind: "wish", id: d.id }} text={d.title} run={run} /> /* AI-83 */}</div> /* DB-10 */}
     </DreamCard>)}</div>
     {write && <IconButton icon="plus" look="fab" tip="up" label={sv.addDream} onClick={addDream} />}
   </>;

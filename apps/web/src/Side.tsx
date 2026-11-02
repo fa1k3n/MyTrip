@@ -10,7 +10,7 @@ import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleT
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
 import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
-import { HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
+import { AiKeep, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
 import { suggestionsAt, type Pending } from "./proposals.ts";
@@ -30,8 +30,8 @@ const CountMark = ({ icon, n, label }: { icon: "sparkle" | "ticket"; n: number; 
 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02). It has no lock: its editing controls show
  * when the role may change it, and a section it may only read shows none (ED-21, AU-21). */
-const Section = ({ title, may, flag, tint = "", children }: { title: string; may: boolean; flag?: ReactNode; tint?: string; children: ReactNode }) => (
-  <details className={`card sec ${may ? "" : "lock"} ${tint}`}>
+const Section = ({ title, may, flag, tint = "", id, children }: { title: string; may: boolean; flag?: ReactNode; tint?: string; id?: string; children: ReactNode }) => (
+  <details className={`card sec ${may ? "" : "lock"} ${tint}`} id={id}>{/* id: opened from Nytt från AI (AI-84) */}
     <summary><h3>{title}</h3>{flag}</summary>
     {children}
   </details>
@@ -92,14 +92,14 @@ function useMailProposals(t: Trip, may: boolean) {
   return list;
 }
 
-function Bookings({ t, edit, onPlace, part, review }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review }) {
+function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review; run: Run }) {
   const mails = useMailProposals(t, part("bookings"));
   const suggested = useAiSuggestions(t, !!review && part("bookings"), "prep", "bookings/-"); // BK-21
   const [err, setErr] = useState<string | null>(null);
   const flag = <>{mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>}
     <CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} /><CountMark icon="ticket" n={toBook(t)} label={sv.marks.toBook(toBook(t))} /></>;
   return (
-    <Section title={sv.bookings} may={part("bookings")} flag={flag}>
+    <Section title={sv.bookings} may={part("bookings")} flag={flag} id="sec-bookings">
       {mails.length > 0 && <div className="mails">{/* not an editing control: reviewing is the point (BK-17) */}
         <p className="ro note">{sv.mail.waiting(mails.length)}</p>
         {mails.map((m) => (
@@ -117,6 +117,7 @@ function Bookings({ t, edit, onPlace, part, review }: { part: MayOf; t: Trip; ed
             {b.note && <><br /><small className="ro">{b.note}</small></>}</span>
           <span className="end"><span className={statusBadge(b.status)}>{sv.badge[b.status]}</span>
             <TicketButton b={b} edit={edit} />
+            {b.ai && part("bookings") && <AiKeep item={{ kind: "booking", id: b.id }} text={b.name} run={run} /> /* AI-83 */}
             {!b.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${b.name}`} onClick={() => edit({ kind: "booking", id: b.id })} mut />}</span>
         </div>
       ))}
@@ -158,7 +159,7 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
   const suggested = useAiSuggestions(t, !!review && part("tasks"), "prep", "tasks/-");
   const [err, setErr] = useState<string | null>(null);
   return (
-    <Section title={sv.todo} may={part("tasks")} flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
+    <Section title={sv.todo} may={part("tasks")} id="sec-tasks" flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
       {!t.tasks.length && !suggested.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
@@ -170,6 +171,7 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
               {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}
               {isOverdue(k, today) && <> <span className="badge late">{sv.overdue}</span></>}</span>
           </label>
+          {k.ai && part("tasks") && <AiKeep item={{ kind: "task", id: k.id }} text={k.text} run={run} /> /* AI-83 */}
           {!k.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${k.text}`} onClick={() => edit({ kind: "task", id: k.id })} mut />}
         </div>
       ))}
@@ -243,7 +245,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
   const part = (id: string) => parts[id] === "write";
   return <>
     {wishes && parts.plan === "write" && <Wishes t={t} edit={edit} />}
-    {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} />}
+    {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}
     {parts.tasks !== "hidden" && <Tasks part={part} t={t} today={today} edit={edit} run={run} onPlace={onPlace} tick={atLeast(parts.tasks, "check")} review={review} />}
     {parts.info !== "hidden" && <Info part={part} t={t} edit={edit} onPlace={onPlace} />}

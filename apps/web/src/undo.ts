@@ -4,7 +4,7 @@ import { applyOps } from "@trip/schema/src/ops.ts";
 import { sv } from "./sv.ts";
 
 /** The changes in Nåla that offer Ångra: moves, planned wishes and removals. */
-export const UNDOABLE = new Set(["move activity", "plan wish", "remove activity", "remove booking", "remove budget", "remove task", "remove place", "remove info"]);
+export const UNDOABLE = new Set(["move activity", "plan wish", "remove ai", "keep ai", "remove activity", "remove booking", "remove budget", "remove task", "remove place", "remove info"]);
 
 /** Sets back each part of the trip that the change altered; sent on the revision after it, so a change in between makes it fail (MC-05). */
 export const undoOps = (before: Trip, after: Trip): Op[] =>

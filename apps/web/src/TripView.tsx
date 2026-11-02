@@ -12,6 +12,7 @@ import type { Transfer } from "./money.ts";
 import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
 import { api } from "./api.ts";
 import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
+import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
 import { fmtDuration } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
@@ -90,6 +91,28 @@ export function ActivityText({ t, a, who, eye, onPlace }: { t: Trip; a: Activity
   );
 }
 
+/** AI-83: keep an item the AI added (its AI mark goes) or remove it at once, both with Ångra. Editing controls (mut). */
+export function AiKeep({ item, text, run }: { item: AiItem; text: string; run: Run }) {
+  return <span className="aikeep">
+    <IconButton icon="check" look="bare" tip="left" label={sv.aiReview.keep(text)} onClick={() => run((x) => keepAi(x, item), "keep ai")} mut />
+    <IconButton icon="close" look="bare" tip="left" label={sv.aiReview.remove(text)} onClick={() => run((x) => removeAi(x, item), "remove ai")} mut />
+  </span>;
+}
+
+/** AI-84: what the AI added and nobody has confirmed yet, as buttons that show it, and Behåll allt. Calm, not a warning. */
+function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (ids: string[]) => void; setTab: (t: Tab) => void }) {
+  const n = aiCounts(t), r = sv.aiReview;
+  if (!n.activities && !n.tasks && !n.bookings && !n.wishes) return null;
+  const section = (id: string) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+  const count = (k: keyof typeof r.kinds, v: number, go: () => void) => v > 0 && <button type="button" className="aicount" onClick={go}>{v} {v === 1 ? r.kinds[k][0] : r.kinds[k][1]}</button>;
+  return <div className="ainew" role="region" aria-label={r.title}>
+    <span className="ainew-h"><AiMark label={r.title} />{r.title}</span>
+    {count("activities", n.activities, () => openDays(n.days))}{count("tasks", n.tasks, () => section("sec-tasks"))}
+    {count("bookings", n.bookings, () => section("sec-bookings"))}{count("wishes", n.wishes, () => setTab("dr"))}
+    <button type="button" className="btn ghost aikeepall" onClick={() => run((x) => keepAllAi(x), "keep ai")}><Icon name="check" />{r.keepAll}</button>
+  </div>;
+}
+
 /** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. */
 export const TravelRow = ({ travel, li }: { travel?: Activity["travel"]; li?: boolean }) => {
   if (!travel) return null;
@@ -110,13 +133,14 @@ export const TicketButton = ({ b, edit }: { b: Trip["bookings"][number]; edit?: 
 /** The pin of a fixed activity, for those who only read the plan (ED-24). */
 export const PinMark = () => <span className="pinmark" role="img" aria-label={sv.pin.mark} title={sv.pin.mark}><Icon name="pin" /></span>;
 
-export function Activities({ t, x, onPlace, edit }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void }) {
+export function Activities({ t, x, onPlace, edit, run }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void; run?: Run }) {
   const who = hiddenFromIn(x);
   return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} />
     <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`}>
       <ActivityWhen a={a} />{a.pinned && <PinMark />}
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />
       {(() => { const b = ticketFor(t, a.id); return b && <TicketButton b={b} edit={edit} />; })() /* BK-08 */}
+      {edit && run && a.ai && <AiKeep item={{ kind: "activity", dayId: x.id, id: a.id }} text={a.text} run={run} /> /* AI-83 */}
       {edit && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${a.text}`} onClick={() => edit({ kind: "activity", dayId: x.id, id: a.id })} mut />}
     </div></Fragment>
   ))}</>;
@@ -194,6 +218,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
       </div>
       {open && (
         <div className="tools">
+          {editing && x.activities.some((a) => a.ai) && <IconButton icon="trash" look="bare" tip="left" label={sv.aiReview.removeDay} onClick={() => run((cur) => removeDayAi(cur, x.id), "remove ai")} mut /> /* AI-85 */}
           <IconButton icon="edit" look="bare" tip="left" label={sv.editDay} onClick={() => edit({ kind: "day", id: x.id })} mut />
         </div>
       )}
@@ -202,7 +227,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
           ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} />}><PreviewActivities t={t} x={x} m={marks ?? undefined} onPlace={onPlace} /></Suspense>
           : editing
           ? <Suspense fallback={<Activities t={t} x={x} onPlace={onPlace} edit={edit} />}><PlanActivities t={t} x={x} onPlace={onPlace} edit={edit} run={run} /></Suspense>
-          : <Activities t={t} x={x} onPlace={onPlace} edit={edit} />}
+          : <Activities t={t} x={x} onPlace={onPlace} edit={edit} run={run} />}
         {marks === undefined && review && suggested.length > 0 && <DaySuggestions list={suggested} review={review} />}
         <div className="add"><IconButton icon="plus" label={sv.addActivity} onClick={() => edit({ kind: "activity", dayId: x.id })} mut tip="right" /></div> {/* UI-09 */}
         {vehicles.length > 0 && <p><button className="badge linkish" onClick={onTransport}><CatIcons ids={vehicles} /> {sv.travelTime}</button></p>}
@@ -213,7 +238,7 @@ function DayCard({ t, x, today, open, forecast, onToggle, onPlace, onTransport, 
 
 export type TripViewProps = {
   t: Trip; cover?: string; tab: Tab; open: Open; forecast: Record<string, Forecast>;
-  setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void;
+  setTab: (t: Tab) => void; toggleDay: (id: string) => void; toggleAll: () => void; jump: (id: string) => void; openDays: (ids: string[]) => void; // openDays: AI-84
   place: (id: string) => void; transport: (dayId: string) => void; vote: (i: number) => void; addDream: () => void; editImage: (id: string) => void; back: () => void; admin: () => void;
   today: string; upDay: string | null; setUpDay: (id: string) => void;
   addExpense: () => void; addShortExpense: (currency: string, activity?: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }, pick?: { choices: { id: string; text: string; category?: string; dreamId?: string; activityId?: string }[]; guess?: string }) => void; /* Uppleva (UP-22, UP-30, UP-43) */ addPayment: (prefill?: Transfer) => void;
@@ -257,7 +282,7 @@ export function TripView(p: TripViewProps) {
   }, [t, reviews, tab]);
   let main;
   if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })}
-    suggestions={reviews ? wishSugs : []} review={p.review} /></Suspense>;
+    suggestions={reviews ? wishSugs : []} review={p.review} run={p.run} /></Suspense>;
   else if (tab === "nala") main = <>
     <div className="tl">{timelineStops(t).map((s, i) => (
       <button className="stop" key={`${s.dayId}-${i}`} aria-current={s.dayId === now ? "date" : undefined} onClick={() => p.jump(s.dayId)}><b>{stopLabel(s)}</b><small>{s.sub}</small></button>
@@ -265,6 +290,7 @@ export function TripView(p: TripViewProps) {
     <div className="bar top0">
       <IconButton icon={anyOpen(p.open) ? "collapse" : "expand"} label={toggleAllLabel(p.open)} onClick={p.toggleAll} tip="right" />
     </div><div style={{ height: 10 }}></div>
+    {perms.view.nala.plan === "write" && !preview && <AiNewBar t={t} run={p.run} openDays={p.openDays} setTab={p.setTab} />}
     {reviews && <Suspense fallback={null}><Proposals t={t} approve={p.review!.approve} reject={p.review!.reject} preview={preview} setPreview={setPreview} /></Suspense>}
     <div className="cols">
       <div>{days.map((x) => (

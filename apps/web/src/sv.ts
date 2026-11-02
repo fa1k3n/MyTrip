@@ -64,6 +64,11 @@ export const sv = {
   amount: "Belopp (kr)", paidBy: "Betalt av", addedBy: "Tillagd av", sharedBy: "Delas av", everyone: "alla", text: "Beskrivning",
   payments: "Inbetalningar", addPayment: "Registrera inbetalning", newPayment: "Ny inbetalning", noPayments: "Inga inbetalningar ännu.",
   from: "Från", to: "Till", note: "Notering",
+  aiReview: { // AI-83..AI-85
+    title: "Nytt från AI", keepAll: "Behåll allt", kept: "Behållet, AI-märket är borttaget", keep: (n: string) => `Behåll: ${n}`, remove: (n: string) => `Ta bort: ${n}`,
+    removeDay: "Ta bort AI-förslagen för dagen",
+    kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"] },
+  },
   travelHere: "Resväg hit", noTravel: "Ingen", travelMin: "Restid (minuter)", // TR-20
   travelVehicles: { walk: "Till fots", transit: "Kollektivt", car: "Bil", train: "Tåg", ferry: "Färja" } as Record<string, string>,
   travelRow: (vehicle: string, time: string) => `${vehicle}, ${time}`,

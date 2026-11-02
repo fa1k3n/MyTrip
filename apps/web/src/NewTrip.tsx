@@ -1,12 +1,14 @@
 // A new trip from "Beskriv din dröm" (AI-10): the description becomes the purpose as written, and with AI a draft of the trip
 // comes as a proposal to review in Nåla. Without AI the trip is made with the purpose only.
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { Trip } from "@trip/schema";
 import { api } from "./api.ts";
+import { draftSummary, readProposal, type Pending } from "./proposals.ts";
 import { aiErrorText } from "./format.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
 
-export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (id: string, notice?: string) => void; close: () => void }) {
+export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (id: string, notice?: string, draft?: string) => void; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
   useEffect(() => {
@@ -21,7 +23,7 @@ export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (i
     if (!withAi || !text.trim()) return created(id);
     try { await api.aiConsent(id); } catch { return created(id, sv.aiRun.errors.network); } // pressing "Skapa med AI" is the agreement (AI-64)
     const r = await api.ai(id, "draft");
-    created(id, r.ok ? (r.proposalIds.length ? sv.newTripAi.ready : sv.newTripAi.nothing) : aiErrorText(r));
+    created(id, r.ok ? (r.proposalIds.length ? undefined : sv.newTripAi.nothing) : aiErrorText(r), r.ok ? r.proposalIds[0] : undefined);
   };
   const submit = (e: FormEvent) => { e.preventDefault(); void make(ai); };
   return (
@@ -38,6 +40,49 @@ export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (i
           {ai && <button className="btn ghost" type="button" disabled={busy} onClick={() => void make(false)}>{sv.newTripAi.makeEmpty}</button>}
         </div>
       </form>
+    </dialog>
+  );
+}
+
+/** AI-75: the draft of a trip just made with AI, over Nåla: title, travelers and days in words, to use or to start empty.
+ * Closing keeps it as a proposal in Nåla's list. */
+export function DraftDialog({ t, pid, approve, reject, close }: {
+  t: Trip; pid: string; approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void>; close: (later: boolean) => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [p, setP] = useState<Pending | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  useEffect(() => {
+    const d = ref.current!, opener = document.activeElement as HTMLElement | null;
+    d.showModal();
+    return () => { opener?.focus(); };
+  }, []);
+  useEffect(() => {
+    api.proposals(t.id).then((ps) => { const x = (ps as unknown as Pending[]).find((y) => y.id === pid && y.status === "pending"); if (x) setP(x); else close(false); }, () => close(false));
+  }, [t.id, pid]); // eslint-disable-line react-hooks/exhaustive-deps -- once per draft
+  const next = p && readProposal(t, p).next;
+  const s = next && draftSummary(next);
+  const act = async (use: boolean) => {
+    setBusy(true); setErr("");
+    if (use) { const e = await approve(pid); if (e) { setErr(e); setBusy(false); return; } } else await reject(pid);
+    close(false);
+  };
+  return (
+    <dialog ref={ref} aria-label={sv.newTripAi.draftTitle} onClose={() => close(true)}>
+      <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => close(true)} disabled={busy} /></span>
+      <h3>{sv.newTripAi.draftTitle}</h3>
+      {!s ? <p className="ro">{sv.loading}</p> : <>
+        <p className="ro">{p!.reason || sv.newTripAi.draftLead}</p>
+        <p><b>{s.title}</b></p>
+        <h4>{sv.newTripAi.draftTravelers}</h4>
+        <ul className="asklist">{s.travelers.map((x) => <li key={x}>{x}</li>)}</ul>
+        <h4>{sv.newTripAi.draftDays}</h4>
+        <ul className="asklist">{s.days.map((x) => <li key={x}>{x}</li>)}</ul>
+        {err && <p className="err" role="alert">{err}</p>}
+        <div className="dlgbar">
+          <button className="btn" type="button" disabled={busy} onClick={() => void act(true)}>{sv.newTripAi.useDraft}</button>
+          <button className="btn ghost" type="button" disabled={busy} onClick={() => void act(false)}>{sv.newTripAi.emptyDraft}</button>
+        </div>
+      </>}
     </dialog>
   );
 }

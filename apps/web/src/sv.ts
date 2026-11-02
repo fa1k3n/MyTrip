@@ -148,7 +148,10 @@ export const sv = {
     note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
     makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI",
     busy: "AI-tjänsten gör ett utkast. Det tar upp till en minut…",
-    ready: "Ett utkast till resan väntar på dig i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",
+    vehicles: { car: "bil", ferry: "färja", train: "tåg", transit: "kollektivt", walk: "till fots" } as Record<string, string>, // AI-75
+    draftTitle: "Utkast till resan", draftLead: "Så här föreslår AI-tjänsten att resan börjar. Du kan ändra allt efteråt.",
+    draftTravelers: "Resenärer", draftDays: "Dagar", useDraft: "Använd utkastet", emptyDraft: "Börja från tomt",
+    draftLater: "Utkastet ligger kvar under Förslag i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",
   },
   aiRun: { // AI-03, AI-64, AI-65
     consentAsk: "Skicka resan till AI-tjänsten?", consentOk: "Godkänn och skicka",

@@ -31,6 +31,7 @@ const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login }
 const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
 const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
 const NewTripDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.NewTripDialog }))); // AI-10
+const DraftDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.DraftDialog }))); // AI-75
 const SetupPassword = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.SetupPassword }))); // US-05
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
@@ -96,6 +97,7 @@ export function App() {
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
   const [newOpen, setNewOpen] = useState(false); // AI-10: "Beskriv din dröm"
+  const [draft, setDraft] = useState<{ tripId: string; pid: string } | null>(null); // AI-75
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -226,11 +228,12 @@ export function App() {
   const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
   const newTrip = () => setNewOpen(true);
-  /** AI-10: with a draft the trip opens on Nåla, where the proposal is reviewed. */
-  const created = async (id: string, msg?: string) => {
+  /** AI-10: with a draft the trip opens on Nåla with the draft in a dialog (AI-75). */
+  const created = async (id: string, msg?: string, pid?: string) => {
     setNewOpen(false);
     await load();
-    openTrip(id, msg === sv.newTripAi.ready ? "nala" : "dr");
+    openTrip(id, pid ? "nala" : "dr");
+    if (pid) setDraft({ tripId: id, pid });
     if (msg) setNotice(msg);
   };
   /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
@@ -444,7 +447,9 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
-    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg) => void created(id, msg)} close={() => setNewOpen(false)} /></Suspense>}
+    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, pid) => void created(id, msg, pid)} close={() => setNewOpen(false)} /></Suspense>}
+    {draft && view === "trip" && t?.id === draft.tripId && <Suspense fallback={null}><DraftDialog t={t} pid={draft.pid} approve={approveProposal} reject={rejectMail}
+      close={(later) => { setDraft(null); if (later) setNotice(sv.newTripAi.draftLater); }} /></Suspense>}
     {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog

@@ -182,3 +182,13 @@ test("AI-68 consent turns the helper on", async () => {
   await call(app, "/api/trips/berlin/ai/consent", "a", "POST", { helper: "kitchen" });
   assert.deepEqual((await json(call(app, "/api/trips/berlin", "a"))).aiHelpers, { prep: true }, "only real helpers");
 });
+
+// REQ: AI-74 with the trip's AI switch off a helper is still listed, so the app shows it greyed, and the status says whether AI is on for the instance
+test("AI-74 status with the trip's switch off", async () => {
+  const { app } = await setup(fake([]), trip({ ai: false }));
+  const r = await json(call(app, "/api/trips/berlin/ai", "a"));
+  assert.equal(r.enabled, true);
+  assert.equal(r.helpers.prep.available, true);
+  const off = await setup(fake([]), trip(), { ai: { enabled: false, areas: {} } });
+  assert.equal((await json(call(off.app, "/api/trips/berlin/ai", "a"))).enabled, false);
+});

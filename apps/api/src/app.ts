@@ -921,6 +921,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   });
   /** AI-07, AI-62: the feature's capability, and the web for one that searches, are on for the instance and the trip. */
   const mayRun = (s: Settings, f: AiFeature, t: Trip) => aiOnForTrip(s, f.area, true, t) && (!f.web || aiOn(s, "web", true));
+  /** The same without the trip's switch: a helper the app lists, greyed while the trip's switch is off (AI-74). */
+  const offered = (s: Settings, f: AiFeature) => aiOn(s, f.area, true) && (!f.web || aiOn(s, "web", true));
   const spent = (xs: AiUse[]) => xs.reduce((n, x) => n + x.usd, 0);
   /** Which cap stops a person this month, if any (AI-03). */
   const capReached = (s: Settings, uses: AiUse[], who: string) => (spent(uses) >= (s.ai.capUsd ?? CAP_USD) ? "instance"
@@ -983,9 +985,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     for (const [name, f] of Object.entries(features())) {
       if (!f.helper) continue;
       const st = await store.aiHelper(t.id, name);
-      helpers[name] = { available: !!opts.ai && mayRun(s, f, t), on: !!t.aiHelpers?.[name], ...(st ? { at: st.at, result: st.result } : {}), remaining: runsLeft(s, uses, all, who, name) };
+      helpers[name] = { available: !!opts.ai && offered(s, f), on: !!t.aiHelpers?.[name], ...(st ? { at: st.at, result: st.result } : {}), remaining: runsLeft(s, uses, all, who, name) };
     }
-    return c.json({ consent: !!t.aiConsent, helpers });
+    return c.json({ enabled: !!opts.ai && s.ai.enabled, consent: !!t.aiConsent, helpers }); // AI-74: enabled, AI for the instance
   });
   // AI-65: one AI feature on the trip, now; for a helper the "Kör nu" button (AI-68).
   app.post("/api/trips/:id/ai/:feature", async (c) => {

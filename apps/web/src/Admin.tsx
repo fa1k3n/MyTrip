@@ -10,7 +10,7 @@ import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { IconButton } from "./Icons.tsx";
 import { QrDialog } from "./QrDialog.tsx";
-import { AiHelpers, TripAi } from "./Settings.tsx";
+import { TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
 import { sv } from "./sv.ts";
@@ -327,8 +327,8 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
 
 /** The trip's settings: only what applies to this trip (MT-13). A Planerare sees them; the AI switch and permissions are for the superuser
  * (AU-14), deleting also for the trip's owner (US-14). */
-export function AdminPage({ t, superuser, manager, settings, back, edit, addPerson, change, reload, run, removeTrip, openSettings }: {
-  t: Trip; superuser: boolean; manager: boolean; settings?: Settings; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
+export function AdminPage({ t, superuser, manager, back, edit, addPerson, change, reload, run, removeTrip, openSettings }: {
+  t: Trip; superuser: boolean; manager: boolean; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
   change: (ops: Op[], reason: string) => void | Promise<unknown>; reload: () => void | Promise<unknown>; removeTrip: () => void; openSettings: () => void;
 }) {
   return <>
@@ -343,8 +343,7 @@ export function AdminPage({ t, superuser, manager, settings, back, edit, addPers
     <ShareLink t={t} />
     <Inbox t={t} kind="bookings" />
     <Inbox t={t} kind="wishes" />
-    {superuser && settings && <TripAi s={settings} on={t.ai} consent={t.aiConsent} openSettings={openSettings} onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />}
-    {manager && <AiHelpers t={t} change={change} reload={reload} />}
+    {manager && <TripAi t={t} superuser={superuser} change={change} reload={reload} openSettings={openSettings} />}
     {manager && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
   </>;
 }

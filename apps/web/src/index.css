@@ -187,6 +187,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .stop[aria-pressed=true]::before{background:var(--sage);border-color:var(--sage)}
 .check input[type=checkbox]{flex:0 0 22px} /* keep checkboxes 22 px on long rows (TK-06) */
 .check.switch input[type=checkbox]{flex:0 0 44px} /* but a switch keeps its whole track (AI-08) */
+.sub.off{opacity:.5} /* helpers greyed while the trip's AI switch is off (AI-74) */
 .stop::before{width:18px;height:18px;border-width:3.5px}.stop::after{top:8px} /* slightly larger dots */
 /* Every dialog closes with an X in the top right corner (UI-07, PL-12); headings leave room for it. */
 dialog{position:fixed} /* fixed, not relative: a relative modal sits at the top of the page and focusing it scrolls there (PL-18) */

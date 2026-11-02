@@ -182,7 +182,7 @@ export const api = {
         : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
     } catch { return { ok: false, error: "network" }; }
   },
-  aiStatus: (tripId: string) => call<{ consent: boolean; helpers: Record<string, HelperStatus> }>(`${trip(tripId)}/ai`), // AI-68, AI-72
+  aiStatus: (tripId: string) => call<{ enabled: boolean; consent: boolean; helpers: Record<string, HelperStatus> }>(`${trip(tripId)}/ai`), // AI-68, AI-72
   aiConsent: (tripId: string, helper?: string) => call<{ revision: number }>(`${trip(tripId)}/ai/consent`, { method: "POST", body: JSON.stringify(helper ? { helper } : {}) }), // AI-64, AI-68
   users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12
   addUser: (name: string, email: string) => call<{ user: UserInfo; setup: SetupLink }>("/api/users", { method: "POST", body: JSON.stringify({ name, email }) }),

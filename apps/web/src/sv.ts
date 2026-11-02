@@ -164,8 +164,15 @@ export const sv = {
     capInvalid: "Skriv ett belopp, till exempel 5 eller 2,5.",
     cost: (name: string, calls: number, usd: string) => `${name}: ${calls} AI-anrop, ${usd} USD`, costTitle: "AI",
     auto: "AI-hjälpen", // AI-69: who an automatic run is made by
-    helpersTitle: "AI-hjälp", helpersLead: "Påslagen hjälp körs av sig själv en stund efter att resan ändrats. Förslagen dyker upp i listan och läggs till först när du tar med dem.",
+    helpersTitle: "AI-hjälp",
     helpers: { prep: ["Bra att veta inför resan", "Föreslår regler, dokument och sånt som ska beställas i förväg längs hela resvägen, som uppgifter i Att göra."] } as Record<string, [string, string]>,
+    info: (name: string) => `Om ${name}`, // AI-74
+    about: { prep: [
+      "Letar upp sånt som är lätt att missa inför resan: regler längs hela resvägen som miljödekaler, vägtullar och vinjetter, dokument som pass och EU-kort, och sånt som måste bokas eller beställas i förväg.",
+      "Hjälpen körs av sig själv tio minuter efter att resans datum, platser, rutt, resenärer eller syfte ändrats. Med Kör nu körs den direkt.",
+      "Förslagen hamnar under Att göra i Nåla, märkta AI-förslag och med en källa. Inget läggs till förrän du tar med det, och det du avvisar föreslås inte igen.",
+      "Kontrollera reglerna via källan, de kan ha ändrats. Varje körning kostar en liten summa, därför visas ungefär hur många körningar som är kvar i månaden.",
+    ] } as Record<string, string[]>,
     runNow: (name: string) => `Kör nu: ${name}`, ran: (n: number) => (n ? `${n} nya förslag.` : "Inget nytt att föreslå."),
     never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
     left: (n: number) => `ca ${n} ${n === 1 ? "körning" : "körningar"} kvar`, capped: "Taket för månaden är nått",

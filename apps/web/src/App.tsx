@@ -408,7 +408,7 @@ export function App() {
   </>;
   else if (view === "admin") page = (
     <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      <AdminPage t={t} superuser={perms(t).superuser} manager={perms(t).manager} settings={settings} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} reload={load} run={run} removeTrip={removeTrip}
+      <AdminPage t={t} superuser={perms(t).superuser} manager={perms(t).manager} back={() => setView("trip")} edit={setDlg} addPerson={() => setDlg({ kind: "person" })} change={change} reload={load} run={run} removeTrip={removeTrip}
         openSettings={() => { setSettingsBack("admin"); setView("settings"); }} />
     </Suspense>
   );

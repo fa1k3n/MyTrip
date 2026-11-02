@@ -4,6 +4,7 @@ import { CAP_ACCOUNT_USD, CAP_USD, type AiArea, type Op, type Settings, type Tri
 import { api, maskedToken, type HelperStatus } from "./api.ts";
 import { IconButton } from "./Icons.tsx";
 import { startAi } from "./aiStart.ts";
+import { InfoButton } from "./InfoButton.tsx";
 import { sv } from "./sv.ts";
 import { aiConsentLine, capValue, helperLine } from "./format.ts";
 import { ask } from "./Ask.tsx"; // UI-11
@@ -11,39 +12,29 @@ import { Users } from "./Users.tsx";
 import { BetaNotes, BetaUsage } from "./Beta.tsx";
 
 /** On/off switch with an explanation shown on hover or keyboard focus, and read by screen readers. */
-export function Switch({ id, label, tip, checked, onChange }: { id: string; label: string; tip: string; checked: boolean; onChange: (on: boolean) => void }) {
+export function Switch({ id, label, tip, checked, disabled, onChange }: { id: string; label: string; tip: string; checked: boolean; disabled?: boolean; onChange: (on: boolean) => void }) {
   return (
     <label className="check switch">
-      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-describedby={`tip-${id}`} />
+      <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-describedby={`tip-${id}`} />
       {label}
       <span className="tip" id={`tip-${id}`} role="tooltip">{tip}</span>
     </label>
   );
 }
 
-/** The trip's single AI switch; shown only while AI is on for the instance (AI-62). */
-export function TripAi({ s, on, consent, onChange, openSettings }: { s: Settings; on: boolean; consent?: { by: string; at: string }; onChange: (on: boolean) => void; openSettings: () => void }) {
-  return (
-    <div className="card">
-      <h3>{sv.ai}</h3>
-      {s.ai.enabled
-        ? <Switch id="trip-ai" label={sv.tripAi} tip={sv.tripAiTip} checked={on} onChange={onChange} />
-        : <p>{sv.aiOffAll} <button className="place" onClick={openSettings}>{sv.aiOpenSettings}</button></p>}
-      {consent && <p className="ro note">{aiConsentLine(consent)}</p>}
-    </div>
-  );
-}
-
-/** The trip's AI helpers for those who plan it: a switch each, a "Kör nu" button, the latest run and the runs left (AI-68, AI-72).
- * Turning one on asks for the agreement first when the trip has none (AI-64). */
-export function AiHelpers({ t, change, reload }: { t: Trip; change: (ops: Op[], reason: string) => void | Promise<unknown>; reload: () => void | Promise<unknown> }) {
-  const [st, setSt] = useState<Record<string, HelperStatus> | null>(null);
+/** AI on the trip in one card (AI-74): the trip's switch (AI-62), changed by the superuser, and under it the helpers for those who plan
+ * the trip, each a switch with an "i", a "Kör nu" button, the latest run and the runs left (AI-68, AI-72); greyed while the trip's
+ * switch is off. Turning a helper on asks for the agreement first when the trip has none (AI-64). */
+export function TripAi({ t, superuser, change, reload, openSettings }: {
+  t: Trip; superuser: boolean; change: (ops: Op[], reason: string) => void | Promise<unknown>; reload: () => void | Promise<unknown>; openSettings: () => void;
+}) {
+  const [st, setSt] = useState<{ enabled: boolean; helpers: Record<string, HelperStatus> } | null>(null);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const refresh = () => api.aiStatus(t.id).then((r) => setSt(r.helpers), () => setSt(null));
+  const refresh = () => api.aiStatus(t.id).then(setSt, () => setSt(null));
   useEffect(() => { void refresh(); }, [t.id, t.revision]); // eslint-disable-line react-hooks/exhaustive-deps -- again after each change
-  const shown = Object.entries(st ?? {}).filter(([, h]) => h.available);
-  if (!shown.length) return null;
+  if (!st) return null;
+  const shown = Object.entries(st.helpers).filter(([, h]) => h.available);
   const runNow = async (name: string) => {
     setBusy(name); setMsg("");
     const r = await startAi(t.id, name);
@@ -59,13 +50,27 @@ export function AiHelpers({ t, change, reload }: { t: Trip; change: (ops: Op[], 
     } else await change([{ op: "set", path: "aiHelpers", value: { ...t.aiHelpers, [name]: on } }], `ai helper ${name} ${on ? "on" : "off"}`);
     if (on) await runNow(name);
   };
-  return <div className="card"><h3>{sv.aiRun.helpersTitle}</h3><p className="ro note">{sv.aiRun.helpersLead}</p>
-    {shown.map(([name, h]) => { const [label, tip] = sv.aiRun.helpers[name] ?? [name, ""]; return <div key={name}>
-      <div className="row mid"><Switch id={`helper-${name}`} label={label} tip={tip} checked={h.on} onChange={(on) => void flip(name, on)} />
-        <IconButton icon="refresh" look="bare" tip="left" label={sv.aiRun.runNow(label)} disabled={!!busy} onClick={() => void runNow(name)} /></div>
-      <p className="ro note" role="status">{busy === name ? sv.loading : helperLine(h, t.timezone)}</p></div>; })}
-    {msg && <p className="ro note" role="status">{msg}</p>}
-  </div>;
+  return (
+    <div className="card">
+      <h3>{sv.ai}</h3>
+      {!st.enabled
+        ? <p>{sv.aiOffAll} {superuser && <button className="place" onClick={openSettings}>{sv.aiOpenSettings}</button>}</p>
+        : <>
+          <Switch id="trip-ai" label={sv.tripAi} tip={sv.tripAiTip} checked={t.ai} disabled={!superuser}
+            onChange={(on) => change([{ op: "set", path: "ai", value: on }], on ? "AI on for trip" : "AI off for trip")} />
+          {!!shown.length && <fieldset className={t.ai ? "sub" : "sub off"}>{/* greyed, but the "i" still explains (AI-74) */}
+            <legend className="ro">{sv.aiRun.helpersTitle}</legend>
+            {shown.map(([name, h]) => { const [label, tip] = sv.aiRun.helpers[name] ?? [name, ""]; return <div key={name}>
+              <div className="row mid"><Switch id={`helper-${name}`} label={label} tip={tip} checked={h.on} disabled={!t.ai} onChange={(on) => void flip(name, on)} />
+                <span className="end"><InfoButton title={label} lines={sv.aiRun.about[name] ?? [tip]} label={sv.aiRun.info(label)} />
+                  <IconButton icon="refresh" look="bare" tip="left" label={sv.aiRun.runNow(label)} disabled={!!busy || !t.ai} onClick={() => void runNow(name)} /></span></div>
+              <p className="ro note" role="status">{busy === name ? sv.loading : helperLine(h, t.timezone)}</p></div>; })}
+            {msg && <p className="ro note" role="status">{msg}</p>}
+          </fieldset>}
+        </>}
+      {t.aiConsent && <p className="ro note">{aiConsentLine(t.aiConsent)}</p>}
+    </div>
+  );
 }
 
 export function AiSettings({ s, service, onChange }: { s: Settings; service: boolean; onChange: (next: Settings) => void }) {

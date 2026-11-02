@@ -190,6 +190,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .sub.off{opacity:.5} /* helpers greyed while the trip's AI switch is off (AI-74) */
 .aimark{display:inline-flex;vertical-align:-2px;margin-right:6px;color:var(--acc)}.aimark svg{width:16px;height:16px} /* an AI suggestion (AI-70) */
 .eye.lead{margin:0 6px 0 0;vertical-align:-3px} /* marks stand before a row's text (UI-21) */
+/* While the AI makes a trip's draft (AI-76): a calm ring, still for reduced motion. */
+.working{text-align:center}.working h3:first-of-type{padding-right:0} /* no X while working */.working .manifest{text-align:left;margin:14px 0 0;font-size:1rem}
+.spinner{width:44px;height:44px;margin:14px auto;border:4px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none;border-top-color:var(--line);border-right-color:var(--acc)}}
 .stop::before{width:18px;height:18px;border-width:3.5px}.stop::after{top:8px} /* slightly larger dots */
 /* Every dialog closes with an X in the top right corner (UI-07, PL-12); headings leave room for it. */
 dialog{position:fixed} /* fixed, not relative: a relative modal sits at the top of the page and focusing it scrolls there (PL-18) */

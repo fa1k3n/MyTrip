@@ -147,7 +147,7 @@ export const sv = {
     aiNote: "Texten sparas som resans syfte. Den skickas som den är till AI-tjänsten Claude från Anthropic, som föreslår namn, datum, resenärer och dagar. Inget läggs in förrän du godkänner förslaget i Nåla.",
     note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
     makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI",
-    busy: "AI-tjänsten gör ett utkast. Det tar upp till en minut…",
+    working: "Skapar din resa…", busy: "AI-tjänsten gör ett utkast utifrån din beskrivning. Det tar upp till en minut.", seconds: (n: number) => `${n} s`, // AI-76
     vehicles: { car: "bil", ferry: "färja", train: "tåg", transit: "kollektivt", walk: "till fots" } as Record<string, string>, // AI-75
     draftTitle: "Utkast till resan", draftLead: "Så här föreslår AI-tjänsten att resan börjar. Du kan ändra allt efteråt.",
     draftTravelers: "Resenärer", draftDays: "Dagar", useDraft: "Använd utkastet", emptyDraft: "Börja från tomt",

@@ -11,6 +11,7 @@ import { sv } from "./sv.ts";
 export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (id: string, notice?: string, draft?: string) => void; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [text, setText] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const [working, setWorking] = useState(false); // AI-76: the AI service is making the draft
   useEffect(() => {
     const d = ref.current!, opener = document.activeElement as HTMLElement | null;
     d.showModal();
@@ -22,26 +23,39 @@ export function NewTripDialog({ ai, created, close }: { ai: boolean; created: (i
     try { id = (await api.create(sv.newTripTitle, text.trim())).id; } catch { setBusy(false); setErr(sv.couldNotSave); return; }
     if (!withAi || !text.trim()) return created(id);
     try { await api.aiConsent(id); } catch { return created(id, sv.aiRun.errors.network); } // pressing "Skapa med AI" is the agreement (AI-64)
+    setWorking(true);
     const r = await api.ai(id, "draft");
     created(id, r.ok ? (r.proposalIds.length ? undefined : sv.newTripAi.nothing) : aiErrorText(r), r.ok ? r.proposalIds[0] : undefined);
   };
   const submit = (e: FormEvent) => { e.preventDefault(); void make(ai); };
   return (
-    <dialog ref={ref} aria-label={sv.newTripAi.title} onClose={() => { if (!busy) close(); }}>
+    <dialog ref={ref} aria-label={working ? sv.newTripAi.working : sv.newTripAi.title} onCancel={(e) => { if (busy) e.preventDefault(); }} onClose={() => { if (!busy) close(); }}>
+      {working ? <Working text={text.trim()} /> : <>
       <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={close} disabled={busy} /></span>
       <h3>{sv.newTripAi.title}</h3>
       <form onSubmit={submit}>
         <label>{sv.newTripAi.label}<textarea rows={6} maxLength={2000} value={text} placeholder={sv.newTripAi.example} onChange={(e) => setText(e.target.value)} disabled={busy} autoFocus /></label>
         <p className="ro note">{ai ? sv.newTripAi.aiNote : sv.newTripAi.note}</p>
         {err && <p className="err" role="alert">{err}</p>}
-        {busy && ai && <p className="ro" role="status">{sv.newTripAi.busy}</p>}
         <div className="dlgbar">
           <button className="btn" type="submit" disabled={busy || (ai && !text.trim())}>{ai ? sv.newTripAi.makeAi : sv.newTripAi.make}</button>
           {ai && <button className="btn ghost" type="button" disabled={busy} onClick={() => void make(false)}>{sv.newTripAi.makeEmpty}</button>}
         </div>
-      </form>
+      </form></>}
     </dialog>
   );
+}
+
+/** AI-76: while the draft is made: a calm spinner, the seconds that have passed and the description being worked on. */
+function Working({ text }: { text: string }) {
+  const [s, setS] = useState(0);
+  useEffect(() => { const i = setInterval(() => setS((n) => n + 1), 1000); return () => clearInterval(i); }, []);
+  return <div className="working" role="status" aria-live="polite">
+    <h3>{sv.newTripAi.working}</h3>
+    <div className="spinner" aria-hidden="true" />
+    <p className="ro">{sv.newTripAi.busy} <span aria-hidden="true">{sv.newTripAi.seconds(s)}</span></p>
+    <blockquote className="manifest">{text}</blockquote>
+  </div>;
 }
 
 /** AI-75: the draft of a trip just made with AI, over Nåla: title, travelers and days in words, to use or to start empty.

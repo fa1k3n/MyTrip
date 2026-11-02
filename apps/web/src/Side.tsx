@@ -9,7 +9,7 @@ import { amountText } from "./budget.ts";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
 import { sv } from "./sv.ts";
-import { Icon, IconButton, PlannedMark } from "./Icons.tsx";
+import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
@@ -134,7 +134,7 @@ function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (er
   const v = (p.ops[0]?.value ?? {}) as { text?: string; due?: string; url?: string };
   const text = v.text ?? "";
   return <div className="row mid todo">
-    <span><span className="badge">{sv.aiRun.suggestion}</span>{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
+    <span><AiMark />{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
       {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}</span>
     <span className="end">
       <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => done(await review.approve(p.id))} />

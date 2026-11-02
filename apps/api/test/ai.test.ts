@@ -190,3 +190,23 @@ test("AI-03 D1 keeps AI uses per month", async () => {
   assert.deepEqual((await store.aiUses("2026-11")).map((x) => x.id), ["u2"]);
   assert.deepEqual((await store.aiUses()).map((x) => x.id), ["u1", "u2"]);
 });
+
+// REQ: AI-65 web search with dynamic filtering runs code, which cannot be combined with disable_parallel_tool_use
+test("AI-65 no disable_parallel_tool_use", async () => {
+  const ai = fake(reply([task("k1")]));
+  await runAi(ai, { ...tasksOnly, web: true }, Trip.parse(trip()));
+  assert.equal(JSON.stringify(ai.seen[0]!.tool_choice ?? {}).includes("disable_parallel_tool_use"), false);
+});
+
+// REQ: AI-65 several proposal calls in one reply are combined, and on problems each call gets its own answer
+test("AI-65 several proposal calls in one reply", async () => {
+  const two = (a: unknown[], b: unknown[]) => ({ ...reply(a), content: [
+    { type: "tool_use", id: "u1", name: "propose_change", input: { ops: a, reason: "Ett" } },
+    { type: "tool_use", id: "u2", name: "propose_change", input: { ops: b, reason: "Två" } }] });
+  const ai = fake(two([task("k1")], [{ op: "add", path: "tasks/-", value: { id: "bad", done: false } }]) as never, two([task("k1")], [task("k2", "Ta med EU-kortet")]) as never);
+  const r = await runAi(ai, tasksOnly, Trip.parse(trip()));
+  assert.ok("ops" in r);
+  assert.deepEqual(r.ops.map((o) => (o.value as { id: string }).id), ["k1", "k2"]);
+  const back = ai.seen[1]!.messages.at(-1)!.content as { type: string; tool_use_id: string }[];
+  assert.deepEqual(back.map((b) => [b.type, b.tool_use_id]), [["tool_result", "u1"], ["tool_result", "u2"]]);
+});

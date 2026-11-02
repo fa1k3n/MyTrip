@@ -945,7 +945,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const own = h ? (await store.proposals(t.id)).filter((p) => p.source?.kind === "ai" && p.source.feature === name && p.status !== "approved") : [];
     const avoid = h ? [...h.known(t), ...own.flatMap((p) => p.ops.map(h.textOf))] : [];
     let r: AiResult;
-    try { r = await runAi(opts.ai!.call, f, t, avoid); } catch { r = { error: "failed", cost: NO_COST }; }
+    try { r = await runAi(opts.ai!.call, f, t, avoid); } catch (e) {
+      console.error(`AI ${name} on ${t.id} failed:`, e instanceof Error ? e.message : e); // shows in the Worker's logs
+      r = { error: "failed", cost: NO_COST };
+    }
     let ops = "error" in r ? [] : r.ops;
     if (h) { // AI-70: nothing the trip has or the travelers rejected, each with an id of its own
       const taken = new Set([...t.tasks.map((k) => k.id), ...t.dreams.map((w) => w.id), ...own.flatMap((p) => p.ops.map((o) => String((o.value as { id?: unknown })?.id)))]);

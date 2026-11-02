@@ -150,19 +150,22 @@ export async function runAi(call: AiCall, f: AiFeature, t: Trip, avoid: string[]
   for (let i = 0; i < TRIES; i++) {
     const m = await call({
       model: MODEL, max_tokens: 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "medium" },
-      system: `${SYSTEM}\n\n${f.instructions}`, tools, tool_choice: { type: "auto", disable_parallel_tool_use: true }, messages,
+      // no disable_parallel_tool_use: web search with dynamic filtering runs code, which rejects it
+      system: `${SYSTEM}\n\n${f.instructions}`, tools, tool_choice: { type: "auto" }, messages,
     });
     cost = add(cost, costOf(m));
     if (m.stop_reason === "refusal") return { error: "refusal", cost };
     messages.push({ role: "assistant", content: m.content });
     if (m.stop_reason === "pause_turn") continue; // a long web search goes on in the next request
-    const use = m.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === PROPOSE.name);
-    if (!use) return { error: "no proposal", cost };
-    const input = use.input as { ops?: unknown; reason?: unknown };
-    const ops = isOps(input.ops) ? fromAi(input.ops, refs) : undefined;
+    // Several calls in one reply are taken together; each gets its own answer when they go back (the API requires one per call).
+    const uses = m.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === PROPOSE.name);
+    if (!uses.length) return { error: "no proposal", cost };
+    const inputs = uses.map((u) => u.input as { ops?: unknown; reason?: unknown });
+    const ops = inputs.every((x) => isOps(x.ops)) ? fromAi(inputs.flatMap((x) => x.ops as Op[]), refs) : undefined;
     const problems = ops ? problemsOf(f, t, ops) : ["ops must be a list of { op, path, value }"];
-    if (ops && !problems.length) return { ops, reason: typeof input.reason === "string" ? input.reason.slice(0, 500) : "", cost };
-    messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: use.id, is_error: true, content: problems.join("\n") }] });
+    const reason = inputs.map((x) => (typeof x.reason === "string" ? x.reason : "")).filter(Boolean).join(" ").slice(0, 500);
+    if (ops && !problems.length) return { ops, reason, cost };
+    messages.push({ role: "user", content: uses.map((u) => ({ type: "tool_result" as const, tool_use_id: u.id, is_error: true, content: problems.join("\n") })) });
   }
   return { error: "failed", cost };
 }

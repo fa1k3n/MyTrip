@@ -283,7 +283,49 @@ export function readingToForm(f: BookingInput, r: BookingReading): BookingInput 
   };
 }
 
-export const removeBooking = (t: Trip, id: string): Op[] => removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]);
+type Booking = Trip["bookings"][number];
+
+/** The booking form for a booking, or for a new one on the trip's first date. */
+export function bookingForm(t: Trip, b?: Booking): BookingInput {
+  const first = [...t.days].sort((x, y) => x.date.localeCompare(y.date))[0]?.date ?? "";
+  return {
+    name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
+    note: b?.note ?? "", kind: b?.kind ?? "other", checkIn: b?.checkIn ?? "", checkOut: b?.checkOut ?? "", start: b?.start ?? "", activityId: b?.activityId ?? "",
+    files: b?.files ?? [],
+  };
+}
+
+const STOP = new Set(["till", "från", "eller", "efter", "inför", "under", "utan", "with", "from", "your", "this", "that", "bokning", "booking"]);
+/** The words of at least four letters, in lower case. */
+const words = (s: string) => new Set(s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !STOP.has(w)));
+const shared = (a: string, b: string) => { const w = words(b); return [...words(a)].filter((x) => w.has(x)).length; };
+const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 864e5;
+
+/** The "Att boka" bookings a reading may be the confirmation of, the best first (BK-22). */
+export function toBookMatches(t: Trip, r: BookingReading): Booking[] {
+  const to = r.to ?? r.from;
+  return t.bookings.flatMap((b) => {
+    const kind = b.kind ?? "other", n = r.name ? shared(r.name, b.name) : 0;
+    const overlap = !!r.from && r.from <= b.to && to! >= b.from;
+    if (b.status !== "tobook" || (r.kind && r.kind !== kind) || (r.from && !overlap)) return [];
+    return n > 0 || (r.kind && overlap) ? [{ b, n, d: r.from ? days(r.from, b.from) : 0 }] : [];
+  }).sort((x, y) => y.n - x.n || x.d - y.d).map((x) => x.b);
+}
+
+/** The form for an "Att boka" booking filled in with a reading: now booked, with its own and the mail's ticket files (BK-22). */
+export function matchedForm(t: Trip, b: Booking, r: BookingReading, files: TicketFile[]): BookingInput {
+  const f = readingToForm(bookingForm(t, b), r);
+  return { ...f, status: r.status ?? "ready", files: [...(b.files ?? []), ...files] };
+}
+
+/** The activity on the first date a ticket is most likely for: most shared words, else the same start time; only one best (BK-23). */
+export function ticketActivityFor(t: Trip, name: string, date: string, start?: string): string | undefined {
+  const scored = ticketActivities(t, date).map((a) => ({ id: a.id, n: shared(name, a.text) * 2 + (start && a.start === start ? 1 : 0) }))
+    .filter((x) => x.n > 0).sort((x, y) => y.n - x.n);
+  return scored[0] && scored[0].n !== scored[1]?.n ? scored[0].id : undefined;
+}
+
+export const removeBooking =(t: Trip, id: string): Op[] => removeAt("bookings", [t.bookings.findIndex((b) => b.id === id)]);
 
 export type BudgetInput = {
   category: string; amount: string; paid: boolean; owner: string;

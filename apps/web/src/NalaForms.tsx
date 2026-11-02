@@ -1,10 +1,10 @@
 // Dialog forms for editing the plan (ED-01..ED-11). The changes themselves are built in edit.ts.
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import type { Op, Trip } from "@trip/schema";
+import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, travelInput, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
-  readingToForm, ticketActivities, type BookingInput, type Result,
+  readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, type BookingInput, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
 import { Icon, IconButton } from "./Icons.tsx";
@@ -298,21 +298,25 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
 function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   const s = useSave(p);
   const b = p.t.bookings.find((x) => x.id === p.id), mail = p.proposal;
-  const first = [...p.t.days].sort((x, y) => x.date.localeCompare(y.date))[0]?.date ?? "";
-  const [f, setF] = useState<BookingInput>(() => {
-    const init: BookingInput = {
-      name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
-      note: b?.note ?? "", kind: b?.kind ?? "other", checkIn: b?.checkIn ?? "", checkOut: b?.checkOut ?? "", start: b?.start ?? "", activityId: b?.activityId ?? "",
-      files: b?.files ?? [],
-    };
-    return mail?.booking ? { ...readingToForm(init, mail.booking), files: mail.booking.files ?? [] } : init; // BK-17
-  });
+  // What was read from the mail or a pasted text, and the "Att boka" booking it fills in, "" for a new one (BK-17, BK-18, BK-22)
+  const [read, setRead] = useState<{ r: BookingReading; files: TicketFile[] } | null>(() => (mail?.booking ? { r: mail.booking, files: mail.booking.files ?? [] } : null));
+  const matches = !p.id && read ? toBookMatches(p.t, read.r) : [];
+  const [target, setTarget] = useState(() => matches[0]?.id ?? "");
+  const fillIn = (base: BookingInput, r: BookingReading, files: TicketFile[], into: string): BookingInput => {
+    const to = p.t.bookings.find((x) => x.id === into);
+    const g = to ? matchedForm(p.t, to, r, files) : { ...readingToForm(base, r), files: [...(base.files ?? []), ...files] };
+    return g.kind === "ticket" && !g.activityId ? { ...g, activityId: ticketActivityFor(p.t, g.name, g.from, g.start) ?? "" } : g; // BK-23
+  };
+  const [f, setF] = useState<BookingInput>(() => (read ? fillIn(bookingForm(p.t, b), read.r, read.files, target) : bookingForm(p.t, b)));
+  const retarget = (into: string) => { setTarget(into); if (read) setF(fillIn(bookingForm(p.t), read.r, read.files, into)); };
   const text = (k: keyof BookingInput) => ({ value: (f[k] as string | undefined) ?? "", onChange: (e: Change) => setF((o) => ({ ...o, [k]: e.target.value })) });
   const [paste, setPaste] = useState<string | null>(null), [filled, setFilled] = useState(""); // BK-18
   const fill = () => {
     const r = readBooking({ text: paste ?? "" }, p.t.days.map((d) => d.date));
     setFilled(Object.keys(r).length ? sv.mail.filled : sv.mail.nothing);
-    if (Object.keys(r).length) { setF((o) => readingToForm(o, r)); setPaste(null); }
+    if (!Object.keys(r).length) return;
+    const into = p.id ? "" : toBookMatches(p.t, r)[0]?.id ?? "";
+    setRead({ r, files: [] }); setTarget(into); setF((o) => fillIn(o, r, [], into)); setPaste(null);
   };
   const [uploading, setUploading] = useState(false), pick = useRef<HTMLInputElement>(null);
   const addFiles = async (list: FileList | null) => { // BK-09
@@ -334,15 +338,19 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   const kinds: NonNullable<BookingInput["kind"]>[] = ["stay", "ticket", "other", ...(b?.kind === "transport" ? ["transport" as const] : [])];
   const acts = ticketActivities(p.t, f.from);
   const submit = () => {
-    const r = saveBooking(p.t, f, p.id);
+    const r = saveBooking(p.t, f, p.id ?? (target || undefined)); // BK-22: a chosen "Att boka" booking is updated
     if (mail && p.approveMail) s.submit(r, "", (ops) => p.approveMail!(mail.id, ops)); // BK-17: saving approves the mail
-    else s.submit(r, p.id ? "edit booking" : "add booking");
+    else s.submit(r, p.id || target ? "edit booking" : "add booking");
   };
   const remove = mail && p.rejectMail ? async () => { if (await ask(sv.mail.confirmReject)) p.rejectMail!(mail.id).then(p.close); }
     : p.id ? () => s.remove(removeBooking(p.t, p.id!), "remove booking") : undefined;
   return (
     <Form title={mail ? sv.mail.review : p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close} onSubmit={submit} onRemove={remove}>
       {mail && <p className="ro note mailfrom"><span className="ico"><Icon name="mail" /></span>{sv.mail.from(mail.source?.subject || sv.mail.noSubject, mail.source?.from ?? "")}<br />{sv.mail.checkFilled}</p>}
+      {matches.length > 0 && <label>{sv.mail.target}<select value={target} onChange={(e) => retarget(e.target.value)}>
+        <option value="">{sv.mail.newBooking}</option>
+        {matches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>{target && <small className="ro">{sv.mail.targetHint}</small>}</label>}
       <div className="lblrow">
         <label htmlFor="bname">{sv.name}</label>
         <IconButton icon="paste" look="bare" tip="left" label={sv.mail.paste} pressed={paste !== null} onClick={() => { setPaste((x) => (x === null ? "" : null)); setFilled(""); }} />

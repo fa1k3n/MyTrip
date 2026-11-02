@@ -273,6 +273,7 @@ export const sv = {
     reject: "Ta bort förslaget", confirmReject: "Ta bort bokningen från mejlet? Dess filer raderas.", checkFilled: "Ifyllt från mejlet. Kontrollera innan du sparar.",
     paste: "Fyll i från bekräftelse", pasteLabel: "Klistra in texten från bokningsbekräftelsen", read: "Fyll i",
     filled: "Fälten är ifyllda från texten. Kontrollera dem innan du sparar.", nothing: "Hittade inget att fylla i.", noSubject: "(utan ämne)",
+    target: "Gäller", newBooking: "Ny bokning", targetHint: "Bokningen som stod som Att boka fylls i och blir klar.", // BK-22
   },
   bookingKinds: { // BK-07, BK-08
     label: "Typ", stay: "Boende", ticket: "Biljett", other: "Övrigt", transport: "Resa", in: "in", out: "ut",

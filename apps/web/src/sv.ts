@@ -10,7 +10,7 @@ export const sv = {
     stale: "Resan har ändrats sedan förslaget gjordes. Avvisa det och be om ett nytt.", problems: "Förslaget går inte att godkänna:", none: "Förslaget ändrar ingenting.",
     pin: (title: string) => `Rubbar en nål: ${title}`,
     other: "Övrigt", added: "Ny", changed: "Ändrad", removed: "Tas bort", preview: "Så här blir planen med förslaget. Inget är sparat än.",
-    kinds: { activity: "Aktivitet", days: "Dag", places: "Plats", bookings: "Bokning", budget: "Budgetpost", tasks: "Att göra", info: "Praktiskt", travelers: "Resenär", dreams: "Önskan", expenses: "Utlägg", payments: "Betalning" },
+    kinds: { stops: "Tidslinje", activity: "Aktivitet", days: "Dag", places: "Plats", bookings: "Bokning", budget: "Budgetpost", tasks: "Att göra", info: "Praktiskt", travelers: "Resenär", dreams: "Önskan", expenses: "Utlägg", payments: "Betalning" },
   },
   pin: { on: "Nåla fast", off: "Ta bort nålen", mark: "Nålad", ask: (title: string) => `Ta bort nålen för ${title}? Då kan den flyttas, tidsändras och tas bort.`, locked: "Aktiviteten är nålad: tid och längd ändras inte, och den flyttas eller tas inte bort förrän nålen tas bort." }, // ED-24, ED-25
   undo: { button: "Ångra", failed: "Kunde inte ångra. Resan har ändrats sedan dess.", kinds: { add: "Lade till", change: "Ändrade", remove: "Tog bort" } }, // ED-22
@@ -141,6 +141,15 @@ export const sv = {
   aiOffAll: "AI är avstängt för alla resor.", aiOpenSettings: "Öppna inställningarna",
   settings: "Inställningar", ai: "AI", aiMain: "Använd AI i appen", aiPerArea: "Vad AI får göra",
   aiPrivacy: "Data skickas till AI-tjänsten först när AI är påslaget. Bokningsnummer och telefonnummer skickas aldrig.",
+  newTripAi: { // AI-10
+    title: "Ny resa", label: "Beskriv din dröm",
+    example: "Vi vill åka till Hamburg på höstlovet med barnen, som är 7 och 10 år. Vi tar bilen och vill inte köra mer än fyra timmar om dagen. Barnen älskar djur och båtar, och vi vuxna vill äta gott och hinna med något museum. Gärna ett hotell med pool.",
+    aiNote: "Texten sparas som resans syfte. Den skickas som den är till AI-tjänsten Claude från Anthropic, som föreslår namn, datum, resenärer och dagar. Inget läggs in förrän du godkänner förslaget i Nåla.",
+    note: "Texten sparas som resans syfte och hjälper till med förslag senare.",
+    makeAi: "Skapa med AI", make: "Skapa resa", makeEmpty: "Skapa utan AI",
+    busy: "AI-tjänsten gör ett utkast. Det tar upp till en minut…",
+    ready: "Ett utkast till resan väntar på dig i Nåla.", nothing: "AI-tjänsten hittade inget att föreslå. Resan är skapad med din beskrivning.",
+  },
   aiRun: { // AI-03, AI-64, AI-65
     consentAsk: "Skicka resan till AI-tjänsten?", consentOk: "Godkänn och skicka",
     consentDetails: [

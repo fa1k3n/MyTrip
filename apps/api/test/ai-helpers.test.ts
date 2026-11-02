@@ -192,3 +192,36 @@ test("AI-74 status with the trip's switch off", async () => {
   const off = await setup(fake([]), trip(), { ai: { enabled: false, areas: {} } });
   assert.equal((await json(call(off.app, "/api/trips/berlin/ai", "a"))).enabled, false);
 });
+
+// REQ: AI-10 a trip from "Beskriv din dröm": the description is the purpose, unchanged, and the draft is a proposal with title, travelers and days
+test("AI-10 a draft trip from the description", async () => {
+  const days = [0, 1].map((i) => ({ op: "add", path: "days/-", value: { id: `d${i}`, date: `2027-10-2${6 + i}`, title: i ? "Hamburg" : "Malmö–Hamburg", summary: "Bil söderut.",
+    icons: ["🚗"], start: "09:00", end: "18:00", location: "Hamburg", legs: i ? [] : [{ vehicle: "car", origin: "Malmö", destination: "Hamburg" }], activities: [] } }));
+  const ai = fake([{ op: "set", path: "title", value: "Höstlov i Hamburg" }, { op: "add", path: "travelers/-", value: { id: "barn-7", name: "Barn (7 år)", age: 7, packing: [] } }, ...days]);
+  const store = memoryStore([]);
+  await store.saveSettings({ ai: { enabled: true, areas: {} } } as never);
+  const app = createApp(store, tokens, { aiService: true, ai: { call: ai } });
+  const description = "Vi vill åka till Hamburg på höstlovet med barnen, som är 7 och 10 år.";
+  const t = await json(call(app, "/api/trips", "a", "POST", { title: "Ny resa", purpose: description }));
+  await call(app, `/api/trips/${t.id}/ai/consent`, "a", "POST");
+  assert.equal((await call(app, `/api/trips/${t.id}/ai/draft`, "a", "POST")).status, 202);
+  assert.match(JSON.stringify(ai.seen[0]!.messages[0]!.content), /<today>\d{4}-\d\d-\d\d<\/today>/, "the date, to place the trip in time");
+  const [p] = await json(call(app, `/api/trips/${t.id}/proposals`, "a"));
+  assert.equal(p.source.item, undefined, "one proposal to review in Nåla");
+  assert.equal((await call(app, `/api/trips/${t.id}/proposals/${p.id}/approve`, "a", "POST")).status, 200);
+  const after = await json(call(app, `/api/trips/${t.id}`, "a"));
+  assert.equal(after.title, "Höstlov i Hamburg");
+  assert.equal(after.purpose, description);
+  assert.equal(after.days.length, 2);
+  assert.equal(after.travelers[0].age, 7);
+});
+
+// REQ: AI-10 the draft only fills a new trip: title, travelers, days and timeline, never the purpose or removals
+test("AI-10 what the draft may change", () => {
+  const f = FEATURES.draft!;
+  assert.equal(f.area, "changes");
+  for (const path of ["title", "travelers/-", "days/-", "stops/-"]) assert.equal(f.allows({ op: path === "title" ? "set" : "add", path, value: {} }), true, path);
+  assert.equal(f.allows({ op: "set", path: "purpose", value: "x" }), false);
+  assert.equal(f.allows({ op: "remove", path: "days/0" }), false);
+  assert.equal(f.helper, undefined);
+});

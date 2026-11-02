@@ -199,7 +199,7 @@ export const api = {
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => kept<Trip[]>("trips", "/api/trips"),
   tripsAs: (key: string) => call<Trip[]>("/api/trips", {}, key), // the trip of one link on the phone (PW-16)
-  create: (title: string) => call<Trip>("/api/trips", { method: "POST", body: JSON.stringify({ title }) }),
+  create: (title: string, purpose = "") => call<Trip>("/api/trips", { method: "POST", body: JSON.stringify({ title, purpose }) }), // AI-10: the description as purpose
   remove: (id: string) => call<void>(trip(id), { method: "DELETE" }),
   change: (t: Trip, ops: Op[], reason: string) =>
     call<unknown>(`${trip(t.id)}/changes`, { method: "POST", body: JSON.stringify({ baseRevision: t.revision, ops, reason }) }),

@@ -30,6 +30,7 @@ const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Adm
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
 const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
+const NewTripDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.NewTripDialog }))); // AI-10
 const SetupPassword = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.SetupPassword }))); // US-05
 const Choose = lazy(() => import("./Choose.tsx"));
 const NoticeSettings = lazy(() => import("./NoticeSettings.tsx"));
@@ -94,6 +95,7 @@ export function App() {
   const [expired, setExpired] = useState(false);
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
+  const [newOpen, setNewOpen] = useState(false); // AI-10: "Beskriv din dröm"
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -223,12 +225,16 @@ export function App() {
   }, [me, view, tab, tripId]);
   const logout = async () => { await api.logout().catch(() => {}); setTrips(null); setView("portal"); setMe(null); };
   const change = (ops: Parameters<typeof api.change>[1], reason: string) => api.change(t!, ops, reason).finally(load);
-  const newTrip = async () => {
-    const n = await api.create(sv.newTripTitle);
-    setTrips((ts) => [...(ts ?? []), n]);
-    openTrip(n.id, "dr");
-    load();
+  const newTrip = () => setNewOpen(true);
+  /** AI-10: with a draft the trip opens on Nåla, where the proposal is reviewed. */
+  const created = async (id: string, msg?: string) => {
+    setNewOpen(false);
+    await load();
+    openTrip(id, msg === sv.newTripAi.ready ? "nala" : "dr");
+    if (msg) setNotice(msg);
   };
+  /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
+  const draftAi = !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas.changes !== false;
   const removeTrip = async () => {
     if (!(await ask(sv.confirmDelete))) return;
     await api.remove(tripId); setView("portal"); load();
@@ -438,6 +444,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
+    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg) => void created(id, msg)} close={() => setNewOpen(false)} /></Suspense>}
     {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog

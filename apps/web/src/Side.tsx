@@ -14,7 +14,7 @@ import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import { atLeast, type Level } from "@trip/schema/src/rules.ts";
-import { suggestionsAt, type Pending } from "./proposals.ts";
+import { mailTwins, suggestionsAt, type Pending } from "./proposals.ts";
 
 /** Approving and rejecting proposals, for those who review them (MC-18, AI-70). */
 type Review = { approve: (pid: string) => Promise<string | null>; reject: (pid: string) => Promise<void> };
@@ -96,7 +96,7 @@ function useMailProposals(t: Trip, may: boolean) {
 }
 
 function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Trip; edit: (d: EditDlg) => void; onPlace: (id: string) => void; review?: Review; run: Run }) {
-  const mails = useMailProposals(t, part("bookings"));
+  const mails = useMailProposals(t, part("bookings")), twins = mailTwins(t, mails);
   const suggested = useAiSuggestions(t, !!review && part("bookings"), "prep", "bookings/-"); // BK-21
   const [err, setErr] = useState<string | null>(null);
   const flag = <>{mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>}
@@ -105,12 +105,13 @@ function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Tri
     <Section title={sv.bookings} may={part("bookings")} flag={flag} id="sec-bookings">
       {mails.length > 0 && <div className="mails">{/* not an editing control: reviewing is the point (BK-17) */}
         <p className="ro note">{sv.mail.waiting(mails.length)}</p>
-        {mails.map((m) => (
-          <button type="button" className="row mid mail" key={m.id} onClick={() => edit({ kind: "booking", proposal: m })} aria-label={sv.mail.open(m.source?.subject || sv.mail.noSubject)}>
-            <span><Icon name="mail" /> {m.booking?.name ?? (m.source?.subject || sv.mail.noSubject)}<br />
+        {mails.map((m) => {
+          const twin = twins.get(m.id); // BK-30: a likely duplicate, still reviewed as usual
+          return <button type="button" className="row mid mail" key={m.id} onClick={() => edit({ kind: "booking", proposal: m })} aria-label={sv.mail.open(m.source?.subject || sv.mail.noSubject) + (twin ? `. ${twin}` : "")}>
+            <span>{twin ? <span className="twin" role="img" aria-label={twin} title={twin}><Icon name="alert" /></span> : <Icon name="mail" />} {m.booking?.name ?? (m.source?.subject || sv.mail.noSubject)}<br />
               <small className="ro">{m.source?.from}{m.source?.at ? ` · ${shortDate(m.source.at.slice(0, 10))}` : ""}</small></span>
-          </button>
-        ))}
+          </button>;
+        })}
       </div>}
       {t.bookings.map((b) => (
         <div className={`row mid ${b.status === "cancelled" ? "off" : ""}`} key={b.id}>

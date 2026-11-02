@@ -61,13 +61,14 @@ export const InfoText = ({ t, x, onPlace }: { t: Trip; x: Trip["info"][number]; 
     {x.verify && <><br /><small className="ro">{sv.verify}</small></>}</span>
 );
 
-/** PI-06: the emergency numbers of the trip's countries, each a link that calls it. */
+/** PI-06: the emergency numbers of the trip's countries, each a button of its own that calls it (AC-05). */
 export function Emergency({ t }: { t: Trip }) {
   const sos = emergencyFor(t);
-  return sos.length > 0 && <div className="row sos"><span><b>{sv.emergency.title}</b>{sos.map((c) => (
-    <span key={c.country}><br /><small className="ro">{c.name}: {c.numbers.map((n, i) => <span key={i}>{i > 0 && " · "}{n.label}{" "}
-      <a className="place" href={telHref(n.number)} aria-label={`${c.name}, ${sv.emergency.call(n.label, n.number)}`}>{n.number}</a></span>)}
-      {c.eu && ` ${sv.emergency.eu}`}</small></span>))}</span></div>;
+  return sos.length > 0 && <div className="row sos"><div><b>{sv.emergency.title}</b>{sos.map((c) => (
+    <div key={c.country}><small className="ro">{c.name}{c.eu && ` · ${sv.emergency.eu}`}</small>
+      <div className="tels">{c.numbers.map((n, i) => (
+        <a className="btn ghost tel" href={telHref(n.number)} aria-label={`${c.name}, ${sv.emergency.call(n.label, n.number)}`} key={i}><Icon name="phone" /><b>{n.number}</b>{n.label}</a>))}</div>
+    </div>))}</div></div>;
 }
 
 export type Activity = Day["activities"][number];

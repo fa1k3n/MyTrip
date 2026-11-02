@@ -8,4 +8,5 @@ export * from "./rules.ts";
 export * from "./hidden.ts";
 export * from "./mailbooking.ts";
 export * from "./mailwish.ts";
+export * from "./duplicates.ts";
 export * from "./pins.ts";

@@ -14,16 +14,17 @@ import { MailInButton } from "./MailIn.tsx";
 import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
 
 const pictures = new Map<string, Promise<string>>(); // object URLs of wish images, fetched once per page (DB-09)
-/** A wish's copied image, fetched with the link's credentials. */
-export function WishPicture({ tripId, file, whole = false }: { tripId: string; file: string; whole?: boolean }) {
-  const [src, setSrc] = useState<string>();
+/** A wish's copied image, fetched with the link's credentials; `fallback` while it loads or when it cannot be shown (DB-28). */
+export function WishPicture({ tripId, file, whole = false, fallback }: { tripId: string; file: string; whole?: boolean; fallback?: ReactNode }) {
+  const [src, setSrc] = useState<string>(), [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
     if (!pictures.has(file)) pictures.set(file, api.file(tripId, file).then((b) => URL.createObjectURL(b)));
-    pictures.get(file)!.then((u) => live && setSrc(u), () => pictures.delete(file));
+    pictures.get(file)!.then((u) => live && setSrc(u), () => { pictures.delete(file); if (live) setFailed(true); });
     return () => { live = false; };
   }, [tripId, file]);
-  return src ? <img className={`wishpic${whole ? " whole" : ""}`} src={src} alt="" /> : null; // a Commons image whole, not cropped (DB-09)
+  // a Commons image whole, not cropped (DB-09)
+  return src && !failed ? <img className={`wishpic${whole ? " whole" : ""}`} src={src} alt="" onError={() => setFailed(true)} /> : fallback ?? null;
 }
 
 /** A wish's card, the same in Önska and in Minnas (DB-01, DB-02, MI-16); without `vote` the heart is read-only, and Minnas shows none.
@@ -31,7 +32,8 @@ export function WishPicture({ tripId, file, whole = false }: { tripId: string; f
 /** `planned`: the wish is in the plan, marked in a corner of the image area (DB-19); Minnas leaves it out. */
 export function DreamCard({ t, d, i, vote, votes = true, open, planned, children }: { t: Trip; d: Trip["dreams"][number]; i: number; vote?: () => void; votes?: boolean; open?: () => void; planned?: boolean; children?: ReactNode }) {
   const pic = cardImage(d); // DB-09: the image in place of the icon
-  const area = <>{pic ? <WishPicture tripId={t.id} file={pic.file} whole={pic.whole} /> : <CatIcon id={categoryIcon(d.category) ?? d.icon} big />}
+  const icon = <CatIcon id={categoryIcon(d.category) ?? d.icon} big />;
+  const area = <>{pic ? <WishPicture tripId={t.id} file={pic.file} whole={pic.whole} fallback={icon} /> : icon}
     {creditMark(d) && <span className="picinfo" aria-hidden="true">i</span> /* DB-09: the credit is under Om önskan */}
     {planned && <PlannedMark />}</>;
   const bg = { background: ICONS[d.category] ? `color-mix(in srgb, ${ICONS[d.category].color} 22%, var(--card))` : WISH_BG[i % 3] };

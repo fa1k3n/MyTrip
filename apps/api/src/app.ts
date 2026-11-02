@@ -836,7 +836,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     p.status = "approved";
     await store.saveProposal(p);
     const r = await addWish(store, t, { ...w, title }, photo?.id, actorName(c, t));
-    if ("error" in r) { p.status = "pending"; await store.saveProposal(p); return c.json(r, 422); }
+    if ("error" in r) { p.status = "pending"; await store.saveProposal(p); return r.error === "duplicate" ? c.json({ ...r, problems: ["duplicate"] }, 409) : c.json(r, 422); } // DB-27
     await store.removeFiles(files.map((f) => f.id).filter((id) => id !== photo?.id));
     return c.json(r, 201);
   });

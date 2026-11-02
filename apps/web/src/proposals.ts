@@ -1,5 +1,5 @@
 // Proposals from an LLM client or the AI, read for review in Nåla (MC-15..MC-18). Pure, so it runs under node --test.
-import { applyOps, checkTrip, pinBreaks, Trip, type Op } from "@trip/schema";
+import { applyOps, bookingTwin, checkTrip, pinBreaks, Trip, type BookingReading, type Op } from "@trip/schema";
 import { tripChanges, type Change } from "./changes.ts";
 import { sv } from "./sv.ts";
 export { previewMarks, tripChanges, type Change, type Mark } from "./changes.ts";
@@ -27,3 +27,15 @@ export function readProposal(t: Trip, p: Pending): { stale: boolean; problems: s
 /** A helper's pending suggestions of one kind, by the path of their main change: tasks/- or bookings/- for prep (AI-70, BK-21, UI-22). */
 export const suggestionsAt = <P extends Sourced & { ops: Op[] }>(list: P[], feature: string, path: string) =>
   aiSuggestions(list, feature).filter((p) => p.ops[0]?.path === path);
+
+type Mailed = { id: string; source?: { subject: string; at: string }; booking?: BookingReading };
+/** For each pending mail that repeats a booking of the trip or a mail that came before it, the mark's text (BK-30). */
+export function mailTwins(t: { bookings: Parameters<typeof bookingTwin>[1] }, mails: Mailed[]): Map<string, string> {
+  const out = new Map<string, string>(), name = (m: Mailed) => m.source?.subject || m.booking?.name || sv.mail.noSubject;
+  const byTime = [...mails].sort((a, b) => (a.source?.at ?? "").localeCompare(b.source?.at ?? ""));
+  byTime.forEach((m, i) => {
+    const twin = m.booking && bookingTwin(m.booking, t.bookings, byTime.slice(0, i).map((x) => ({ id: x.id, name: name(x), reading: x.booking ?? {} })));
+    if (twin) out.set(m.id, sv.mail.twin(twin.name));
+  });
+  return out;
+}

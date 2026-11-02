@@ -329,7 +329,10 @@ export function App() {
     }
   };
   const rejectMail = async (pid: string) => { await api.rejectMail(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); };
-  const mailToWish = async (pid: string) => { await api.mailToWish(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); }; // BK-29
+  const mailToWish = async (pid: string) => { // BK-29; a wish the trip already has leaves the mail pending (DB-27)
+    await api.mailToWish(t!.id, pid).catch((e) => setNotice(e instanceof ApiError && e.problems.includes("duplicate") ? sv.mail.wishExists : sv.couldNotSave));
+    await load();
+  };
   /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
   const run: Run = async (build, reason) => {
     let cur = t!;

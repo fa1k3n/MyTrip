@@ -73,3 +73,12 @@ test("AC-05 touch targets", () => {
   assert.match(css, /\.phead \.who \.btn\.icon\{width:44px;height:44px\}/);
   assert.match(css, /\.heart\{[^}]*min-width:44px;min-height:44px/);
 });
+
+// REQ: AC-05 a text link keeps its look but gets a 44 px tall touch area; the emergency numbers are buttons of their own
+test("AC-05 place links and emergency numbers", () => {
+  assert.match(css, /\.place\{[^}]*position:relative[^}]*\}\.place::before\{content:"";position:absolute;inset:-10px -4px\}/);
+  assert.match(css, /\.tel\{display:inline-flex;align-items:center;gap:6px;min-height:44px;/);
+  const view = src("TripView.tsx");
+  assert.match(view, /<a className="btn ghost tel" href=\{telHref\(n\.number\)\} aria-label=\{`\$\{c\.name\}, \$\{sv\.emergency\.call\(n\.label, n\.number\)\}`\} key=\{i\}><Icon name="phone" \/>/);
+  assert.doesNotMatch(view, /<a className="place" href=\{telHref/);
+});

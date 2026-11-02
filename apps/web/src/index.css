@@ -64,7 +64,8 @@ button:focus-visible,.place:focus-visible,.hd:focus-visible{outline:3px solid va
 .aikeep{display:inline-flex;align-items:center;flex:none}.act .aikeep{margin-left:auto}.act .aikeep+.icon{margin-left:0} /* AI-83 */
 .upday>.travel{list-style:none;padding:2px 0 2px 18px;border:0}
 .step.wait{opacity:.5}.step.wait .mark{border:2px dashed var(--line)} /* AI-76: not started yet */
-.place{background:none;border:0;border-bottom:2px solid var(--acc);color:var(--acct);padding:0;font-weight:600}
+.place{background:none;border:0;border-bottom:2px solid var(--acc);color:var(--acct);padding:0;font-weight:600;position:relative}.place::before{content:"";position:absolute;inset:-10px -4px} /* a 44 px tall touch area, the look unchanged (AC-05) */
+.tels{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.tel{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 12px;font-size:.88rem;font-weight:400;color:var(--ink);text-decoration:none}.tel svg{width:16px;height:16px;color:var(--acct)}.tel b{font-variant-numeric:tabular-nums} /* PI-06, AC-05 */
 .badge{display:inline-block;background:var(--bg);border-radius:8px;padding:1px 8px;font-size:.8rem;margin-right:4px}
 .ok{background:var(--sage);color:#1b2a20}
 dialog{border:0;border-radius:16px;background:var(--card);color:var(--ink);max-width:420px;width:92%;padding:20px}dialog::backdrop{background:rgba(0,0,0,.45)}
@@ -341,7 +342,7 @@ fieldset.files svg{width:16px;height:16px;vertical-align:-3px}
 .badge.tobook{background:color-mix(in srgb,var(--acc) 20%,var(--card));color:var(--acct);font-weight:600} /* BK-20 */
 .mails{margin-bottom:10px;padding:4px 10px;border-left:4px solid var(--acc);background:var(--bg);border-radius:8px}
 button.row.mail{width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer}button.row.mail:last-child{border-bottom:0}
-button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)}
+button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)}button.row.mail .twin svg{color:var(--cautionT)} /* BK-30: a likely duplicate, the less serious warning colour */
 .mailfrom{display:block}.mailfrom .ico svg{width:16px;height:16px;vertical-align:-3px;margin-right:4px}
 .pastebox{margin:6px 0 10px}.pastebox .btn{margin-top:6px}
 /* Uppleva: the day as a timeline of cards that do not fold out (UP-16), all alike (UP-27); the "Nu" line (UP-29); clash (UP-28); the eye in the corner (UP-32); buttons (UP-20, UP-21). */

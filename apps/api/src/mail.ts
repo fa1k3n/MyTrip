@@ -2,7 +2,7 @@
 // with its ticket attachments and stored as a proposal that a Planerare or the superuser reviews (BK-17), so nothing in the trip
 // changes here; anything else becomes a wish at once (DB-23..DB-25).
 import PostalMime from "postal-mime";
-import { applyOps, checkTrip, mailKind, readBooking, readWish, Trip, type WishReading } from "@trip/schema";
+import { applyOps, checkTrip, mailKind, readBooking, readWish, Trip, wishTwin, type WishReading } from "@trip/schema";
 import { MAX_FILE, newFileId, storeTicket, ticketType, type Proposal, type Store } from "./app.ts";
 import { IMAGE_MAX, imageType } from "./wishimage.ts";
 import { sv } from "../../web/src/sv.ts";
@@ -11,7 +11,7 @@ const MAX_PENDING = 20, MAX_FILES = 5;
 const MAX_WISHES = 20, DAY_MS = 86_400_000;
 export const MIN_PHOTO = 8 * 1024; // DB-24: smaller images are taken to be logos
 type Result = { proposalId: string } | { error: "unknown address" | "too many" };
-export type WishResult = { wishId: string } | { error: "unknown address" | "too many" | "no title" | "invalid" };
+export type WishResult = { wishId: string } | { error: "unknown address" | "too many" | "no title" | "invalid" | "duplicate" };
 
 /** A mail for the trip with this address, or with a booking or wish address made before BK-26; an unknown address is rejected
  * (BK-15, BK-26). `f` fetches a linked page for a wish without a title (DB-26). */
@@ -91,8 +91,10 @@ export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayB
   if (t.dreams.filter((w) => w.mailedAt && now - Date.parse(w.mailedAt) < DAY_MS).length >= MAX_WISHES) return { error: "too many" }; // DB-25
   const m = await PostalMime.parse(raw);
   const r = readWish({ subject: m.subject, text: m.text, html: m.html });
+  const titleFromLink = !r.title && !!r.url;
   if (!r.title && r.url) r.title = await pageTitle(r.url, f); // DB-26
   if (!r.title) return { error: "no title" };
+  if (wishTwin({ ...r, titleFromLink }, t)) return { error: "duplicate" }; // DB-27: already on the trip
   const photo = m.attachments
     .map((a) => (typeof a.content === "string" ? new TextEncoder().encode(a.content) : new Uint8Array(a.content)))
     .map((bytes) => ({ bytes, type: imageType(bytes) }))
@@ -100,13 +102,14 @@ export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayB
     .sort((a, b) => b.bytes.length - a.bytes.length)[0];
   const file = photo && newFileId();
   if (photo && file) await store.saveFile({ id: file, tripId: t.id, type: photo.type! }, photo.bytes);
-  const r2 = await addWish(store, t, { ...r, title: r.title, source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }, file, "mejl", now);
+  const r2 = await addWish(store, t, { ...r, title: r.title, titleFromLink, source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }, file, "mejl", now);
   if ("error" in r2 && file) await store.removeFiles([file]);
   return r2;
 }
 
-/** Adds a wish read from a mail, with an own photo when there is one (DB-23, BK-29). */
-export async function addWish(store: Store, t: Trip, r: WishReading & { title: string; source: string }, file: string | undefined, actor: string, now = Date.now()): Promise<WishResult> {
+/** Adds a wish read from a mail, with an own photo when there is one (DB-23, BK-29); not one the trip already has (DB-27). */
+export async function addWish(store: Store, t: Trip, r: WishReading & { title: string; source: string; titleFromLink?: boolean }, file: string | undefined, actor: string, now = Date.now()): Promise<WishResult> {
+  if (wishTwin(r, t)) return { error: "duplicate" };
   const id = `dream-${crypto.randomUUID().slice(0, 8)}`;
   const wish = {
     id, title: r.title, category: r.category, source: r.source, icon: "✨", votes: 0,

@@ -28,9 +28,10 @@ type ClockState = { storage: { get<T>(key: string): Promise<T | undefined>; put(
 export type IncomingMail = { to: string; raw: ReadableStream; setReject(reason: string): void };
 
 /** What the sender's mail server is told when a mail is rejected. */
-const REJECT = {
+export const REJECT = {
   "unknown address": "Unknown address", "too many": "Too many mails for this trip right now",
   "no title": "The mail needs a subject", invalid: "The mail could not be added",
+  duplicate: "This wish is already on the trip", // DB-27
 };
 
 /** The AI service: through the gateway when it is configured (AI-73), else with an Anthropic key (AI-03). */

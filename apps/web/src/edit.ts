@@ -166,10 +166,16 @@ export type ActivityInput = {
   note?: string; // undefined: keep, "": remove (ED-19)
   hiddenFrom?: string[]; // undefined: keep, []: shown to everyone (AU-18)
   dreamId?: string; // undefined: keep, "": no wish (MI-19)
+  newWish?: boolean; // a new wish with the activity's title and category, linked to it, unless a wish is chosen (ED-29)
   travel?: Activity["travel"] | false | null; // undefined: keep, false: none, null: not valid (TR-20)
 };
 
 const VEHICLES = ["walk", "transit", "car", "train", "ferry"] as const;
+/** Whether the form proposes a new wish: not for a moment or a journey, an activity hidden from someone, or a role that may not
+ * change wishes (ED-29). */
+export const wishByDefault = (category: string, hiddenFrom: string[], mayWish: boolean) =>
+  mayWish && !hiddenFrom.length && category !== TIME_POINT && category !== "Resa";
+
 /** The way to an activity as typed in the form: false when no vehicle is chosen; null when the minutes are no whole number (TR-20). */
 export function travelInput(vehicle: string, minutes: string): Activity["travel"] | false | null {
   if (!vehicle) return false;
@@ -204,6 +210,12 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
   const list = t.days[di].activities;
   const old = list.find((a) => a.id === id);
   const category = input.category === undefined ? old?.category : input.category || undefined;
+  let dreamId = input.dreamId;
+  if (input.newWish && !dreamId) { // ED-29: the wish first, so the link points at something that exists (MI-19)
+    dreamId = uniqueId(text, taken);
+    taken.push(dreamId);
+    ops.push({ op: "add", path: "dreams/-", value: { id: dreamId, title: text, category: category && category !== TIME_POINT ? category : "Aktivitet", source: sv.manual, icon: "✨", votes: 0 } });
+  }
   const point = category === TIME_POINT && !!input.start; // a moment: no duration, ends at its start (ED-20)
   const activity: Activity = clean({
     ...old, id: old?.id ?? uniqueId(text, taken), text, placeIds,
@@ -212,7 +224,7 @@ export function saveActivity(t: Trip, dayId: string, input: ActivityInput, id?: 
     durationMin: point ? undefined : input.durationMin ?? old?.durationMin,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     hiddenFrom: input.hiddenFrom === undefined ? old?.hiddenFrom : input.hiddenFrom.length ? input.hiddenFrom : undefined,
-    dreamId: input.dreamId === undefined ? old?.dreamId : input.dreamId || undefined,
+    dreamId: dreamId === undefined ? old?.dreamId : dreamId || undefined,
     travel: input.travel === undefined ? old?.travel : input.travel || undefined,
     end: point ? input.start : input.durationMin === undefined ? old?.end : undefined, // the form sets a duration, which replaces a fixed end
   });

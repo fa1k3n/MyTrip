@@ -27,6 +27,10 @@ export function hasEnded<A extends Timed>(list: A[], i: number, now: string | un
   return !!end && toMin(end) <= toMin(now);
 }
 
+/** What the floating add button in Uppleva adds: an activity for a role that may change the plan, an expense for one that may add
+ * expenses; with both it offers a choice (UP-41, UP-51). */
+export const addChoices = (expense: boolean, plan: boolean) => [...(plan ? ["activity" as const] : []), ...(expense ? ["expense" as const] : [])];
+
 /** Activities that end after the next timed activity starts, fixed or estimated (UP-28). */
 export function clashes<A extends Timed>(list: A[]) {
   const out = new Map<string, { end: string; with: A }>();

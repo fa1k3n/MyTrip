@@ -44,6 +44,7 @@ export const sv = {
     split: (text: string) => `Välj vilka som delar på ${text}`, splitTitle: "Delas av", splitNeeded: "Välj minst en person.",
   },
   up: { // the day's timeline in Uppleva (UP-16..UP-21)
+    addWhat: "Lägg till", needsNet: "Kräver nätverk", // UP-51
     applies: "Aktivitet", wish: "Önskan", noActivity: "Ingen", // UP-43, UP-47, MI-41: one wish, so the singular
     sheetKicker: "Utlägg", what: "Beskrivning", whatExample: "Till exempel: bensin", saveExpense: "Spara utlägg", // UP-42
     now: "Nu",
@@ -265,7 +266,7 @@ export const sv = {
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",
   missing: { label: "Saknar", time: "tid", duration: "uppskattad tid", category: "kategori" },
   duration: "Uppskattad tid", chooseDuration: "Välj…",
-  addActivity: "Lägg till aktivitet", newActivity: "Ny aktivitet", editActivity: "Ändra aktivitet",
+  addActivity: "Lägg till aktivitet", newActivity: "Ny aktivitet", editActivity: "Ändra aktivitet", moreDetails: "Fler detaljer", newWishOption: "Ny önskan", // ED-27, ED-29
   addBooking: "Lägg till bokning", newBooking: "Ny bokning", editBooking: "Ändra bokning",
   addCost: "Lägg till kostnad", newCost: "Ny kostnad", editCost: "Ändra kostnad",
   date: "Datum", summaryLabel: "Sammanfattning (en mening, utan klockslag)", icons: "Egna ikoner, en eller två (visas när aktiviteterna saknar kategori)",

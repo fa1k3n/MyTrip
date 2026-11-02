@@ -425,10 +425,14 @@ dialog[open]::backdrop{transition:background-color .2s}
 @starting-style{dialog[open]::backdrop{background-color:rgba(0,0,0,0)}}
 /* An expense without an activity: its own sheet with category tiles (UP-42), opened from the floating button (UP-41). */
 .upday.withfab{padding-bottom:72px} /* the last card's buttons never under the floating button */
+.fabmenu{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:16px;
+  background:var(--card);box-shadow:var(--sh)} /* Aktivitet or Utlägg (UP-51) */
+.fabmenu .btn{display:flex;align-items:center;gap:10px;justify-content:flex-start;min-height:44px;text-align:left;white-space:nowrap}.fabmenu .btn svg{width:20px;height:20px;flex:none}.fabmenu small{color:var(--mute);margin-left:auto}
 @media (min-width:600px){ /* on a wide screen in the day's column, following the scroll, not far out in the window's corner (UP-41) */
   .upday.withfab{padding-bottom:0}
   .fabdock{position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:flex-end;margin-top:12px;pointer-events:none;z-index:3}
   .fabdock .btn.fab.icon,.fabdock .btn.fab.icon[data-tip]{position:relative;right:auto;bottom:auto;pointer-events:auto}
+  .fabdock .fabmenu{position:absolute;right:0;bottom:68px;pointer-events:auto}
 }
 dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px}dialog .kicker+h3{font-size:1.6rem;margin:0 0 14px}
 .tiles{border:0;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.tiles legend{padding:0;margin-bottom:6px;font-size:.9rem;color:var(--mute)}
@@ -437,6 +441,9 @@ dialog .kicker{display:block;color:var(--mute);font-size:.8rem;margin-bottom:2px
 .tile input{position:absolute;opacity:0;pointer-events:none}.tile .cat{width:38px;height:38px}.tile .cat svg{width:19px;height:19px}
 .tile:has(:checked){border-color:var(--sage);background:color-mix(in srgb,var(--sage) 16%,var(--card))}.tile:has(:focus-visible){outline:3px solid var(--sage);outline-offset:2px}
 .tile:active{transform:scale(.95)}
+.tiles.four{grid-template-columns:repeat(4,1fr)} /* the activity form's ten categories (ED-27) */
+.more{margin:0 0 12px}.more>summary{cursor:pointer;color:var(--acct);font-weight:600;padding:8px 0;min-height:44px;display:flex;align-items:center}
+.more>summary:focus-visible{outline:3px solid var(--sage);outline-offset:2px}.more[open]>summary{margin-bottom:6px}
 .btn.wide{display:block;width:100%;margin-top:6px;padding:14px}
 @media (max-width:599px){
   dialog.sheet{margin:auto 0 0;width:100%;max-width:none;border-radius:22px 22px 0 0;padding:26px 20px calc(20px + env(safe-area-inset-bottom,0px))}

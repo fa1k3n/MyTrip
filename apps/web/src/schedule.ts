@@ -22,6 +22,19 @@ export function activityMissing(input: { start: string; durationMin?: number; ca
   return null;
 }
 
+/** A new activity's start: the end of the day's last timed activity, an hour after its start without a duration, rounded up to the
+ * quarter hour and never past 23.45; 10.00 on a day without times (ED-28). */
+export function suggestStart(list: Timed[]) {
+  const last = [...list].reverse().find((a) => a.start);
+  if (!last) return "10:00";
+  const end = activityEnd(last), min = end ? toMin(end) : toMin(last.start!) + DEFAULT_MIN;
+  return fromMin(Math.min(Math.ceil(min / 15) * 15, 23 * 60 + 45));
+}
+
+/** The duration a new activity gets from its category until the user sets one; a Klockslag has none (ED-20, ED-28). */
+const DEFAULT_DURATION: Record<string, number> = { Mat: 60, Utsikt: 30, Aktivitet: 120, Avkoppling: 90, Museum: 120, Bad: 120, Shopping: 60, Natur: 120, Resa: 60 };
+export const defaultDuration = (category: string): number | undefined => DEFAULT_DURATION[category];
+
 export type Row<A> = { kind: "act"; a: A } | { kind: "gap" | "clash"; min: number };
 
 /** The activities with a gap or clash row between them where the plan has a hole or an overlap (ED-17); the way to an activity counts (TR-20). */

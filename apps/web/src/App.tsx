@@ -509,7 +509,7 @@ export function App() {
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
-        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} mailToWish={mailToWish} />
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} mailToWish={mailToWish} wishes={perms(t).view.dr.dreams === "write"} />
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (

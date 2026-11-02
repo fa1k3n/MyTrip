@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
 import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.ts";
-import { clashes, durationText, hasEnded, nowAt, upDayTime, upTime } from "./upday.ts";
+import { addChoices, clashes, durationText, hasEnded, nowAt, upDayTime, upTime } from "./upday.ts";
 import { verdictWish } from "./memories.ts";
 import { Verdicts } from "./Verdicts.tsx"; // UP-50
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
@@ -111,6 +111,17 @@ export function Uppleva(p: TripViewProps) {
 type Day = Trip["days"][number];
 
 /** The time of day in the trip's time zone, updated every half minute while the shown day is today (UP-29). */
+/** Whether the device has a network; adding an activity needs one (UP-51, PW-10). */
+function useOnline() {
+  const [on, setOn] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    const up = () => setOn(true), down = () => setOn(false);
+    addEventListener("online", up); addEventListener("offline", down);
+    return () => { removeEventListener("online", up); removeEventListener("offline", down); };
+  }, []);
+  return on;
+}
+
 function useClock(timeZone: string, on: boolean) {
   const [now, setNow] = useState(() => clockIn(timeZone));
   useEffect(() => {
@@ -142,8 +153,14 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
   const at = nowAt(day.activities, now), clash = clashes(day.activities), who = hiddenFromIn(day);
   const currency = useDayCurrency(day, t.currency, p.today);
   const rates = p.perms.view.mi.memories === "write" && !!p.memoryBy; // verdicts on today's ended activities (UP-50)
+  const choices = addChoices(add, p.perms.view.nala.plan === "write"); // UP-51
+  const [menu, setMenu] = useState(false);
+  const online = useOnline();
+  const newActivity = () => { setMenu(false); p.edit({ kind: "activity", dayId: day.id }); };
+  const newExpense = () => { setMenu(false); p.addShortExpense(currency, undefined, { // the trip's wishes, the day's first, the one going on now guessed (UP-47)
+    choices: wishChoices(day, t.dreams), guess: guessWish(day.activities, now) }); };
   const line = now && <li className="nowline" key="now"><span>{sv.up.now} {now.replace(":", ".")}</span></li>;
-  return <><ol className={`upday${add ? " withfab" : ""}`}>
+  return <><ol className={`upday${choices.length ? " withfab" : ""}`}>
     {day.activities.map((a, i) => {
       const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false); // UP-36
       const hid = who.get(a.id), eye = p.edit && (() => p.edit({ kind: "hidden", dayId: day.id, id: a.id }));
@@ -172,7 +189,15 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
     })}
     {at === day.activities.length && line}
   </ol>
-  {add && <div className="fabdock"><IconButton icon="money" look="fab" tip="up" label={sv.addExpense} onClick={() => p.addShortExpense(currency, undefined, { // the trip's wishes, the day's first, the one going on now guessed (UP-47)
-    choices: wishChoices(day, t.dreams), guess: guessWish(day.activities, now) })} /></div> /* the phone's corner, else the day's column (UP-41) */}
+  {choices.length > 0 && <div className="fabdock" onKeyDown={(e) => { if (e.key === "Escape") setMenu(false); }}>{/* the phone's corner, else the day's column (UP-41) */}
+    {menu && <div className="fabmenu" role="menu" aria-label={sv.up.addWhat}>
+      <button type="button" role="menuitem" className="btn ghost" onClick={newActivity} disabled={!online} autoFocus>
+        <Icon name="calplus" />{sv.addActivity}{!online && <small>{sv.up.needsNet}</small>}</button>
+      <button type="button" role="menuitem" className="btn ghost" onClick={newExpense}><Icon name="money" />{sv.addExpense}</button>
+    </div>}
+    {choices.length === 2 ? <IconButton icon="plus" look="fab" tip="up" label={sv.up.addWhat} pressed={menu} onClick={() => setMenu((m) => !m)} />
+      : choices[0] === "activity" ? <IconButton icon="plus" look="fab" tip="up" label={online ? sv.addActivity : `${sv.addActivity}: ${sv.up.needsNet}`} onClick={newActivity} disabled={!online} />
+      : <IconButton icon="money" look="fab" tip="up" label={sv.addExpense} onClick={newExpense} />}
+  </div>}
   </>;
 }

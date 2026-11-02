@@ -3,7 +3,7 @@ import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
-  saveActivity, travelInput, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
+  saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
   readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, type BookingInput, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
@@ -11,7 +11,8 @@ import { Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { replaceNeedsAsk, suggestPurpose } from "./purpose.ts";
 import { dayLabel, dayTitle, shortDate } from "./format.ts";
-import { activityMissing, planWish } from "./schedule.ts";
+import { activityMissing, defaultDuration, planWish, suggestStart } from "./schedule.ts";
+import { CatIcon } from "./CatIcon.tsx";
 import { pickedLabel } from "./hiddenView.ts";
 import { svAdmin } from "./sv-admin.ts";
 import { fmtDuration } from "./transport.ts";
@@ -35,6 +36,7 @@ type Props = {
   t: Trip; save: Save; close: () => void; self?: string; // self: the traveler of a personal link (AU-18)
   approveMail?: (pid: string, ops: Op[]) => Promise<string | null>; rejectMail?: (pid: string) => Promise<void>; // BK-17
   mailToWish?: (pid: string) => Promise<void>; // BK-29
+  wishes?: boolean; // the role may change wishes, so a new activity can make one (ED-29)
 };
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
@@ -230,15 +232,24 @@ function DayForm(p: Props & { id?: string }) {
   );
 }
 
+const NEW_WISH = "__new"; // "Ny önskan" in the wish field (ED-29)
+
+/** Vad, the time and the category tiles, the rest under "Fler detaljer" (ED-27); the time and the duration filled in (ED-28) and a new
+ * wish made by default (ED-29), so that an activity is added on a phone with a few taps. */
 function ActivityForm(p: Props & { dayId: string; id?: string }) {
   const s = useSave(p);
-  const a = p.t.days.find((x) => x.id === p.dayId)?.activities.find((x) => x.id === p.id);
-  const { f, text, check } = useFields({
-    start: a?.start ?? "", estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
+  const day = p.t.days.find((x) => x.id === p.dayId);
+  const a = day?.activities.find((x) => x.id === p.id);
+  const { f, text, check, set } = useFields({
+    start: a ? a.start ?? "" : suggestStart(day?.activities ?? []), estimated: a?.estimated ?? false, text: a?.text ?? "", place: a?.placeIds[0] ?? "", placeName: "", address: "",
     category: a?.category ?? "", duration: String(a?.durationMin ?? ""), note: a?.note ?? "", dreamId: a?.dreamId ?? "",
     vehicle: a?.travel?.vehicle ?? "", travelMin: String(a?.travel?.durationMin ?? ""), // TR-20
   });
   const [hiddenFrom, setHiddenFrom] = useState<string[]>(a?.hiddenFrom ?? []); // AU-18
+  const [ownDuration, setOwnDuration] = useState(!!a?.durationMin); // until the user sets one, the duration follows the category (ED-28)
+  const [ownWish, setOwnWish] = useState(!!a); // until the user picks, a new activity proposes a new wish (ED-29)
+  const wish = ownWish ? f.dreamId : wishByDefault(f.category, hiddenFrom, !!p.wishes) ? NEW_WISH : "";
+  const pick = (c: string) => { set("category", c); if (!ownDuration) set("duration", String(defaultDuration(c) ?? "")); };
   const place = f.place === "__new" ? { kind: "new" as const, name: f.placeName, address: f.address }
     : f.place ? { kind: "existing" as const, id: f.place } : { kind: "none" as const };
   return (
@@ -246,52 +257,58 @@ function ActivityForm(p: Props & { dayId: string; id?: string }) {
       onSubmit={() => {
         const durationMin = a?.pinned ? undefined : Number(f.duration) || undefined; // ED-25: a pinned activity keeps its time
         const miss = f.text.trim() && !a?.pinned ? activityMissing({ start: f.start, durationMin, category: f.category }) : null; // ED-15; saveActivity reports a missing text
-        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note, dreamId: f.dreamId, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)), travel: travelInput(f.vehicle, f.travelMin) }, p.id), p.id ? "edit activity" : "add activity");
+        s.submit(miss ? { ok: false, error: miss } : saveActivity(p.t, p.dayId, { start: f.start, estimated: f.estimated, text: f.text, place, category: f.category, durationMin, note: f.note,
+          dreamId: wish === NEW_WISH ? "" : wish, newWish: wish === NEW_WISH, hiddenFrom: p.t.travelers.map((x) => x.id).filter((id) => hiddenFrom.includes(id)), travel: travelInput(f.vehicle, f.travelMin) }, p.id),
+          p.id ? "edit activity" : "add activity");
       }}
       onRemove={p.id && !a?.pinned ? () => s.remove(removeActivity(p.t, p.dayId, p.id!), "remove activity") : undefined}>
-      <label>{sv.what}<input {...text("text")} autoFocus /></label>
-      <label>{sv.activityNote}<input {...text("note")} /></label>
+      <label>{sv.what}<input {...text("text")} autoFocus={!a} /></label>
       {a?.pinned && <p className="ro note">{sv.pin.locked}</p> /* ED-25 */}
-      <div className="two">
-        <label>{sv.time}<input type="time" {...text("start")} disabled={a?.pinned} /></label>
-        <label className="check"><input type="checkbox" {...check("estimated")} disabled={a?.pinned} />{sv.estimate}</label>
-      </div>
-      {f.category !== TIME_POINT && <label>{sv.duration}<select {...text("duration")} disabled={a?.pinned}> {/* a Klockslag has no duration (ED-20) */}
-        <option value="">{sv.chooseDuration}</option>
-        {[...new Set([...DURATIONS, ...(a?.durationMin ? [a.durationMin] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
-      </select></label>}
-      <div className="two">{/* the way here from the place before (TR-20) */}
-        <label>{sv.travelHere}<select {...text("vehicle")}>
-          <option value="">{sv.noTravel}</option>
-          {(["walk", "transit", "car", "train", "ferry"] as const).map((v) => <option key={v} value={v}>{sv.travelVehicles[v]}</option>)}
+      <label>{sv.time}<input type="time" {...text("start")} disabled={a?.pinned} /></label>
+      <fieldset className="tiles four"><legend>{sv.category}</legend>
+        {ACTIVITY_CATEGORIES.map((c) => <label className="tile" key={c.name}>
+          <input type="radio" name="acategory" value={c.name} checked={f.category === c.name} onChange={() => pick(c.name)} /><span aria-hidden="true"><CatIcon id={c.name} /></span><span>{c.name}</span>
+        </label>)}
+      </fieldset>
+      <details className="more"><summary>{sv.moreDetails}</summary>
+        {f.category !== TIME_POINT && <div className="two">{/* a Klockslag has no duration (ED-20) */}
+          <label>{sv.duration}<select value={f.duration} onChange={(e) => { setOwnDuration(true); set("duration", e.target.value); }} disabled={a?.pinned}>
+            <option value="">{sv.chooseDuration}</option>
+            {[...new Set([...DURATIONS, ...(f.duration ? [Number(f.duration)] : [])])].sort((x, y) => x - y).map((m) => <option key={m} value={m}>{fmtDuration(m)}</option>)}
+          </select></label>
+          <label className="check"><input type="checkbox" {...check("estimated")} disabled={a?.pinned} />{sv.estimate}</label>
+        </div>}
+        <label>{sv.activityNote}<input {...text("note")} /></label>
+        <label>{sv.minnas.dream}<select value={wish} onChange={(e) => { setOwnWish(true); set("dreamId", e.target.value); }}> {/* the wish it makes come true (MI-19, ED-29) */}
+          {p.wishes && !a?.dreamId && <option value={NEW_WISH}>{sv.newWishOption}</option>}
+          <option value="">{sv.minnas.noDream}</option>
+          {p.t.dreams.filter((w) => !w.hidden).map((w) => <option key={w.id} value={w.id}>{w.title}</option>)}
         </select></label>
-        {f.vehicle && <label>{sv.travelMin}<input inputMode="numeric" {...text("travelMin")} /></label>}
-      </div>
-      <label>{sv.category}<select {...text("category")}>
-        <option value="">{sv.noCategory}</option>
-        {ACTIVITY_CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
-      </select></label>
-      {p.t.dreams.length > 0 && <label>{sv.minnas.dream}<select {...text("dreamId")}> {/* the wish it makes come true (MI-19) */}
-        <option value="">{sv.minnas.noDream}</option>
-        {p.t.dreams.filter((w) => !w.hidden).map((w) => <option key={w.id} value={w.id}>{w.title}</option>)}
-      </select></label>}
-      <label>{sv.placeLabel}<select {...text("place")}>
-        <option value="">{sv.noPlace}</option>
-        {p.t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-        <option value="__new">{sv.newPlace}</option>
-      </select></label>
-      {f.place === "__new" && <>
-        <label>{sv.placeName}<input {...text("placeName")} /></label>
-        <label>{sv.address}<input {...text("address")} /></label>
-      </>}
-      {p.t.travelers.some((x) => x.id !== p.self) && <fieldset className="hidefrom"> {/* no one hides an activity from themselves (AU-18) */}
-        <legend>{svAdmin.hidden.pickLabel}</legend>
-        <details className="multi"><summary>{pickedLabel(p.t, hiddenFrom)}</summary> {/* a dropdown with several choices (AU-25) */}
-          <div className="menu">{p.t.travelers.filter((x) => x.id !== p.self).map((x) => <label className="check" key={x.id}><input type="checkbox" checked={hiddenFrom.includes(x.id)}
-            onChange={(e) => setHiddenFrom((h) => (e.target.checked ? [...h, x.id] : h.filter((id) => id !== x.id)))} />{x.name}</label>)}</div>
-        </details>
-        <p className="ro note">{svAdmin.hidden.hint}</p>
-      </fieldset>}
+        <label>{sv.placeLabel}<select {...text("place")}>
+          <option value="">{sv.noPlace}</option>
+          {p.t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          <option value="__new">{sv.newPlace}</option>
+        </select></label>
+        {f.place === "__new" && <>
+          <label>{sv.placeName}<input {...text("placeName")} /></label>
+          <label>{sv.address}<input {...text("address")} /></label>
+        </>}
+        <div className="two">{/* the way here from the place before (TR-20) */}
+          <label>{sv.travelHere}<select {...text("vehicle")}>
+            <option value="">{sv.noTravel}</option>
+            {(["walk", "transit", "car", "train", "ferry"] as const).map((v) => <option key={v} value={v}>{sv.travelVehicles[v]}</option>)}
+          </select></label>
+          {f.vehicle && <label>{sv.travelMin}<input inputMode="numeric" {...text("travelMin")} /></label>}
+        </div>
+        {p.t.travelers.some((x) => x.id !== p.self) && <fieldset className="hidefrom"> {/* no one hides an activity from themselves (AU-18) */}
+          <legend>{svAdmin.hidden.pickLabel}</legend>
+          <details className="multi"><summary>{pickedLabel(p.t, hiddenFrom)}</summary> {/* a dropdown with several choices (AU-25) */}
+            <div className="menu">{p.t.travelers.filter((x) => x.id !== p.self).map((x) => <label className="check" key={x.id}><input type="checkbox" checked={hiddenFrom.includes(x.id)}
+              onChange={(e) => setHiddenFrom((h) => (e.target.checked ? [...h, x.id] : h.filter((id) => id !== x.id)))} />{x.name}</label>)}</div>
+          </details>
+          <p className="ro note">{svAdmin.hidden.hint}</p>
+        </fieldset>}
+      </details>
     </Form>
   );
 }

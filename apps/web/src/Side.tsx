@@ -135,7 +135,7 @@ function Suggestion({ p, review, done }: { p: Pending; review: Review; done: (er
   const text = v.text ?? "";
   return <div className="row mid todo">
     <span><AiMark />{text}{v.due && <small className="ro"> · {shortDate(v.due)}</small>}
-      {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}</span>
+      {v.url && <small> · <a className="place" href={v.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}</span>
     <span className="end">
       <IconButton icon="check" look="bare" tip="left" label={sv.aiRun.take(text)} onClick={async () => done(await review.approve(p.id))} />
       <IconButton icon="close" look="bare" tip="left" label={sv.aiRun.reject(text)} onClick={async () => { await review.reject(p.id); done(null); }} />
@@ -153,11 +153,10 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
         <div className="row mid todo" key={k.id}>
           <label className="check">
             <input type="checkbox" checked={k.done} disabled={!tick} onChange={() => run((x) => toggleTask(x, k.id), k.done ? "task undone" : "task done")} />
-            <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
+            <span className={k.done ? "done" : ""}>{k.hidden ? <HiddenText /> : <>{k.ai && <AiMark label={sv.aiRun.aiMade} />}{k.text}<TextEye t={t} texts={[k.text]} placeId={k.placeId} /></>}
               {k.placeId && <> · <PlaceLink t={t} id={k.placeId} onPlace={onPlace} /></>}
               {k.due && <small className="ro"> · {shortDate(k.due)}</small>}
-              {k.ai && <small className="ro"> · <AiMark label={sv.aiRun.aiMade} />{sv.aiRun.verify}</small>}
-              {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.source}</a></small>}
+              {k.url && <small> · <a className="place" href={k.url} target="_blank" rel="noopener noreferrer">{sv.aiRun.checkSource}</a></small>}
               {isOverdue(k, today) && <> <span className="badge late">{sv.overdue}</span></>}</span>
           </label>
           {!k.hidden && <IconButton icon="edit" look="bare" tip="left" label={`${sv.edit} ${k.text}`} onClick={() => edit({ kind: "task", id: k.id })} mut />}

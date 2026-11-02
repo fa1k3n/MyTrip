@@ -121,3 +121,10 @@ export const showInstallHint = (ua: string, installed: boolean, closed: boolean)
   !installed && !closed && /iPhone/.test(ua) && /Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
 /** The link the phone keeps for a trip, so a notice opens that trip (NT-04). */
 export const linkForTrip = (keys: string[], tripId: string) => keys.find((k) => tripOfLink(k) === tripId) ?? null;
+
+/** The permission matrix's columns, the role that may do most first (AU-34). */
+export const PERM_ROLES = ["planner", "traveler", "follower"] as const;
+/** The icon of each level in the permission matrix; a page row is Synlig or Dold (AU-35). */
+export const LEVEL_ICON = { hidden: "eyeoff", read: "eye", shown: "eye", check: "check", add: "plus", write: "edit" } as const;
+/** The level after `cur` among those a cell allows, round to the first again (AU-35). */
+export const nextLevel = (levels: readonly string[], cur: string) => levels[(levels.indexOf(cur) + 1) % levels.length]!;

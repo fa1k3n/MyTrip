@@ -57,6 +57,7 @@ export const svAdmin = {
       mi: { expenses: "Utlägg", budget: "Budget", memories: "Upplevt" },
     } as Record<string, Record<string, string>>,
     level: { hidden: "Dold", read: "Läsa", check: "Bocka av", add: "Lägga till", write: "Ändra" },
+    cell: (part: string, role: string, level: string) => `${part}, ${role}: ${level}. Tryck för att byta.`, // AU-35
     reset: (role: string) => `Återställ standard för ${role}`, fixed: "Resans inställningar och länkar kan bara Planerare och du ändra.",
   },
 };

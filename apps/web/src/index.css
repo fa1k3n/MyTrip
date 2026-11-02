@@ -297,6 +297,12 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 /* Permissions (AU-20): a matrix with a column per role; pages as groups with their components under them; a pill per cell coloured
    by level, from grey (hidden) to terracotta (change); "–" where the page is hidden for the role. */
 .pgrid{margin-top:6px}
+.lvlcell{display:inline-flex}.lvlcell .btn.icon{border:1.5px solid;border-radius:50%;width:44px;height:44px} /* AU-35: one button per cell */
+.lvlcell.lvl-hidden{color:var(--mute)}.lvlcell.lvl-hidden .btn.icon{color:var(--mute);border-color:var(--line);background:var(--card)}
+.lvlcell.lvl-read,.lvlcell.lvl-shown{color:var(--sageT)}.lvlcell.lvl-read .btn.icon,.lvlcell.lvl-shown .btn.icon{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 14%,var(--card))}
+.lvlcell.lvl-check,.lvlcell.lvl-add{color:var(--sageT)}.lvlcell.lvl-check .btn.icon,.lvlcell.lvl-add .btn.icon{color:var(--sageT);border-color:var(--sageT);background:color-mix(in srgb,var(--sage) 30%,var(--card))}
+.lvlcell.lvl-write{color:var(--acct)}.lvlcell.lvl-write .btn.icon{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
+.plegend .lvlcell svg{width:16px;height:16px}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(86px,128px));gap:6px;align-items:center;padding:3px 0}
 .prow>span:not(:first-child){display:flex;justify-content:center;align-items:center}
 .phead{position:sticky;top:0;background:var(--card);z-index:1;padding-bottom:6px}
@@ -305,13 +311,6 @@ h3:has(> .eye){display:flex;align-items:flex-start;gap:2px}h3 > .eye{margin:-4px
 .ppage>span:first-child{font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:.85rem}
 .prow:not(.ppage):not(.phead)>span:first-child{padding-left:14px;font-size:.92rem}
 .na{color:var(--mute);min-height:44px;display:inline-flex;align-items:center}
-.rolepick.sm{width:100%;margin:0}.rolepick.sm select{width:100%;min-width:0;padding:0 24px 0 10px;font-size:.85rem}.rolepick.sm::after{right:11px}
-.rolepick.lvl-hidden select{color:var(--mute);border-color:var(--line);background:var(--card)}.rolepick.lvl-hidden::after{color:var(--mute)}
-.rolepick.lvl-read select,.rolepick.lvl-shown select{color:var(--sageT);border-color:var(--sage);background:color-mix(in srgb,var(--sage) 14%,var(--card))}
-.rolepick.lvl-read::after,.rolepick.lvl-shown::after{color:var(--sageT)}
-.rolepick.lvl-check select,.rolepick.lvl-add select{color:var(--sageT);border-color:var(--sageT);background:color-mix(in srgb,var(--sage) 30%,var(--card))}
-.rolepick.lvl-check::after,.rolepick.lvl-add::after{color:var(--sageT)}
-.rolepick.lvl-write select{color:var(--acct);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--card))}.rolepick.lvl-write::after{color:var(--acct)}
 /* Narrow screens: the row's name on a line of its own above the three role cells, so nothing overlaps (AU-20, RS-*). */
 @media (max-width:599px){
   .prow{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:2px}

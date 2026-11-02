@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
-import { linkFromText, missingLinks, personUrl, shareUrl } from "./access.ts";
+import { LEVEL_ICON, linkFromText, missingLinks, nextLevel, PERM_ROLES, personUrl, shareUrl } from "./access.ts";
 import { DEFAULT_ACCESS, levelsFor, PAGE_PARTS, PAGES, type Level, type Page } from "@trip/schema/src/rules.ts";
 import { tripRange } from "./edit.ts";
 import { tripDates } from "./format.ts";
@@ -279,7 +279,7 @@ function Sharing({ t, run }: { t: Trip; run: Run }) {
   );
 }
 
-const ROLES = ["follower", "traveler", "planner"] as const;
+const ROLES = PERM_ROLES; // AU-34: Planerare first
 /** The role icons of US-23, with an eye for Följare and the crown for the superuser (AU-33, AU-34). */
 const ROLE_ICON = { follower: "eye", traveler: "luggage", planner: "compass", admin: "crown" } as const;
 type ARole = (typeof ROLES)[number];
@@ -294,17 +294,20 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
     const cur = own[pg] ?? {};
     return [{ op: "set", path: "access", value: { ...others, [r]: { ...own, [pg]: { ...cur, ...next, parts: { ...cur.parts, ...next.parts } } } } }];
   }, `access ${r} ${pg}`);
-  const cell = (label: string, value: string, options: [string, string][], onChange: (v: string) => void) => (
-    <span className={`rolepick sm lvl-${value}`}><select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
-      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select></span>
+  /** AU-35: one button per cell that steps through the levels the cell allows, its icon and colour following the level. */
+  const cell = (part: string, r: ARole, value: string, options: [string, string][], onChange: (v: string) => void) => (
+    <span className={`lvlcell lvl-${value}`}><IconButton icon={LEVEL_ICON[value as keyof typeof LEVEL_ICON] ?? "eyeoff"} look="bare" tip="left"
+      label={svAdmin.perms.cell(part, svAdmin.perms.roles[r], options.find(([v]) => v === value)?.[1] ?? value)}
+      onClick={() => onChange(nextLevel(options.map(([v]) => v), value))} /></span>
   );
   return (
     <div className="card perms">
       <h3>{svAdmin.perms.title}</h3>
       <p className="ro note">{svAdmin.perms.hint}</p>
-      <p className="ro note plegend">{(["follower", "traveler", "planner", "admin"] as const).map((r) => /* AU-34: what each icon means */
+      <p className="ro note plegend">{(["planner", "traveler", "follower", "admin"] as const).map((r) => /* AU-34: what each icon means */
         <span key={r}><span className={`rolemark ${r}`} aria-hidden="true"><Icon name={ROLE_ICON[r]} /></span>{svAdmin.perms.legend[r]}</span>)}</p>
+      <p className="ro note plegend">{(["write", "add", "check", "read", "hidden"] as const).map((l) => /* AU-35: the level icons */
+        <span key={l}><span className={`lvlcell lvl-${l}`} aria-hidden="true"><Icon name={LEVEL_ICON[l]} /></span>{svAdmin.perms.level[l]}</span>)}</p>
       <div className="pgrid" role="table" aria-label={svAdmin.perms.title}>
         <div className="prow phead" role="row"><span role="columnheader" />
           {ROLES.map((r) => <span key={r} role="columnheader" className={`who ${r}`}><span className={`rolemark ${r}`} role="img" aria-label={svAdmin.perms.roles[r]} title={svAdmin.perms.roles[r]}><Icon name={ROLE_ICON[r]} /></span>
@@ -313,12 +316,12 @@ function Permissions({ t, run }: { t: Trip; run: Run }) {
         {PAGES.map((pg) => <div key={pg} className="pgroup" role="rowgroup">
           <div className="prow ppage" role="row"><span role="rowheader">
             <button className="pfold" aria-expanded={open.includes(pg)} onClick={() => setOpen((o) => (o.includes(pg) ? o.filter((x) => x !== pg) : [...o, pg]))}>{sv.tabs[pg]}</button></span>
-            {ROLES.map((r) => <span key={r} role="cell">{cell(`${svAdmin.perms.page} ${sv.tabs[pg]}, ${svAdmin.perms.roles[r]}`, raw(r, pg).visible ? "shown" : "hidden",
+            {ROLES.map((r) => <span key={r} role="cell">{cell(`${svAdmin.perms.page} ${sv.tabs[pg]}`, r, raw(r, pg).visible ? "shown" : "hidden",
               [["shown", svAdmin.perms.shown], ["hidden", svAdmin.perms.level.hidden]], (v) => save(r, pg, { visible: v === "shown" }))}</span>)}
           </div>
           {open.includes(pg) && Object.keys(PAGE_PARTS[pg]).map((k) => <div key={k} className="prow" role="row"><span role="rowheader">{svAdmin.perms.part[pg][k]!}</span>
             {ROLES.map((r) => <span key={r} role="cell">{raw(r, pg).visible
-              ? cell(`${svAdmin.perms.part[pg][k]!} (${sv.tabs[pg]}), ${svAdmin.perms.roles[r]}`, raw(r, pg).parts[k] ?? "hidden", levelsFor(r, pg, k).map((l) => [l, svAdmin.perms.level[l]]),
+              ? cell(`${svAdmin.perms.part[pg][k]!} (${sv.tabs[pg]})`, r, raw(r, pg).parts[k] ?? "hidden", levelsFor(r, pg, k).map((l) => [l, svAdmin.perms.level[l]]),
                 (v) => save(r, pg, { parts: { [k]: v as Level } }))
               : <span className="na" title={svAdmin.perms.off}>–</span>}</span>)}
           </div>)}

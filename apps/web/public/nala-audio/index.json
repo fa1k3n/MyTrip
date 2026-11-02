@@ -1,0 +1,50 @@
+{
+  "voice": "kpTdKfohzvarfFPnwuHW",
+  "model": "eleven_v4",
+  "scenes": [
+    {
+      "file": "01.mp3",
+      "text": "Nåla är fliken där resan planeras i detalj. Här nålar Anna och Erik fast familjens höstlov i Hamburg: dagarna, aktiviteterna och allt runt omkring."
+    },
+    {
+      "file": "02.mp3",
+      "text": "Överst går tidslinjen med ett stopp per dag, och ett tryck på ett stopp öppnar dagen. Varje dag är ett kort med datum, rubrik, en mening om dagen, tiderna och ikoner för det som händer. Vädret står under datumet."
+    },
+    {
+      "file": "03.mp3",
+      "text": "Med plusknappen lägger Erik till en aktivitet. Den får en starttid, hur länge den ungefär tar och en kategori. Det som fattas står i grått, så att inget glöms. Ett klockslag med en klocka passar för sådant som en avgång."
+    },
+    {
+      "file": "04.mp3",
+      "text": "Aktiviteter flyttas med handtaget, inom dagen eller till en annan dag, och nästa aktivitet börjar när den före slutar. En lucka på en halvtimme eller mer syns som en egen rad, och en krock blir röd. Efter en flytt finns Ångra i tio sekunder."
+    },
+    {
+      "file": "05.mp3",
+      "text": "En del ligger fast, som bordet på restaurangen klockan sju. Då nålar Anna fast aktiviteten med nålen. Den kan inte dras och tiden ligger kvar, så resten av dagen får rätta sig efter den."
+    },
+    {
+      "file": "06.mp3",
+      "text": "Mellan aktiviteterna står vägen dit: gång, buss, bil, tåg eller färja och ungefär hur många minuter det tar, med en länk till resvägen på kartan. Tiden på dagkortet öppnar dagens resor med karta, och på bildagar kan Basläger varna för köer."
+    },
+    {
+      "file": "07.mp3",
+      "text": "I sidokolumnen ligger familjens önskningar från Önska, de med flest hjärtan först. Erik drar Mias önskan om Miniatur Wunderland till en dag, och då blir den en aktivitet. I Önska syns sen att önskan är med i planen."
+    },
+    {
+      "file": "08.mp3",
+      "text": "Under Bokningar står hotell, biljetter och det som ska bokas. Det som ska bokas är terrakotta, det som är klart eller betalt är grönt. Bekräftelser som mejlas till resans inkorg blir förslag att granska, och biljetterna går att öppna på resan, även utan nät."
+    },
+    {
+      "file": "09.mp3",
+      "text": "Längre ner finns resten: budgeten per kategori med plan, utfall och prognos, att göra som alla kan bocka av, en packlista för varje resenär, och Praktiskt med parkering och nödnummer för varje land ni passerar."
+    },
+    {
+      "file": "10.mp3",
+      "text": "Ska barnen överraskas? Anna döljer aktiviteten för Olle och Mia. De ser bara Dold aktivitet, och rubriker som liknar den döljs också. Anna ser ett överstruket öga, och där står vem den är dold för."
+    },
+    {
+      "file": "11.mp3",
+      "text": "Allt ni nålar fast följer med till Uppleva, där resan visas dag för dag när ni är på väg. Planera i lugn och ro hemma, så har ni hela Hamburg i fickan."
+    }
+  ]
+}

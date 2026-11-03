@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
-  datesMode, removeActivity, removedDays, type DatesMode, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
+  datesForm, removeActivity, removedDays, type DatesMode, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, saveRules, rulesForm, setTripDates, tripRange,
   readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, NEW_PLACE, type BookingInput, type NewPlace, type Result,
 } from "./edit.ts";
@@ -219,13 +219,14 @@ function PlanWishForm(p: Props & { id: string }) {
 function DatesForm(p: Props) {
   const s = useSave(p);
   const r = tripRange(p.t);
-  const { f, text } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
+  const { f, text, set } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
   const [picked, setPicked] = useState<DatesMode | null>(null);
-  const offered = datesMode(p.t, f.from, f.to);
-  const mode = offered ? picked ?? offered : "length";
+  const [toTyped, setToTyped] = useState(!r);
+  const { to, mode, offered } = datesForm(p.t, f.from, f.to, picked, toTyped); // the last date follows the first (ED-31)
   const submit = async () => {
-    const res = setTripDates(p.t, f, mode);
-    const gone = res.ok ? removedDays(p.t, f, mode) : [];
+    const dates = { from: f.from, to };
+    const res = setTripDates(p.t, dates, mode);
+    const gone = res.ok ? removedDays(p.t, dates, mode) : [];
     if (gone.length && !(await ask(sv.confirmRemoveDays, { details: gone.map((d) => `${shortDate(d.date)} ${d.title}`) }))) return;
     s.submit(res, "trip dates");
   };
@@ -233,7 +234,7 @@ function DatesForm(p: Props) {
     <Form title={sv.editDates} {...s} close={p.close} onSubmit={submit}>
       <div className="two">
         <DateField label={sv.firstDay} {...text("from")} autoFocus />
-        <DateField label={sv.lastDay} {...text("to")} />
+        <DateField label={sv.lastDay} value={to} onChange={(e) => { setToTyped(true); set("to", e.target.value); }} />
       </div>
       {offered ? (
         <fieldset><legend>{sv.datesHow}</legend>

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, checkTrip, Trip } from "@trip/schema";
-import { datesMode, daysOutside, removedDays, setTripDates, tripRange } from "../src/edit.ts";
+import { datesForm, datesMode, daysOutside, movedTo, removedDays, setTripDates, tripRange } from "../src/edit.ts";
 import { sv } from "../src/sv.ts";
 
 const day = (id: string, date: string) => ({ id, date, title: `Dag ${date}`, summary: "Planerat.", icons: ["🚗"], start: "09:00", end: "18:00", activities: [] });
@@ -113,4 +113,21 @@ test("TK-11 moving the trip moves the tasks' due dates by as many days; changing
   assert.deepEqual(t.tasks.map((k) => k.due), ["2026-10-31", undefined]);
   const l = apply(planned(), "2026-10-23", "2026-10-25");
   assert.equal(l.tasks[0]!.due, "2026-10-20");
+});
+
+test("ED-31 moving the trip keeps its number of days from the new first date", () => {
+  assert.equal(movedTo(trip(), "2026-11-04"), "2026-11-05");
+  assert.equal(movedTo({ ...trip(), days: [] }, "2026-11-04"), null);
+  assert.equal(movedTo(trip(), ""), null);
+});
+
+test("ED-31 the last date follows the first while Flytta resan is chosen, until the user changes it", () => {
+  const t = trip(); // 24–25 Oct
+  assert.deepEqual(datesForm(t, "2026-11-04", "2026-10-25", null, false), { to: "2026-11-05", mode: "move", offered: true });
+  assert.deepEqual(datesForm(t, "2026-10-25", "2026-10-25", null, false), { to: "2026-10-25", mode: "length", offered: true }, "a moved trip that overlaps: length first");
+  assert.deepEqual(datesForm(t, "2026-10-25", "2026-10-25", "move", false), { to: "2026-10-26", mode: "move", offered: true });
+  assert.deepEqual(datesForm(t, "2026-11-04", "2026-10-25", "length", false), { to: "2026-10-25", mode: "length", offered: true });
+  assert.deepEqual(datesForm(t, "2026-11-04", "2026-11-10", null, true), { to: "2026-11-10", mode: "move", offered: true }, "a last date typed by the user stays");
+  assert.deepEqual(datesForm(t, "2026-10-24", "2026-10-30", null, true), { to: "2026-10-30", mode: "length", offered: false });
+  assert.deepEqual(datesForm({ ...t, days: [] }, "2026-07-01", "2026-07-03", null, true), { to: "2026-07-03", mode: "length", offered: false });
 });

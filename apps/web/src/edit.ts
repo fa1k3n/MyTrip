@@ -164,6 +164,22 @@ export function datesMode(t: Trip, from: string, to: string): DatesMode | null {
   return to < r.from || from > r.to ? "move" : "length";
 }
 
+/** The last date of the trip moved to start on `from`, with as many days as now; null without days (ED-31). */
+export function movedTo(t: Trip, from: string) {
+  const r = tripRange(t);
+  return r && isDate(from) ? addDaysTo(from, daysBetween(r.from, r.to)) : null;
+}
+
+/** What the dates form shows: the last date follows the first while "Flytta resan" is chosen and the user has not typed one;
+ * the preselected choice compares the moved trip with the old one (ED-30, ED-31). */
+export function datesForm(t: Trip, from: string, to: string, picked: DatesMode | null, toTyped: boolean) {
+  const follow = toTyped ? null : movedTo(t, from);
+  const offered = datesMode(t, from, follow ?? to);
+  if (!offered) return { to: toTyped ? to : tripRange(t)?.to ?? to, mode: "length" as DatesMode, offered: false };
+  const mode = picked ?? offered;
+  return { to: follow ? (mode === "move" ? follow : tripRange(t)!.to) : to, mode, offered: true };
+}
+
 /** The days a change of dates removes: when moving, those beyond the new number of days (ED-30). */
 export const removedDays = (t: Trip, input: { from: string; to: string }, mode: DatesMode = "length") =>
   mode === "move" ? byDate(t).slice(datesBetween(input.from, input.to).length) : daysOutside(t, input.from, input.to);

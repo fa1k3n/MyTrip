@@ -274,6 +274,11 @@ export const sv = {
   conflict: "Resan ändrades samtidigt av någon annan. Den är nu uppdaterad, försök igen.", edit: "Ändra",
   tripDetails: "Resan", tripDates: "Datum", editDates: "Ändra datum", firstDay: "Första dagen", lastDay: "Sista dagen",
   datesHint: "Nya datum får en tom dag. Dagar utanför datumen tas bort.", confirmRemoveDays: "Dessa dagar tas bort:",
+  datesHow: "Hur ska dagarna ändras?", // ED-30
+  datesModes: {
+    move: { label: "Flytta resan", hint: "Alla dagar följer med till de nya datumen, med aktiviteter och resor, och datumen på Att göra flyttas lika mycket. Blir resan kortare tas de sista dagarna bort." },
+    length: { label: "Ändra längden", hint: "Dagarna står kvar på sina datum. Nya datum blir tomma dagar och dagar utanför tas bort." },
+  },
   activityNote: "Anteckning (visas under rubriken)", editTrip: "Ändra namn och syfte", purpose: "Syfte",
   suggestPurpose: "Föreslå syfte utifrån planen", purposeHint: "Syftet hjälper till att ge bra förslag på aktiviteter. Förslaget bygger på dagarna i Nåla, ändra fritt innan du sparar.", noPurposeYet: "Lägg in dagar i Nåla först, så kan ett syfte föreslås.",
   replacePurposeAsk: "Ersätta det som står i Syfte med förslaget?", replacePurpose: "Ersätt",

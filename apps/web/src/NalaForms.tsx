@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
-  daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
+  datesMode, removeActivity, removedDays, type DatesMode, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, saveRules, rulesForm, setTripDates, tripRange,
   readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, NEW_PLACE, type BookingInput, type NewPlace, type Result,
 } from "./edit.ts";
@@ -215,14 +215,17 @@ function PlanWishForm(p: Props & { id: string }) {
   );
 }
 
-/** First and last date of the trip; days follow the dates (ED-14). Removing days asks first (ED-09). */
+/** First and last date of the trip; days follow the dates (ED-14), or the whole trip moves (ED-30). Removing days asks first (ED-09). */
 function DatesForm(p: Props) {
   const s = useSave(p);
   const r = tripRange(p.t);
   const { f, text } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
+  const [picked, setPicked] = useState<DatesMode | null>(null);
+  const offered = datesMode(p.t, f.from, f.to);
+  const mode = offered ? picked ?? offered : "length";
   const submit = async () => {
-    const res = setTripDates(p.t, f);
-    const gone = res.ok ? daysOutside(p.t, f.from, f.to) : [];
+    const res = setTripDates(p.t, f, mode);
+    const gone = res.ok ? removedDays(p.t, f, mode) : [];
     if (gone.length && !(await ask(sv.confirmRemoveDays, { details: gone.map((d) => `${shortDate(d.date)} ${d.title}`) }))) return;
     s.submit(res, "trip dates");
   };
@@ -232,7 +235,16 @@ function DatesForm(p: Props) {
         <DateField label={sv.firstDay} {...text("from")} autoFocus />
         <DateField label={sv.lastDay} {...text("to")} />
       </div>
-      <p className="ro note">{sv.datesHint}</p>
+      {offered ? (
+        <fieldset><legend>{sv.datesHow}</legend>
+          {(["move", "length"] as const).map((m) => (
+            <label className="check datesmode" key={m}>
+              <input type="radio" name="datesmode" checked={mode === m} onChange={() => setPicked(m)} />
+              <span><b>{sv.datesModes[m].label}</b><span className="ro">{sv.datesModes[m].hint}</span></span>
+            </label>
+          ))}
+        </fieldset>
+      ) : <p className="ro note">{sv.datesHint}</p>}
     </Form>
   );
 }

@@ -149,24 +149,56 @@ function datesBetween(from: string, to: string) {
 /** Days that a new date range would remove; the form asks before removing them (ED-09). */
 export const daysOutside = (t: Trip, from: string, to: string) => t.days.filter((d) => d.date < from || d.date > to);
 
-export function setTripDates(t: Trip, input: { from: string; to: string }): Result {
+/** "move": the days keep their order and plan on the new dates (ED-30); "length": they stay on their dates (ED-14). */
+export type DatesMode = "move" | "length";
+const byDate = (t: Trip) => [...t.days].sort((a, b) => a.date.localeCompare(b.date));
+const badgeOf = (iso: string) => { const b = dateBadge(iso); return `${b.d} ${b.w}`; };
+const addDaysTo = (iso: string, n: number) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+/** The choice the dates form offers: none when the first date stays or the trip has no days; moving is preselected when the
+ * new dates do not overlap the old ones (ED-30). */
+export function datesMode(t: Trip, from: string, to: string): DatesMode | null {
+  const r = tripRange(t);
+  if (!r || !isDate(from) || !isDate(to) || from === r.from) return null;
+  return to < r.from || from > r.to ? "move" : "length";
+}
+
+/** The days a change of dates removes: when moving, those beyond the new number of days (ED-30). */
+export const removedDays = (t: Trip, input: { from: string; to: string }, mode: DatesMode = "length") =>
+  mode === "move" ? byDate(t).slice(datesBetween(input.from, input.to).length) : daysOutside(t, input.from, input.to);
+
+export function setTripDates(t: Trip, input: { from: string; to: string }, mode: DatesMode = "length"): Result {
   if (!isDate(input.from) || !isDate(input.to)) return fail(sv.errors.dates);
   if (input.to < input.from) return fail(sv.errors.toBeforeFrom);
   const dates = datesBetween(input.from, input.to);
   if (dates.length > MAX_DAYS) return fail(sv.errors.tooLong);
-  const taken = allIds(t), have = new Set(t.days.map((d) => d.date));
-  const gone = new Set(daysOutside(t, input.from, input.to).map((d) => d.id));
-  const ops: Op[] = [
+  const taken = allIds(t);
+  const ops: Op[] = [];
+  let have = new Set(t.days.map((d) => d.date)), fresh = dates;
+  if (mode === "move" && t.days.length) {
+    // Sets first, by the days' places in the list as they are; the removals after them change those places.
+    const order = byDate(t);
+    order.slice(0, dates.length).forEach((d, i) => {
+      if (d.date === dates[i]) return;
+      ops.push({ op: "set", path: `days/${t.days.indexOf(d)}/date`, value: dates[i] });
+      t.stops.forEach((s, j) => { if (s.dayId === d.id && s.sub === badgeOf(d.date)) ops.push({ op: "set", path: `stops/${j}/sub`, value: badgeOf(dates[i]!) }); });
+    });
+    const shift = daysBetween(order[0]!.date, input.from);
+    if (shift) t.tasks.forEach((k, n) => { if (k.due) ops.push({ op: "set", path: `tasks/${n}/due`, value: addDaysTo(k.due, shift) }); }); // TK-11
+    have = new Set(); fresh = dates.slice(order.length);
+  }
+  const gone = new Set(removedDays(t, input, mode).map((d) => d.id));
+  ops.push(
     ...removeAt("stops", t.stops.flatMap((s, n) => (gone.has(s.dayId) ? [n] : []))),
     ...removeAt("days", t.days.flatMap((d, n) => (gone.has(d.id) ? [n] : []))),
-  ];
-  for (const date of dates.filter((x) => !have.has(x))) {
+  );
+  for (const date of fresh.filter((x) => !have.has(x))) {
     const id = uniqueId(`day-${date}`, taken);
     taken.push(id);
-    const badge = dateBadge(date);
     ops.push(
       { op: "add", path: "days/-", value: { id, date, title: sv.newDay, summary: sv.emptyDay, icons: ["📅"], start: "09:00", end: "18:00", estimated: true, legs: [], activities: [] } },
-      { op: "add", path: "stops/-", value: { label: sv.newDay, sub: `${badge.d} ${badge.w}`, dayId: id } },
+      { op: "add", path: "stops/-", value: { label: sv.newDay, sub: badgeOf(date), dayId: id } },
     );
   }
   return ok(ops);

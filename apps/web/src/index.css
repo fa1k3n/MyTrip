@@ -207,6 +207,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44p
 .stop::after{top:6px;height:2px;background:color-mix(in srgb,var(--acc) 45%,var(--bg))}
 .stop[aria-pressed=true]::before{background:var(--sage);border-color:var(--sage)}
 .check input[type=checkbox]{flex:0 0 22px} /* keep checkboxes 22 px on long rows (TK-06) */
+.datesmode{align-items:flex-start;padding:4px 0}.datesmode input{flex:0 0 22px;margin-top:2px}.datesmode>span>span{display:block} /* ED-30 */
 .check.switch input[type=checkbox]{flex:0 0 44px} /* but a switch keeps its whole track (AI-08) */
 .sub.off{opacity:.5} /* helpers greyed while the trip's AI switch is off (AI-74) */
 .aimark{display:inline-flex;vertical-align:-2px;margin-right:6px;color:var(--acc)}.aimark svg{width:16px;height:16px} /* an AI suggestion (AI-70) */

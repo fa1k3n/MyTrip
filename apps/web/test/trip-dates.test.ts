@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyOps, checkTrip, Trip } from "@trip/schema";
-import { daysOutside, setTripDates, tripRange } from "../src/edit.ts";
+import { datesMode, daysOutside, removedDays, setTripDates, tripRange } from "../src/edit.ts";
 import { sv } from "../src/sv.ts";
 
 const day = (id: string, date: string) => ({ id, date, title: `Dag ${date}`, summary: "Planerat.", icons: ["🚗"], start: "09:00", end: "18:00", activities: [] });
@@ -57,4 +57,60 @@ test("ED-14 the dates must be valid, in order and at most 60 days", () => {
 test("ED-14 unchanged dates give no changes", () => {
   const r = setTripDates(trip(), { from: "2026-10-24", to: "2026-10-25" });
   assert.deepEqual(r, { ok: true, ops: [] });
+});
+
+const moved = (t: Trip, from: string, to: string) => {
+  const r = setTripDates(t, { from, to }, "move");
+  assert.ok(r.ok, r.ok ? "" : r.error);
+  return Trip.parse(applyOps(t, r.ok ? r.ops : []));
+};
+const planned = () => Trip.parse({
+  ...trip(),
+  stops: [...trip().stops, { label: "Hotell", sub: "Nära vattnet", dayId: "d2" }],
+  days: [{ ...day("d1", "2026-10-24"), legs: [{ vehicle: "train", origin: "Gatwick", destination: "Brighton", durationMin: 35 }] },
+    { ...day("d2", "2026-10-25"), activities: [{ id: "a1", text: "Piren", start: "10:00" }] }],
+  tasks: [{ id: "k1", text: "Ansök om ETA", done: false, due: "2026-10-20" }, { id: "k2", text: "Packa", done: false }],
+});
+
+test("ED-30 the choice is offered when the first date changes; moving is chosen when the dates do not overlap", () => {
+  const t = trip();
+  assert.equal(datesMode(t, "2026-11-04", "2026-11-06"), "move");
+  assert.equal(datesMode(t, "2026-10-25", "2026-10-27"), "length");
+  assert.equal(datesMode(t, "2026-10-23", "2026-10-25"), "length");
+  assert.equal(datesMode(t, "2026-10-24", "2026-10-30"), null, "only the last date changes");
+  assert.equal(datesMode({ ...t, days: [] }, "2026-11-04", "2026-11-06"), null, "a trip without days");
+  assert.equal(datesMode(t, "", "2026-11-06"), null);
+});
+
+test("ED-30 moving the trip keeps the days in order with their plan and adds empty days at the end", () => {
+  const t = moved(planned(), "2026-11-04", "2026-11-06");
+  const byDate = [...t.days].sort((a, b) => a.date.localeCompare(b.date));
+  assert.deepEqual(byDate.map((d) => [d.id, d.date]).slice(0, 2), [["d1", "2026-11-04"], ["d2", "2026-11-05"]]);
+  assert.equal(byDate[0]!.legs[0]!.destination, "Brighton");
+  assert.equal(byDate[1]!.activities[0]!.text, "Piren");
+  assert.equal(byDate[2]!.title, sv.newDay);
+  assert.deepEqual(t.stops.filter((s) => s.dayId !== byDate[2]!.id).map((s) => [s.label, s.sub]),
+    [["Köpenhamn", "4 ons"], ["Berlin", "5 tor"], ["Hotell", "Nära vattnet"]], "a date on a stop follows its day, other text stays");
+  assert.deepEqual(checkTrip(t), []);
+});
+
+test("ED-30 moving the trip to fewer days removes the last days, and only those are listed", () => {
+  const t = planned();
+  assert.deepEqual(removedDays(t, { from: "2026-11-04", to: "2026-11-04" }, "move").map((d) => d.id), ["d2"]);
+  assert.deepEqual(removedDays(t, { from: "2026-11-04", to: "2026-11-04" }, "length").map((d) => d.id), ["d1", "d2"]);
+  const n = moved(t, "2026-11-04", "2026-11-04");
+  assert.deepEqual(n.days.map((d) => [d.id, d.date]), [["d1", "2026-11-04"]]);
+  assert.deepEqual(n.stops.map((s) => s.dayId), ["d1"]);
+});
+
+test("ED-30 changing the length works as before", () => {
+  const t = planned();
+  assert.deepEqual(setTripDates(t, { from: "2026-10-23", to: "2026-10-26" }, "length"), setTripDates(t, { from: "2026-10-23", to: "2026-10-26" }));
+});
+
+test("TK-11 moving the trip moves the tasks' due dates by as many days; changing the length does not", () => {
+  const t = moved(planned(), "2026-11-04", "2026-11-05");
+  assert.deepEqual(t.tasks.map((k) => k.due), ["2026-10-31", undefined]);
+  const l = apply(planned(), "2026-10-23", "2026-10-25");
+  assert.equal(l.tasks[0]!.due, "2026-10-20");
 });

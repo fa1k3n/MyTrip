@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { parseLinkHash, parseSetupHash, permsFor, roleIcons, roleIn, setupUrl, whoChip } from "../src/access.ts";
 
 const me = {
@@ -52,4 +53,11 @@ test("US-40 US-24 the role icons of a trip card", () => {
 test("US-25 the chip on Drömmar shows the user, or Administratör for the admin password", () => {
   assert.equal(whoChip(me), "Olle");
   assert.equal(whoChip({ role: "admin" }), "Administratör");
+});
+
+// REQ: US-40 a new trip's card shows the user's roles at once: the roles are read again when a trip has been created
+test("US-40 the roles are read again after a trip is created", () => {
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const created = app.slice(app.indexOf("const created = async"), app.indexOf("const undoAi"));
+  assert.match(created, /api\.me\(\)\.then\(setMe/);
 });

@@ -273,7 +273,7 @@ export function App() {
   const created = async (id: string, msg?: string, drafted?: Drafted) => {
     setNewOpen(false);
     if (drafted && aiRun.current?.tripId !== id) aiRun.current = { tripId: id, before: drafted.before, undone: false }; // before any await: the helpers may be done (AI-82)
-    await load();
+    await Promise.all([load(), api.me().then(setMe, () => {})]); // the new trip's roles for its card (US-40)
     openTrip(id, drafted ? "nala" : "dr");
     if (drafted && !aiRun.current?.undone) setUndo((u) => (u?.draft && u.after.id === id ? u : { text: sv.newTripAi.drafted, ...drafted, draft: true }));
     if (msg) setNotice(msg);

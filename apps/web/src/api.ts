@@ -205,7 +205,7 @@ export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner";
 /** An account as the superuser's list shows it (US-02). */
 export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
 export type SetupLink = { secret: string; expires: string }; // US-04
-export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string }; // US-27, US-34
+export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string; version?: string }; // US-27, US-34, US-38
 export type MyNote = { id: string; at: string; text: string; page: string; reply?: string; replyAt?: string }; // US-34
 export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
   people: { name: string; days: Record<"dr" | "nala" | "up" | "mi", number>; upDuring: number; changes: number }[]; // US-29
@@ -233,7 +233,7 @@ export const api = {
   setupInfo: (user: string, secret: string) => call<{ name: string; email: string }>("/api/setup/info", { method: "POST", body: JSON.stringify({ user, secret }) }), // US-05
   setup: (user: string, secret: string, password: string, consent = false) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password, consent }) }),
   consent: () => call<void>("/api/consent", { method: "POST" }), // US-26
-  feedback: (text: string, page: string, tripId?: string) => call<void>("/api/feedback", { method: "POST", body: JSON.stringify({ text, page, tripId }) }), // US-27
+  feedback: (text: string, page: string, tripId?: string, version?: string) => call<void>("/api/feedback", { method: "POST", body: JSON.stringify({ text, page, tripId, version }) }), // US-27, US-38
   notes: () => call<FeedbackNote[]>("/api/feedback"),
   myNotes: () => call<MyNote[]>("/api/feedback/mine"), // US-34
   reply: (id: string, text: string) => call<FeedbackNote>(`/api/feedback/${encodeURIComponent(id)}/reply`, { method: "PUT", body: JSON.stringify({ text }) }),

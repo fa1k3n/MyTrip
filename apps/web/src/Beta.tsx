@@ -13,7 +13,7 @@ export function BetaNotes() {
   return <div className="card"><h3>{sv.beta.notes}</h3>
     {notes && !notes.length && <p className="ro">{sv.beta.noNotes}</p>}
     {notes?.map((n) => <div className="note-row" key={n.id}>
-      <p className="ro"><b>{n.name}</b> · {when(n.at)} · {sv.beta.page(PAGE[n.page] ?? n.page)}</p>
+      <p className="ro"><b>{n.name}</b> · {when(n.at)} · {sv.beta.page(PAGE[n.page] ?? n.page)}{n.version ? ` · ${sv.beta.version(n.version)}` : ""}</p>
       <p>{n.text}</p>
       <Answer n={n} />
     </div>)}

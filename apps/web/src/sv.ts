@@ -104,6 +104,7 @@ export const sv = {
   unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
   beta: { // US-26..US-29: the beta
+    version: (v: string) => `Version ${v}`, // US-38
     tag: "Beta", feedback: "Tyck till (beta)", title: "Tyck till", lead: "Basläger är i beta. Skriv vad som var krångligt, vad du saknar eller vad du gillar.",
     label: "Din synpunkt", send: "Skicka", sent: "Tack! Synpunkten är skickad.", failed: "Det gick inte att skicka. Försök igen.",
     goes: "Det du skriver går till den som driver Basläger, tillsammans med ditt namn och vilken sida du var på.",

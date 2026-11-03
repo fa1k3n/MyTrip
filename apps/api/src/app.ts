@@ -31,7 +31,7 @@ export type LogEntry = { at: string; tripId: string; actor: string; reason: stri
 export type PersonLink = { tripId: string; travelerId: string; secret: string; role: "traveler" | "planner"; account?: string }; // account: the tied address (US-21)
 /** A phone that wants notices for a trip (NT-03): who is a traveler id, "follower" for the common link, or "admin". */
 /** A note sent with "Tyck till" during the beta (US-27). */
-export type Feedback = { id: string; at: string; who: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string }; // reply: US-34
+export type Feedback = { id: string; at: string; who: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string; version?: string }; // reply: US-34; version: US-38
 /** That a consenting user opened one of the four pages of a trip on a day, in the trip's time zone (US-28). */
 export type Usage = { tripId: string; who: string; tab: "dr" | "nala" | "up" | "mi"; day: string };
 export type PushSub = { tripId: string; who: string; endpoint: string; p256dh: string; auth: string };
@@ -1298,11 +1298,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   app.post("/api/feedback", async (c) => {
     const u = c.get("user");
     if (!u?.consentAt) return c.json({ error: "forbidden" }, 403);
-    const b = await c.req.json<{ text?: unknown; page?: unknown; tripId?: unknown }>().catch(() => ({} as { text?: unknown; page?: unknown; tripId?: unknown }));
+    const b = await c.req.json<{ text?: unknown; page?: unknown; tripId?: unknown; version?: unknown }>().catch(() => ({} as { text?: unknown; page?: unknown; tripId?: unknown; version?: unknown }));
     const text = typeof b.text === "string" ? b.text.trim() : "";
     if (!text || text.length > 2000) return c.json({ error: "1 to 2000 characters" }, 400);
     const page = typeof b.page === "string" ? b.page.slice(0, 40) : "";
-    await store.saveFeedback({ id: crypto.randomUUID(), at: clock().toISOString(), who: u.id, name: u.name, text, page, ...(typeof b.tripId === "string" ? { tripId: b.tripId.slice(0, 80) } : {}) });
+    await store.saveFeedback({ id: crypto.randomUUID(), at: clock().toISOString(), who: u.id, name: u.name, text, page, ...(typeof b.tripId === "string" ? { tripId: b.tripId.slice(0, 80) } : {}),
+      ...(typeof b.version === "string" && /^[\w.+-]{1,20}$/.test(b.version) ? { version: b.version } : {}) }); // US-38
     return c.body(null, 201);
   });
   // US-34: the superuser answers a note; an empty text clears the answer.

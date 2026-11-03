@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, type MyNote } from "./api.ts";
 import { IconButton } from "./Icons.tsx";
 import { sv } from "./sv.ts";
+import { APP_VERSION } from "./version.ts";
 import { onOutside } from "./outside.ts";
 
 const when = (iso: string) => new Date(iso).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -20,7 +21,7 @@ export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?:
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState("busy");
-    try { await api.feedback(text, page, tripId); setState("sent"); setText(""); } catch { setState("failed"); }
+    try { await api.feedback(text, page, tripId, APP_VERSION); setState("sent"); setText(""); } catch { setState("failed"); }
   };
   return (
     <dialog ref={ref} aria-label={sv.beta.feedback} onClose={close} onClick={onOutside(close)}>
@@ -29,7 +30,7 @@ export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?:
       <p className="ro">{sv.beta.lead}</p>
       <form onSubmit={submit}>
         <label>{sv.beta.label}<textarea rows={5} maxLength={2000} value={text} onChange={(e) => { setText(e.target.value); if (state === "sent") setState(""); }} autoFocus /></label>
-        <p className="ro note">{sv.beta.goes}</p>
+        <p className="ro note">{sv.beta.goes} {sv.beta.version(APP_VERSION)}.</p>
         {state === "sent" && <p className="ro" role="status">{sv.beta.sent}</p>}
         {state === "failed" && <p className="err" role="alert">{sv.beta.failed}</p>}
         <button className="btn" type="submit" disabled={!text.trim() || state === "busy"}>{sv.beta.send}</button>

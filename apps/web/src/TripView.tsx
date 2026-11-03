@@ -129,7 +129,7 @@ function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (
 }
 
 /** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. In Uppleva, a way by
- * public transport also gets "Visa linjer", which asks the server only when pressed (TR-23). */
+ * public transport also gets "Visa linjer", which asks the server only when pressed (TR-23), and so does Nåla (TR-26). */
 export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["travel"]; li?: boolean; href?: string; lines?: { tripId: string; dayId: string; aid: string } }) => {
   const [open, setOpen] = useState(false), [got, setGot] = useState<TransitStep[] | "asking" | "locating" | "none" | "failed" | "noPosition" | null>(null);
   const [note, setNote] = useState<string>(); // TR-24: why none was found, or that the steps are an example
@@ -172,7 +172,7 @@ export const PinMark = () => <span className="pinmark" role="img" aria-label={sv
 
 export function Activities({ t, x, onPlace, edit, run }: { t: Trip; x: Day; onPlace: (id: string) => void; edit?: (d: EditDlg) => void; run?: Run }) {
   const who = hiddenFromIn(x);
-  return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} href={wayUrl(t, x.id, a.id)} />
+  return <>{x.activities.map((a) => (<Fragment key={a.id}><TravelRow travel={a.travel} href={wayUrl(t, x.id, a.id)} lines={{ tripId: t.id, dayId: x.id, aid: a.id }} /> {/* TR-26 */}
     <div className={`act ${who.has(a.id) ? "hiddenrow" : ""}`}>
       <ActivityWhen a={a} />{a.pinned && <PinMark />}
       <ActivityText t={t} a={a} who={who.get(a.id)} eye={edit && (() => edit({ kind: "hidden", dayId: x.id, id: a.id }))} onPlace={onPlace} />

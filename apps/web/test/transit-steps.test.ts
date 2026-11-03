@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { stepIcon, stepText, transitNote } from "../src/transport.ts";
 import { sv } from "../src/sv.ts";
@@ -25,4 +26,11 @@ test("TR-24 the note of a trip far ahead", () => {
 test("TR-25 lines turned off", () => {
   assert.equal(transitNote({ status: "off" }), "Linjer är inte påslagna i det här Basläger än. Använd Visa resvägen.");
   assert.equal(transitNote({ status: "none" }), "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.");
+});
+
+// REQ: TR-26 Nåla's day cards, edited and read, ask for the lines as Uppleva does
+test("TR-26 Visa linjer in Nåla", () => {
+  const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  assert.match(src("Plan.tsx"), /<TravelRow travel=\{a\.travel\} href=\{wayUrl\(t, x\.id, a\.id\)\} lines=\{\{ tripId: t\.id, dayId: x\.id, aid: a\.id \}\} \/>/);
+  assert.match(src("TripView.tsx"), /export function Activities[\s\S]{0,300}<TravelRow travel=\{a\.travel\} href=\{wayUrl\(t, x\.id, a\.id\)\} lines=\{\{ tripId: t\.id, dayId: x\.id, aid: a\.id \}\} \/>/);
 });

@@ -292,7 +292,8 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const files = input.files === undefined ? old?.files : input.files.length ? input.files : undefined;
   let placeId = input.placeId || undefined, placeOps: Op[] = [];
   if (placeId === NEW_PLACE) { // BK-36: the place first, so the booking points at something that exists
-    const r = savePlace(t, { bookingUrl: "", bookingLabel: "", notes: "", ...input.newPlace!, name: input.newPlace?.name.trim() || name });
+    const np = { name: "", address: "", phone: "", website: "", ...input.newPlace }; // chosen by hand: nothing read yet
+    const r = savePlace(t, { bookingUrl: "", bookingLabel: "", notes: "", ...np, name: np.name.trim() || name });
     if (!r.ok) return r;
     placeOps = r.ops; placeId = (r.ops[0] as { value: { id: string } }).value.id;
   }

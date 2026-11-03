@@ -84,13 +84,15 @@ function useSave({ t, save, close }: Props) {
 }
 
 function Form({ title, err, busy, close, onSubmit, onRemove, children }: {
-  title: string; err: string; busy: boolean; close: () => void; onSubmit: () => void; onRemove?: () => void; children: ReactNode;
+  title: string; err: string; busy: boolean; close: () => void; onSubmit: () => void | Promise<void>; onRemove?: () => void; children: ReactNode;
 }) {
+  const [crash, setCrash] = useState(""); // ED-10: a fault in the form itself still says that nothing was saved
+  const send = () => { setCrash(""); Promise.resolve().then(onSubmit).catch((e) => { console.error(e); setCrash(sv.couldNotSave); }); };
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+    <form onSubmit={(e) => { e.preventDefault(); send(); }}>
       <h3>{title}</h3>
       {children}
-      {err && <p className="err" role="alert">{err}</p>}
+      {(err || crash) && <p className="err" role="alert">{err || crash}</p>}
       <div className="dlgbar">
         <button className="btn" type="submit" disabled={busy}>{sv.save}</button>
         {onRemove && <IconButton icon="trash" look="red" tip="up" label={sv.remove} onClick={onRemove} />}

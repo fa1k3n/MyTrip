@@ -38,3 +38,9 @@ test("BK-36 saving the booking adds its place", () => {
   assert.ok(!saveBooking(t(), { ...f, newPlace: { ...f.newPlace!, address: " " } }).ok);
   assert.ok(!saveBooking(t(), { ...f, newPlace: { ...f.newPlace!, website: "inte en adress" } }).ok);
 });
+
+// REQ: BK-36 "Ny plats…" chosen by hand, with its fields left empty, says what is missing instead of failing silently
+test("BK-36 an empty new place says what is missing", () => {
+  const r = saveBooking(t(), { ...bookingForm(t()), name: "Testhotell", placeId: "__new" });
+  assert.deepEqual(r, { ok: false, error: "Ange namn och adress för den nya platsen." });
+});

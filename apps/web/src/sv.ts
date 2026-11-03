@@ -313,7 +313,11 @@ export const sv = {
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
   check: { // DQ-08: "Kontrollera resan"
     title: "Kontrollera resan", ok: "Inga problem hittade.", warn: "Resan har allvarliga problem", caution: "Resan har något att se över", allOk: "Resan ser bra ut",
-    what: "Kontrollerar nu: boende varje natt.",
+    what: "Kontrollerar nu: boende varje natt, att tiderna hinns med och incheckning.",
+    late: (day: string, name: string, at: string, before: string, end: string, way?: string) => `${day}: ${name} ${at} hinns inte. ${before} slutar ${end}${way ? ` och vägen dit tar ${way}` : ""}.`,
+    lateCa: (day: string, name: string, at: string, before: string, end: string) => `${day}: ${name} ca ${at} krockar med ${before}, som slutar ${end}.`,
+    buffer: (day: string, name: string, at: string, spare: string) => `${day}: bara ${spare} marginal före ${name} ${at}.`,
+    checkIn: (day: string, name: string, at: string, end: string) => `${day}: incheckningen på ${name} öppnar ${at}, men dagen slutar ${end}.`,
     noStay: (nights: string, n: number) => `${n === 1 ? "Natten" : "Nätterna"} ${nights} saknar boende.`,
     toBook: (nights: string, n: number) => `${n === 1 ? "Natten" : "Nätterna"} ${nights}: boendet är inte bokat än.`,
   },

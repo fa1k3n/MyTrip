@@ -6,6 +6,7 @@ import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
 import { googleOf } from "./users.ts";
 import { brevoMailer } from "./mailer.ts";
 import { anthropicCall, CLOCK_DELAY_MS } from "./ai.ts";
+import { withReplay } from "./ai-replay.ts";
 // The entry module exports only handlers and Durable Object classes; the runtime rejects anything else.
 
 export type WorkerEnv = {
@@ -21,6 +22,7 @@ export type WorkerEnv = {
   TRAFFIC_DELAY_MIN?: string;
   INBOX_DOMAIN?: string; // the domain whose mail Cloudflare Email Routing sends to this Worker (BK-14)
   BREVO_API_KEY?: string; MAIL_FROM?: string; APP_URL?: string; // mail for a forgotten password (US-35): the key a secret, the rest vars
+  AI_REPLAY?: string; // "1" on a test instance: AI answers are recorded and replayed (DP-13)
 };
 /** The parts of a Durable Object namespace and state the timer uses. */
 type ClockNamespace = { idFromName(name: string): unknown; get(id: unknown): { fetch(r: Request | string, init?: RequestInit): Promise<Response> } };
@@ -38,9 +40,16 @@ export const REJECT = {
 /** The mail service when its key, sender and the app's address are set (US-35). */
 const mailOf = (env: WorkerEnv) => (env.BREVO_API_KEY && env.MAIL_FROM && env.APP_URL ? { ...brevoMailer({ apiKey: env.BREVO_API_KEY, from: env.MAIL_FROM }), appUrl: env.APP_URL } : undefined);
 
-/** The AI service: through the gateway when it is configured (AI-73), else with an Anthropic key (AI-03). */
-const aiOf = (env: WorkerEnv) => (env.AI_GATEWAY_URL && env.AI_GATEWAY_TOKEN ? anthropicCall({ gateway: { url: env.AI_GATEWAY_URL, token: env.AI_GATEWAY_TOKEN } })
-  : env.AI_API_KEY ? anthropicCall({ apiKey: env.AI_API_KEY }) : undefined);
+/** The AI service: through the gateway when it is configured (AI-73), else with an Anthropic key (AI-03); recorded and replayed
+ * on a test instance (DP-13). */
+const aiOf = (env: WorkerEnv) => {
+  const call = env.AI_GATEWAY_URL && env.AI_GATEWAY_TOKEN ? anthropicCall({ gateway: { url: env.AI_GATEWAY_URL, token: env.AI_GATEWAY_TOKEN } })
+    : env.AI_API_KEY ? anthropicCall({ apiKey: env.AI_API_KEY }) : undefined;
+  return call && withReplay(call, env.AI_REPLAY, {
+    get: async (key) => (await env.DB.prepare("SELECT json FROM ai_replay WHERE key = ?").bind(key).first<{ json: string }>())?.json,
+    put: async (key, json) => { await env.DB.prepare("INSERT INTO ai_replay (key, json, at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET json = excluded.json, at = excluded.at").bind(key, json, new Date().toISOString()).run(); },
+  });
+};
 
 // One app per set of bindings, kept while the Worker instance lives; state that must last is in D1.
 const apps = new WeakMap<WorkerEnv, ReturnType<typeof createApp>>();

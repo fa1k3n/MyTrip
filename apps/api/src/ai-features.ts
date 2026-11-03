@@ -26,6 +26,9 @@ saying what to do, for example "Beställ miljödekal (Umweltplakette) till bilen
 when it must be ordered or booked ahead, counted back from the trip's first day; leave it out otherwise.
 Propose each booking to book with an add operation on bookings/-: { id, name (short Swedish name, for example "Hotell med pool i Hamburg"),
 kind: stay|ticket|transport|other, from and to (YYYY-MM-DD, days of the trip it is for), status: "tobook", url (where it is booked) }.
+Make one booking per stay of consecutive nights in one place: from is the first night, to the day of checking out, so the same town on two
+separate nights (on the way there and back) is two bookings. Make one booking per direction of a ferry, train or flight, on its day of travel
+(from and to the same day, or the next day for a night crossing), so a ferry out and back is two bookings.
 Propose each card of practical information with an add operation on info/-: { id, title (short Swedish title, for example "Parkering vid hotellet"
 or "Bussbiljett i Hamburg"), text (the facts in one to three Swedish sentences) }.`,
   allows: (o) => o.op === "add" && (o.path === "tasks/-" || isBooking(o) || isInfo(o)),

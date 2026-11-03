@@ -25,10 +25,11 @@ function nights(from: string, to: string) {
 }
 
 /** Each night of the trip without a stay, consecutive nights of the same level together: red when nothing covers it, yellow when only
- * a stay still to book does. A stay, an overnight transport or an old booking without a kind covers its nights; the last day's night is at home (DQ-08). */
+ * a stay still to book does. A stay, a Resa over exactly one night (a night ferry, not a round trip) or an old booking without a kind
+ * covers its nights; the last day's night is at home (DQ-08). */
 export function nightFindings(t: CheckTrip): Finding[] {
   const days = [...t.days].sort((a, b) => a.date.localeCompare(b.date)).slice(0, -1);
-  const covers = t.bookings.filter((b) => b.status !== "cancelled" && (b.kind === "stay" || b.kind === "transport" || !b.kind));
+  const covers = t.bookings.filter((b) => b.status !== "cancelled" && (b.kind === "stay" || !b.kind || (b.kind === "transport" && b.to === next(b.from)))); // a Resa: only over one night
   const levelOf = (d: string) => {
     const on = covers.filter((b) => b.from <= d && d < b.to);
     return on.some((b) => b.status !== "tobook") ? undefined : on.length ? "caution" as const : "warn" as const;

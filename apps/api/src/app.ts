@@ -605,7 +605,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const t = view(await load(c.req.param("id")), c.get("role"), c.get("travelerId"));
     const day = t.days.find((d) => d.id === c.req.param("dayId"));
     if (!day) return c.json({ error: "not found" }, 404);
-    return c.json(day.hiddenRoute ? { status: "none" } : await checkTransit(t, day.id, c.req.param("aid"), opts));
+    const from = c.req.query("from"), m = from === undefined ? undefined : /^(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)$/.exec(from);
+    if (from !== undefined && (!m || Math.abs(+m[1]!) > 90 || Math.abs(+m[2]!) > 180)) return c.json({ error: "from must be lat,lng" }, 400);
+    return c.json(day.hiddenRoute ? { status: "none" } : await checkTransit(t, day.id, c.req.param("aid"), opts, m ? { lat: +m[1]!, lng: +m[2]! } : undefined)); // the phone's position, when no place is before
   });
   app.get("/api/trips/:id/check", async (c) => c.json({ problems: checkTrip(await load(c.req.param("id"))) }));
   app.get("/api/trips/:id/proposals", async (c) => (["link", "traveler"].includes(c.get("role")) ? c.json({ error: "forbidden" }, 403)

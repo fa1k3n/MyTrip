@@ -78,7 +78,8 @@ export const sv = {
   },
   showWay: "Visa resvägen", // TR-21
   transit: { // TR-23
-    show: "Visa linjer", hide: "Dölj linjer", asking: "Söker resa…", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.", failed: "Kunde inte hämta linjerna just nu.",
+    show: "Visa linjer", hide: "Dölj linjer", asking: "Söker resa…", locating: "Söker var du är…",
+    noPosition: "Ingen plats före den här på dagen, och telefonen gav inte sin position. Tillåt platsen, eller använd Visa resvägen.", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.", failed: "Kunde inte hämta linjerna just nu.",
     walk: (min: number) => `Gå ${min} min`, toward: (h: string) => `mot ${h}`, stops: (n: number) => (n === 1 ? "1 hållplats" : `${n} hållplatser`),
     kinds: { bus: "Buss", tram: "Spårvagn", metro: "Tunnelbana", train: "Tåg", ferry: "Färja", other: "Linje" } as Record<string, string>,
     label: "Resan med kollektivtrafik",

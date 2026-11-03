@@ -29,6 +29,7 @@ test("TR-23 a Routes answer becomes walking and ride steps", () => {
     { kind: "ride", line: "U2", vehicle: "metro", headsign: "Ruhleben", from: "Rosenthaler Platz", to: "Zoologischer Garten", dep: "10:02", arr: "10:17", stops: 9 },
     { kind: "walk", min: 4 }]);
   assert.equal(transitSteps({}), null);
+  assert.deepEqual(transitSteps({ routes: [{ legs: [{ steps: [{ travelMode: "WALK", staticDuration: "600s" }] }] }] }), [{ kind: "walk", min: 10 }]); // walking all the way
 });
 
 // REQ: TR-23 the server asks Google Routes by transit from the place before, arriving by the start; without a key it is off
@@ -64,4 +65,32 @@ test("TR-23 leaves now when the start has passed", async () => {
   assert.equal(body.arrivalTime, undefined);
   assert.equal(body.departureTime, "2026-11-20T11:01:00.000Z");
   assert.equal(b.status, "none"); // no trip found
+});
+
+// REQ: TR-23 without a place before, the phone's position is the start; without it, the server asks for it
+test("TR-23 the first activity of the day starts from the phone's position", async () => {
+  let body: Record<string, unknown> = {};
+  const fetch = (async (_u: string, init: RequestInit) => { body = JSON.parse(String(init.body)); return new Response(JSON.stringify(answer), { status: 200 }); }) as typeof globalThis.fetch;
+  const t = trip();
+  t.days[0]!.activities = [t.days[0]!.activities[1]!]; // the bus is the day's first activity, and no stay is booked
+  const app = createApp(memoryStore([t]), tokens, { routesKey: "k", fetch, now: () => new Date("2026-11-19T12:00:00Z") });
+  const ask = (q = "") => app.request(`/api/trips/berlin/days/d1/activities/a2/transit${q}`, { headers: { authorization: "Bearer a" } });
+  assert.deepEqual(await (await ask()).json(), { status: "nofrom" });
+  const r = await (await ask("?from=52.5321,13.4013")).json();
+  assert.equal(r.status, "ok");
+  assert.deepEqual(body.origin, { location: { latLng: { latitude: 52.5321, longitude: 13.4013 } } });
+  assert.equal((await ask("?from=inte,en,plats")).status, 400);
+});
+
+// REQ: TR-23 an error from Google is logged with its status
+test("TR-23 a Routes error is logged", async () => {
+  const fetch = (async () => new Response('{"error":{"message":"API key not valid"}}', { status: 403 })) as unknown as typeof globalThis.fetch;
+  const app = createApp(memoryStore([trip()]), tokens, { routesKey: "k", fetch, now: () => new Date("2026-11-19T12:00:00Z") });
+  const logged: string[] = [], was = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+  try {
+    const b = await (await app.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json();
+    assert.equal(b.status, "error");
+  } finally { console.error = was; }
+  assert.ok(logged.some((l) => l.includes("403") && l.includes("API key not valid")), logged.join("\n"));
 });

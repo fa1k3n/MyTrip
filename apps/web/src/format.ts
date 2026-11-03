@@ -152,7 +152,6 @@ export function helperLine(s: { at?: string; result?: string; remaining: number 
   return `${s.result === "error" ? r.failed(when) : r.last(when) + (s.result === "nothing" ? r.nothing : "")} · ${left}`;
 }
 
-/** The line under a traveler's name in the card Resenärer: the permission, and when the traveler does not share costs (AU-38, MI-38). */
 /** US-31: the invitation as a mailto link for the phone's own mail app; spaces as %20, which every mail app reads. */
 export function inviteMail(x: { to: string; name: string; trip: string; url: string; until: string }) {
   const q = (v: string) => encodeURIComponent(v);
@@ -171,4 +170,7 @@ export function receiptFill(r: { amount?: number; currency?: string; date?: stri
 }
 /** US-34: an answer to one's feedback that came after the dialog was last opened on this device. */
 export const newReply = (notes: { replyAt?: string }[], seen: string | null) => notes.some((n) => !!n.replyAt && (!seen || n.replyAt > seen));
-export const travelerLine = (role: "traveler" | "planner", shares: boolean) => [sv.people[role], ...(shares ? [] : [sv.people.noShare])].join(" · ");
+/** The line under a traveler's name in the card Vilka som är med: the permission, the login status, and when the traveler does not
+ * share costs (AU-40, US-36, MI-38). */
+export const travelerLine = (role: "traveler" | "planner", shares: boolean, login: keyof typeof sv.people.login = "none") =>
+  [sv.people[role], sv.people.login[login], ...(shares ? [] : [sv.people.noShare])].join(" · ");

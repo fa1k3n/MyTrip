@@ -67,10 +67,10 @@ test("UI-22 marks together", () => {
   assert.match(css, /\.mailflag svg\{width:15px;height:15px\}/);
 });
 
-// REQ: AC-05 icon buttons keep their 44 px, also in a crowded row, in the permission card's head and as the vote heart
+// REQ: AC-05 icon buttons keep their 44 px, also in a crowded row, as the vote heart, and the permission switches are 44 px rows (AU-41)
 test("AC-05 touch targets", () => {
   assert.match(css, /\.btn\.icon\{width:44px;height:44px;padding:0;flex:none;/);
-  assert.match(css, /\.phead \.who \.btn\.icon\{width:44px;height:44px\}/);
+  assert.match(css, /\.perms \.switch\{display:flex;min-height:44px/);
   assert.match(css, /\.heart\{[^}]*min-width:44px;min-height:44px/);
 });
 

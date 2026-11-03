@@ -33,7 +33,7 @@ export function TripAi({ t, superuser, change, reload, openSettings }: {
   const [msg, setMsg] = useState("");
   const refresh = () => api.aiStatus(t.id).then(setSt, () => setSt(null));
   useEffect(() => { void refresh(); }, [t.id, t.revision]); // eslint-disable-line react-hooks/exhaustive-deps -- again after each change
-  if (!st) return null;
+  if (!st || (!st.enabled && !superuser)) return null; // AU-39: nothing to say to those who cannot turn AI on
   const shown = Object.entries(st.helpers).filter(([, h]) => h.available);
   const runNow = async (name: string) => {
     setBusy(name); setMsg("");

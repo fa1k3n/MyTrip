@@ -1,16 +1,15 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, installed, type PersonLinkInfo, type SetupLink } from "./api.ts";
-import { LEVEL_ICON, linkFromText, missingLinks, nextLevel, PERM_ROLES, personUrl, setupUrl, shareUrl } from "./access.ts";
-import { CONTENT, contentLevels, DEFAULT_CONTENT, DEFAULT_TABS, ownAccess, PAGES, type Level, type RoleAccess } from "@trip/schema/src/rules.ts";
+import { customAccess, linkFromText, missingLinks, permSwitches, personUrl, setupUrl, shareUrl, switchAccess, type PermSwitches } from "./access.ts";
 import { renameTraveler, tripRange } from "./edit.ts";
 import { inviteMail, travelerLine, tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
 import { QrDialog } from "./QrDialog.tsx";
-import { TripAi } from "./Settings.tsx";
+import { Switch, TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
 import { sv } from "./sv.ts";
@@ -159,42 +158,39 @@ function PasteLink() {
   </form>;
 }
 
-/** AU-06: the trip's share link, to copy or replace. Replacing it stops the old link at once. */
-function ShareLink({ t }: { t: Trip }) {
+/** AU-40, AU-06, AU-31: the row Följare: everyone with the trip's share link reads it; the button opens the link as a QR code with
+ * buttons to copy and replace it. Replacing it stops the old link at once. */
+function FollowerRow({ t }: { t: Trip }) {
   const [secret, setSecret] = useState<string | null | undefined>(undefined); // undefined: loading, null: none yet
-  const [copied, setCopied] = useState(false), [showQr, setShowQr] = useState(false);
+  const [open, setOpen] = useState(false), [copied, setCopied] = useState(false);
   useEffect(() => { api.link(t.id).then((r) => setSecret(r.secret), () => setSecret(null)); }, [t.id]);
   const url = secret ? shareUrl(location.origin, t.id, secret) : "";
   const make = async () => {
     if (secret && !(await ask(svAdmin.share.confirmReplace, { ok: sv.askOk.replace }))) return;
     setSecret((await api.newLink(t.id)).secret);
     setCopied(false);
+    setOpen(true);
   };
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(url); setCopied(true); } catch { /* the field can still be copied by hand */ }
-  };
-  return (
-    <div className="card">
-      <h3>{svAdmin.share.title}</h3>
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); } catch { /* no clipboard */ } };
+  return <div className="row mid trow">
+    <span className="tperson"><span className="rolemark initial follower" role="img" aria-label={svAdmin.people.follower} title={svAdmin.people.follower}><Icon name="eye" /></span>
+      <span className="tname"><b>{svAdmin.people.follower}</b><small className="ro">{secret === null ? svAdmin.share.none : svAdmin.share.line}</small></span></span>
+    {secret !== undefined && <span className="end">{secret
+      ? <IconButton icon="link" look="bare" tip="left" label={svAdmin.share.open} onClick={() => { setCopied(false); setOpen(true); }} />
+      : <IconButton icon="plus" look="bare" tip="left" label={svAdmin.share.create} onClick={make} />}</span>}
+    {open && url && <QrDialog url={url} name={svAdmin.people.follower} close={() => setOpen(false)}>
       <p className="ro note">{svAdmin.share.hint}</p>
-      {secret !== undefined && (
-        <div className="row mid">{/* the field and its buttons on one row, as for the personal links */}
-          {secret ? <input className="linkfield" readOnly value={url} aria-label={svAdmin.share.title} onFocus={(e) => e.currentTarget.select()} />
-            : <span className="ro">{svAdmin.share.none}</span>}
-          <span className="end">
-            {secret && <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(svAdmin.people.follower)} onClick={() => setShowQr(true)} />}
-            {secret && <IconButton icon="copy" look="bare" tip="left" label={svAdmin.share.copy} onClick={copy} />}
-            <IconButton icon={secret ? "refresh" : "plus"} look="bare" tip="left" label={secret ? svAdmin.share.replace : svAdmin.share.create} onClick={make} />
-          </span>
-        </div>
-      )}
+      <div className="row mid sharebar">
+        <IconButton icon="copy" tip="right" label={svAdmin.share.copy} onClick={copy} />
+        <IconButton icon="refresh" tip="right" label={svAdmin.share.replace} onClick={make} />
+      </div>
       {copied && <p className="ro" role="status">{svAdmin.share.copied}</p>}
-      {showQr && url && <QrDialog url={url} name={svAdmin.people.follower} close={() => setShowQr(false)} />}
-    </div>
-  );
+    </QrDialog>}
+  </div>;
 }
 
-/** BK-26: the trip's one mail address, made when the settings first show it, to copy or replace; off without a mail domain on the server. */
+/** BK-26, AU-39: the trip's one mail address as plain text, made when the settings first show it, to copy or replace; off without a
+ * mail domain on the server. */
 function Inbox({ t }: { t: Trip }) {
   const [box, setBox] = useState<{ enabled: boolean; address?: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -207,13 +203,13 @@ function Inbox({ t }: { t: Trip }) {
     setBox({ enabled: true, address: (await api.replaceInbox(t.id)).address });
     setCopied(false);
   };
-  const copy = async () => { try { await navigator.clipboard.writeText(box.address ?? ""); setCopied(true); } catch { /* the field can still be copied by hand */ } };
+  const copy = async () => { try { await navigator.clipboard.writeText(box.address ?? ""); setCopied(true); } catch { /* the address can still be selected */ } };
   return (
-    <div className="card">
+    <div className="card inbox">
       <h3>{svAdmin.inbox.title}</h3>
       <p className="ro note">{box.enabled ? svAdmin.inbox.hint : svAdmin.inbox.off}</p>
       {box.enabled && box.address && <div className="row mid">
-        <input className="linkfield" readOnly value={box.address} aria-label={svAdmin.inbox.title} onFocus={(e) => e.currentTarget.select()} />
+        <span className="addr">{box.address}</span>
         <span className="end">
           <IconButton icon="copy" look="bare" tip="left" label={svAdmin.inbox.copy} onClick={copy} />
           <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.inbox.replace} onClick={replace} />
@@ -224,9 +220,10 @@ function Inbox({ t }: { t: Trip }) {
   );
 }
 
-/** AU-38: the travelers in one calm card: a row each with the permission's colour and a line on how they take part, a button that
- * shares the personal link (AU-11, AU-31), and the row opens the traveler's dialog. A link with the permission Resenär is made
- * for each traveler who has none. */
+type Login = NonNullable<PersonLinkInfo["login"]>;
+/** AU-40: everyone who takes part in one card: a row per traveler with the permission's colour, a line with the permission, the login
+ * status (US-36) and whether they share costs, and a mail button that opens the dialog at the address (US-30); then the row Följare
+ * and the add button. A link with the permission Resenär is made for each traveler who has none (AU-11). */
 function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: Run }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
   const [open, setOpen] = useState<string | null>(null), [sharing, setSharing] = useState<string | null>(null);
@@ -238,6 +235,7 @@ function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: 
     }, () => setLinks([]));
   }, [t.id, t.travelers.map((x) => x.id).join()]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when travelers change
   const put = (l: PersonLinkInfo) => setLinks((ls) => [...(ls ?? []).filter((x) => x.travelerId !== l.travelerId), l]);
+  const mark = (id: string, login: Login) => setLinks((ls) => (ls ?? []).map((x) => (x.travelerId === id ? { ...x, login } : x)));
   const linkOf = (id: string) => links?.find((y) => y.travelerId === id);
   const who = t.travelers.find((x) => x.id === open), shared = t.travelers.find((x) => x.id === sharing);
   return (
@@ -251,22 +249,22 @@ function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: 
           <div className="row mid trow" key={x.id}>
             <button type="button" className="tperson" onClick={() => setOpen(x.id)} aria-label={svAdmin.people.open(x.name)}>
               <span className={`rolemark initial ${role}`} role="img" aria-label={svAdmin.people.roles[role]} title={svAdmin.people.roles[role]}>{x.name.slice(0, 1).toUpperCase()}</span>
-              <span className="tname"><b>{x.name}</b><small className="ro">{travelerLine(role, x.shares !== false)}</small></span>
+              <span className="tname"><b>{x.name}</b><small className={`ro login-${l?.login ?? "none"}`}>{travelerLine(role, x.shares !== false, l?.login)}</small></span>
             </button>
-            {l && <span className="end">
-              <IconButton icon="mail" look="bare" tip="left" label={svAdmin.people.invite(x.name)} onClick={() => { setInviting(true); setOpen(x.id); }} /> {/* US-30 */}
-              <IconButton icon="link" look="bare" tip="left" label={svAdmin.people.share(x.name)} onClick={() => setSharing(x.id)} /></span>}
+            {l && <span className="end"><IconButton icon="mail" look="bare" tip="left" label={svAdmin.people.invite(x.name)} onClick={() => { setInviting(true); setOpen(x.id); }} /></span>} {/* US-30 */}
           </div>
         );
       })}
+      <FollowerRow t={t} />
       <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={() => add()} tip="right" /> {/* never the click as an id */}</div> {/* AU-26, UI-09 */}
+      {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} mark={(login) => mark(who.id, login)} share={() => setSharing(who.id)} run={run} invite={inviting}
+        close={() => { setOpen(null); setInviting(false); }} />}
       {shared && linkOf(shared.id) && <ShareDialog t={t} name={shared.name} link={linkOf(shared.id)!} put={put} close={() => setSharing(null)} />}
-      {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} run={run} invite={inviting} close={() => { setOpen(null); setInviting(false); }} />}
     </div>
   );
 }
 
-/** AU-38, AU-31: a personal link as a QR code, with buttons to copy it and to make a new one that replaces it at once (AU-11). */
+/** AU-40, AU-31: a personal link as a QR code, with buttons to copy it and to make a new one that replaces it at once (AU-11). */
 function ShareDialog({ t, name, link, put, close }: { t: Trip; name: string; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; close: () => void }) {
   const [copied, setCopied] = useState(false);
   const url = personUrl(location.origin, t.id, link.travelerId, link.secret);
@@ -281,8 +279,10 @@ function ShareDialog({ t, name, link, put, close }: { t: Trip; name: string; lin
   </QrDialog>;
 }
 
-/** AU-38: a traveler's name (AU-32), permission (AU-11), Delar på kostnader (MI-38) and account (US-21), saved together. */
-function TravelerDialog({ t, x, link, put, run, invite, close }: { t: Trip; x: Trip["travelers"][number]; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; run: Run; invite?: boolean; close: () => void }) {
+/** AU-40: a traveler's name (AU-32), permission (AU-11) and Delar på kostnader (MI-38), then Inloggning: the status (US-36), the
+ * account address (US-21) with Bjud in beside it (US-30) and the personal link for those without an account; saved together. */
+function TravelerDialog({ t, x, link, put, mark, share, run, invite, close }: { t: Trip; x: Trip["travelers"][number]; link: PersonLinkInfo;
+  put: (l: PersonLinkInfo) => void; mark: (login: Login) => void; share: () => void; run: Run; invite?: boolean; close: () => void }) {
   const ref = useRef<HTMLDialogElement>(null), mailField = useRef<HTMLInputElement>(null);
   useEffect(() => { if (invite) requestAnimationFrame(() => { mailField.current?.scrollIntoView({ block: "center" }); mailField.current?.focus(); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, when opened for an invitation (US-30)
   const [name, setName] = useState(x.name), [role, setRole] = useState(link.role), [shares, setShares] = useState(x.shares !== false);
@@ -324,15 +324,21 @@ function TravelerDialog({ t, x, link, put, run, invite, close }: { t: Trip; x: T
         </fieldset>
         <label className="check switch"><input type="checkbox" role="switch" checked={shares} onChange={(e) => setShares(e.target.checked)} />{svAdmin.people.shares}</label>
         <p className="ro note">{svAdmin.people.sharesHint}</p>
-        <label>{svAdmin.people.account}<input ref={mailField} type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
-        <p className="ro note">{svAdmin.people.accountHint}</p>
-        <Invite t={t} x={x} to={account.trim().toLowerCase()} ready={async () => { // US-30: a typed address is saved first
-          const to = account.trim().toLowerCase();
-          if (!validAddress(to)) { setErr(svAdmin.people.accountBad); return false; }
-          if (to === link.account) return true;
-          try { put(await api.setPerson(t.id, x.id, role, to)); setErr(""); return true; }
-          catch (y) { setErr(y instanceof ApiError && y.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad); return false; }
-        }} />
+        <fieldset className="tlogin"><legend>{svAdmin.people.login}</legend>
+          <p className={`ro login-${link.login ?? "none"}`} role="status">{sv.people.login[link.login ?? "none"]}</p>
+          <Invite t={t} x={x} to={account.trim().toLowerCase()} mark={mark} ready={async () => { // US-30: a typed address is saved first
+            const to = account.trim().toLowerCase();
+            if (!validAddress(to)) { setErr(svAdmin.people.accountBad); return false; }
+            if (to === link.account) return true;
+            try { put(await api.setPerson(t.id, x.id, role, to)); setErr(""); return true; }
+            catch (y) { setErr(y instanceof ApiError && y.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad); return false; }
+          }}>
+            <input ref={mailField} type="email" inputMode="email" autoComplete="off" aria-label={svAdmin.people.account} placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} />
+          </Invite>
+          <p className="ro note">{svAdmin.people.accountHint}</p>
+          {link.login !== "active" && <div className="row mid"><small className="ro">{svAdmin.people.noAccount}</small>
+            <span className="end"><IconButton icon="link" look="bare" tip="left" label={svAdmin.people.share(x.name)} onClick={share} /></span></div>} {/* AU-11 */}
+        </fieldset>
         {err && <p className="err" role="alert">{err}</p>}
         <div className="dlgbar"><button className="btn" type="submit" disabled={busy}>{sv.save}</button></div>
       </form>
@@ -341,23 +347,23 @@ function TravelerDialog({ t, x, link, put, run, invite, close }: { t: Trip; x: T
 }
 
 const until = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
-/** US-30, US-31: the invitation of a traveler with an address: an account and a password link to mail, copy or show, also anew for
- * an account that never logged in. */
 const validAddress = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-function Invite({ t, x, to, ready }: { t: Trip; x: Trip["travelers"][number]; to: string; ready: () => Promise<boolean> }) {
+/** US-30, US-31: the address field with Bjud in beside it: an account and a password link to mail, copy or show, also anew for an
+ * account that never logged in. */
+function Invite({ t, x, to, ready, mark, children }: { t: Trip; x: Trip["travelers"][number]; to: string; ready: () => Promise<boolean>; mark: (login: Login) => void; children: ReactNode }) {
   const [got, setGot] = useState<{ user: string; setup: SetupLink } | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
   const go = async () => {
     if (!(await ready())) return;
     try {
       const r = await api.invite(t.id, x.id);
-      if ("setup" in r) { setGot(r); setNote(""); setCopied(false); return; }
-      setNote(svAdmin.people.hasAccount(x.name));
+      if ("setup" in r) { setGot(r); setNote(""); setCopied(false); mark("invited"); return; }
+      setNote(svAdmin.people.hasAccount(x.name)); mark("active");
     } catch { setNote(svAdmin.people.inviteFailed); }
   };
   const url = got && setupUrl(location.origin, got.user, got.setup.secret);
   const copy = async () => { try { await navigator.clipboard.writeText(url!); setCopied(true); } catch { /* no clipboard */ } };
   return <div className="invite">
-    <div className="row mid"><IconButton icon="mail" tip="right" label={svAdmin.people.invite(x.name)} disabled={!to} onClick={() => go()} /><small className="ro">{svAdmin.people.inviteHint}</small></div>
+    <div className="row mid">{children}<IconButton icon="mail" tip="left" label={svAdmin.people.invite(x.name)} disabled={!to} onClick={() => go()} /></div>
     {got && url && <div className="setuplink" role="status">
       <p>{svAdmin.people.invited(x.name, until(got.setup.expires))}</p>
       <span className="end">
@@ -372,57 +378,30 @@ function Invite({ t, x, to, ready }: { t: Trip; x: Trip["travelers"][number]; to
   </div>;
 }
 
-const ROLES = PERM_ROLES; // AU-37: Resenär, then Följare
-/** The role icons of US-23, with an eye for Följare and the crown for the superuser (AU-37). */
-const ROLE_ICON = { follower: "eye", traveler: "luggage", planner: "compass", admin: "crown" } as const;
-type ARole = (typeof ROLES)[number];
-/** AU-36, AU-37: which tabs Resenär and Följare see, and the level of each kind of content wherever it is shown. Each choice is saved
- * at once, built on the latest trip so a change made meanwhile is kept. */
+/** The role icons of US-23 for the permission toggle. */
+const ROLE_ICON = { traveler: "luggage", planner: "compass" } as const;
+/** AU-41: the permissions as three switches, each saved at once on the latest trip; a trip with permissions the switches cannot give
+ * says so until a switch is changed. */
 function Permissions({ t, run }: { t: Trip; run: Run }) {
-  const tabs = (r: ARole) => ({ ...DEFAULT_TABS(r), ...ownAccess(t, r).tabs });
-  const content = (r: ARole) => ({ ...DEFAULT_CONTENT(r), ...ownAccess(t, r).content });
-  const save = (r: ARole, next: RoleAccess | null) => run((x) => {
-    const all = Object.fromEntries(ROLES.map((y) => [y, ownAccess(x, y)])) as Record<ARole, RoleAccess>, own = all[r];
-    const value = { ...all, [r]: next ? { tabs: { ...own.tabs, ...next.tabs }, content: { ...own.content, ...next.content } } : {} };
-    return [{ op: "set", path: "access", value: Object.fromEntries(Object.entries(value).filter(([, v]) => Object.keys(v).length)) }];
-  }, `access ${r}`);
-  /** AU-37: one button per cell that steps through the levels the cell allows, its icon and colour following the level. */
-  const cell = (part: string, r: ARole, value: string, options: [string, string][], onChange: (v: string) => void) => options.length < 2
-    ? <span className="na" title={options[0]?.[1]}>–</span>
-    : <span className={`lvlcell lvl-${value}`}><IconButton icon={LEVEL_ICON[value as keyof typeof LEVEL_ICON] ?? "eyeoff"} look="bare" tip="left"
-      label={svAdmin.perms.cell(part, svAdmin.perms.roles[r], options.find(([v]) => v === value)?.[1] ?? value)}
-      onClick={() => onChange(nextLevel(options.map(([v]) => v), value))} /></span>;
-  const changed = (r: ARole) => Object.keys(ownAccess(t, r)).length > 0;
+  const s = permSwitches(t);
+  const flip = (k: keyof PermSwitches, on: boolean) => run((y) => [{ op: "set", path: "access", value: switchAccess({ ...permSwitches(y), [k]: on }) }], `access ${k}`);
   return (
     <div className="card perms">
       <h3>{svAdmin.perms.title}</h3>
-      <p className="ro note">{svAdmin.perms.hint}</p>
-      <p className="ro note plegend">{(["write", "add", "check", "read", "hidden"] as const).map((l) => /* the level icons */
-        <span key={l}><span className={`lvlcell lvl-${l}`} aria-hidden="true"><Icon name={LEVEL_ICON[l]} /></span>{svAdmin.perms.level[l]}</span>)}</p>
-      <div className="pgrid" role="table" aria-label={svAdmin.perms.title}>
-        <div className="prow phead" role="row"><span role="columnheader" />
-          {ROLES.map((r) => <span key={r} role="columnheader" className={`who ${r}`}><span className={`rolemark ${r}`} role="img" aria-label={svAdmin.perms.roles[r]} title={svAdmin.perms.roles[r]}><Icon name={ROLE_ICON[r]} /></span>
-            <small>{svAdmin.perms.legend[r]}</small>
-            {changed(r) && <IconButton icon="refresh" look="bare" tip="left" label={svAdmin.perms.reset(svAdmin.perms.roles[r])} onClick={() => save(r, null)} />}</span>)}
-        </div>
-        <div className="prow psec" role="row"><span role="rowheader">{svAdmin.perms.tabs}</span></div>
-        {PAGES.map((pg) => <div key={pg} className="prow" role="row"><span role="rowheader">{sv.tabs[pg]}</span>
-          {ROLES.map((r) => <span key={r} role="cell">{cell(`${svAdmin.perms.tab} ${sv.tabs[pg]}`, r, tabs(r)[pg] ? "shown" : "hidden",
-            [["shown", svAdmin.perms.shown], ["hidden", svAdmin.perms.level.hidden]], (v) => save(r, { tabs: { [pg]: v === "shown" } }))}</span>)}
-        </div>)}
-        <div className="prow psec" role="row"><span role="rowheader">{svAdmin.perms.contents}</span></div>
-        {CONTENT.map((c) => <div key={c} className="prow" role="row"><span role="rowheader">{svAdmin.perms.content[c]}
-          {svAdmin.perms.contentHint[c] && <small className="ro">{svAdmin.perms.contentHint[c]}</small>}</span>
-          {ROLES.map((r) => <span key={r} role="cell">{cell(svAdmin.perms.content[c], r, content(r)[c],
-            contentLevels(r, c).map((l) => [l, svAdmin.perms.level[l as Exclude<Level, never>]]), (v) => save(r, { content: { [c]: v as Level } }))}</span>)}
-        </div>)}
-      </div>
       <p className="ro note">{svAdmin.perms.fixed}</p>
+      {(Object.keys(svAdmin.perms.switches) as (keyof PermSwitches)[]).map((k) =>
+        <Switch key={k} id={`perm-${k}`} label={svAdmin.perms.switches[k][0]} tip={svAdmin.perms.switches[k][1]} checked={s[k]} onChange={(on) => flip(k, on)} />)}
+      {customAccess(t) && <p className="ro note" role="status">{svAdmin.perms.custom}</p>}
     </div>
   );
 }
 
-/** The trip's settings: only what applies to this trip (MT-13). A Planerare sees them; the AI switch and permissions are for the superuser
+/** AU-39: one row of the card Resan, a small label above the value and an edit button. */
+const Detail = ({ label, value, edit, editLabel }: { label: string; value: ReactNode; edit: () => void; editLabel: string }) =>
+  <div className="row mid kv"><span><small className="ro">{label}</small><span>{value}</span></span>
+    <IconButton icon="edit" look="bare" tip="left" label={editLabel} onClick={edit} /></div>;
+
+/** AU-39: the trip's settings, only what applies to this trip (MT-13). A Planerare sees them; the AI switch is for the superuser
  * (AU-14), deleting also for the trip's owner (US-14). */
 export function AdminPage({ t, superuser, manager, back, edit, addPerson, change, reload, run, removeTrip, openSettings }: {
   t: Trip; superuser: boolean; manager: boolean; back: () => void; edit: (d: EditDlg) => void; addPerson: () => void; run: Run;
@@ -430,15 +409,16 @@ export function AdminPage({ t, superuser, manager, back, edit, addPerson, change
 }) {
   return <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={back} tip="right" /></div><h1>{sv.tripSettings}</h1>
-    <div className="card"><h3>{sv.tripDetails}</h3><div className="row mid"><span>{sv.name}: {t.title}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editTrip} onClick={() => edit({ kind: "trip" })} /></div>
-      <div className="row mid"><span>{sv.tripDates}: {tripRange(t) ? tripDates(t) : sv.noDates}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editDates} onClick={() => edit({ kind: "dates" })} /></div>
-      <div className="row mid"><span>{sv.budgetMax}: {t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax}</span><IconButton icon="edit" look="bare" tip="left" label={sv.editBudgetMax} onClick={() => edit({ kind: "budgetMax" })} /></div>
-      <div className="row mid"><span>{sv.minnas.albumLabel}: {t.album ? <a className="place" href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}</span><IconButton icon="edit" look="bare" tip="left" label={sv.minnas.editAlbum} onClick={() => edit({ kind: "album" })} /></div></div>
+    <div className="card"><h3>{sv.tripDetails}</h3>
+      <Detail label={sv.name} value={t.title} editLabel={sv.editTrip} edit={() => edit({ kind: "trip" })} />
+      <Detail label={sv.tripDates} value={tripRange(t) ? tripDates(t) : sv.noDates} editLabel={sv.editDates} edit={() => edit({ kind: "dates" })} />
+      <Detail label={sv.budgetMax} value={t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax} editLabel={sv.editBudgetMax} edit={() => edit({ kind: "budgetMax" })} />
+      <Detail label={sv.minnas.albumLabel} value={t.album ? <a className="place" href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}
+        editLabel={sv.minnas.editAlbum} edit={() => edit({ kind: "album" })} /></div>
     <Travelers t={t} add={addPerson} run={run} />
-    {superuser && <Permissions t={t} run={run} />}
-    <ShareLink t={t} />
+    <Permissions t={t} run={run} />
     <Inbox t={t} />
     {manager && <TripAi t={t} superuser={superuser} change={change} reload={reload} openSettings={openSettings} />}
-    {manager && <div className="card danger"><h3>{sv.danger}</h3><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="right" /></div>}
+    {manager && <div className="card dangerrow row mid"><span>{sv.deleteTrip}</span><IconButton icon="trash" look="red" label={sv.deleteTrip} onClick={removeTrip} tip="left" /></div>}
   </>;
 }

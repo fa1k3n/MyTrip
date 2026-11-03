@@ -179,13 +179,13 @@ const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new U
 /** The role a link has in the trip's permissions (AU-20). */
 const accessRole = (role: Role): AccessRole | undefined => (role === "link" ? "follower" : role === "traveler" || role === "planner" ? role : undefined);
 /** Whether a link's role may make all these changes under the trip's permissions (AU-21, AU-22). Below "write" on expenses,
- * an expense is added one at a time and alone (AU-13). The permissions themselves belong to the superuser. */
+ * an expense is added one at a time and alone (AU-13). The permissions are set by a Planerare, not by a Resenär (AU-22). */
 function linkMayChange(t: Trip, ar: AccessRole, ops: Op[], travelerId?: string) {
   const rules = accessFor(t, ar);
   const ok = ops.length > 0 && ops.every((o) => {
     if (relinksOwn(t, o, travelerId)) return true; // MI-41
     const n = opNeeds(o);
-    return n.part === "access" ? false : n.part === "trip" ? ar === "planner"
+    return n.part === "access" || n.part === "trip" ? ar === "planner"
       : n.part === "memories" ? atLeast(rules.view.mi.memories ?? "hidden", n.level) : atLeast(rules.parts[n.part], n.level); // MI-21
   });
   const adds = ops.some((o) => o.op === "add" && o.path === "expenses/-");
@@ -661,8 +661,18 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
 
   // AU-11: personal links per traveler, managed by the superuser or a Planerare of the trip.
   const people = async (tripId: string) => (await store.personLinks()).filter((l) => l.tripId === tripId);
-  const shown = (l: PersonLink) => ({ travelerId: l.travelerId, role: l.role, secret: l.secret, ...(l.account ? { account: l.account } : {}) });
-  app.get("/api/trips/:id/people", async (c) => (manager(c) ? c.json((await people(c.req.param("id"))).map(shown)) : c.json({ error: "forbidden" }, 403)));
+  /** US-36: whether the traveler's account can log in, has only been invited, or is missing or disabled. */
+  const loginOf = (l: PersonLink, users: User[]) => {
+    const u = l.account ? users.find((x) => x.email === l.account) : undefined;
+    return !u ? "none" : u.disabled ? "disabled" : u.passwordHash || u.googleId ? "active" : "invited";
+  };
+  const shown = async (l: PersonLink, users?: User[]) => ({ travelerId: l.travelerId, role: l.role, secret: l.secret,
+    ...(l.account ? { account: l.account, login: loginOf(l, users ?? await store.users()) } : {}) });
+  app.get("/api/trips/:id/people", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const users = await store.users();
+    return c.json(await Promise.all((await people(c.req.param("id"))).map((l) => shown(l, users))));
+  });
   app.put("/api/trips/:id/people/:tid", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const tripId = c.req.param("id"), travelerId = c.req.param("tid");
@@ -676,7 +686,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (address && all.some((l) => l.tripId === tripId && l.travelerId !== travelerId && l.account === address)) return c.json({ error: "address in use" }, 409);
     const next: PersonLink = { tripId, travelerId, role, secret: old?.secret ?? newSecret(), ...(address ? { account: address } : {}) }; // a new permission keeps the link
     await store.savePersonLinks([...all.filter((l) => l !== old), next]);
-    return c.json(shown(next), old ? 200 : 201);
+    return c.json(await shown(next), old ? 200 : 201);
   });
   app.post("/api/trips/:id/people/:tid/renew", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
@@ -685,7 +695,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const next = { ...old, secret: newSecret() }; // the old link stops working at once
     await store.savePersonLinks([...all.filter((l) => l !== old), next]);
     await store.removePushSubs(old.tripId, { who: old.travelerId }); // NT-05
-    return c.json(shown(next));
+    return c.json(await shown(next));
   });
   app.delete("/api/trips/:id/people/:tid", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
@@ -893,7 +903,6 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const role = c.get("role"), travelerId = c.get("travelerId"), ar = accessRole(role);
     const t = await load(c.req.param("id"));
     if (!(ar ? linkMayChange(t, ar, b.ops, travelerId) : need(c, "propose"))) return c.json({ error: "forbidden" }, 403); // MC-10, AU-21
-    if (role === "owner" && b.ops.some((o) => opNeeds(o).part === "access")) return c.json({ error: "forbidden" }, 403); // AU-22: the permissions are the superuser's
     if (travelerId) { // AU-13: a personal link adds expenses only in its own name
       const own = ownExpenses(b.ops, travelerId);
       if (!own) return c.json({ error: "forbidden" }, 403);

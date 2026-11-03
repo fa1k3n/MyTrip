@@ -201,7 +201,7 @@ const trip = (id: string) => `/api/trips/${encodeURIComponent(id)}`;
 /** A mail to the trip's inbox, read into a proposed booking that waits for review (BK-15, BK-17). */
 export type MailProposal = { id: string; status: "pending" | "approved" | "rejected"; source?: { kind: "mail"; from: string; subject: string; at: string }; booking?: BookingReading & { files?: TicketFile[] } };
 /** A traveler's personal link as the settings show it (AU-11). */
-export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string; account?: string }; // account: US-21
+export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string; account?: string; login?: "none" | "invited" | "active" | "disabled" }; // account: US-21, login: US-36
 /** An account as the superuser's list shows it (US-02). */
 export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
 export type SetupLink = { secret: string; expires: string }; // US-04

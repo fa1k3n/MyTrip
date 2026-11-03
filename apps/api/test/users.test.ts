@@ -243,13 +243,13 @@ test("US-13 US-14 a user sees and manages only their own trips", async () => {
   assert.equal((await call(app, "/api/trips/berlin/changes", { method: "POST", cookie: olle.cookie, body: { baseRevision: 1, ops: [] } })).status, 404);
   const me = await json(call(app, "/api/me", { cookie: eva.cookie }));
   assert.deepEqual(me.trips.berlin, { role: "admin", roles: ["owner"] });
-  // the owner changes the plan at once, manages links, and deletes the trip; permissions and the log are not theirs
+  // the owner changes the plan at once, manages links and permissions (AU-22), and deletes the trip; the log is not theirs
   const r = await call(app, `/api/trips/${made.id}/changes`, { method: "POST", cookie: olle.cookie, body: { baseRevision: 1, ops: [{ op: "set", path: "purpose", value: "Sol" }] } });
   assert.equal(r.status, 200, await r.clone().text());
   assert.equal((await json(call(app, `/api/trips/${made.id}`, { cookie: olle.cookie }))).purpose, "Sol");
   assert.equal((await call(app, `/api/trips/${made.id}/link`, { method: "POST", cookie: olle.cookie })).status, 201);
   const access = await call(app, `/api/trips/${made.id}/changes`, { method: "POST", cookie: olle.cookie, body: { baseRevision: 2, ops: [{ op: "set", path: "access", value: {} }] } });
-  assert.equal(access.status, 403); // AU-22
+  assert.equal(access.status, 200); // AU-22
   assert.equal((await call(app, "/api/log", { cookie: olle.cookie })).status, 403);
   assert.equal((await call(app, "/api/settings", { method: "PUT", cookie: olle.cookie, body: {} })).status, 403);
   assert.equal((await call(app, `/api/trips/${made.id}`, { method: "DELETE", cookie: olle.cookie })).status, 204);

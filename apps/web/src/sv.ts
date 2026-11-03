@@ -67,7 +67,8 @@ export const sv = {
     kinds: { activities: ["aktivitet", "aktiviteter"], tasks: ["uppgift", "uppgifter"], bookings: ["bokning", "bokningar"], wishes: ["önskan", "önskningar"],
       info: ["kort i Praktisk info", "kort i Praktisk info"], packing: ["sak i packlistorna", "saker i packlistorna"] }, // AI-87, AI-89
   },
-  people: { traveler: "Resenär", planner: "Planerare", noShare: "delar inte på kostnader" }, // AU-38
+  people: { traveler: "Resenär", planner: "Planerare", noShare: "delar inte på kostnader", // AU-40
+    login: { none: "Inte inbjuden", invited: "Inbjuden, har inte loggat in", active: "Har konto", disabled: "Kontot är avstängt" } }, // US-36
   mailIn: { // BK-26, BK-27
     open: "Mejla in till resan", copy: "Kopiera adressen", copied: "Kopierad.", failed: "Kunde inte hämta adressen just nu.",
     hint: "Vidarebefordra bokningsbekräftelser hit, så blir de förslag under Bokningar i Nåla. Andra mejl, som en delad sida, blir önskningar i Önska. Skriv Bokning: eller Önskan: först i ämnet för att bestämma själv.",

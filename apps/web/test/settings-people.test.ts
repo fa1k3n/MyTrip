@@ -1,34 +1,38 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LEVEL_ICON, nextLevel, PERM_ROLES } from "../src/access.ts";
+import { customAccess, permSwitches, switchAccess } from "../src/access.ts";
 import { travelerLine } from "../src/format.ts";
 
-// REQ: AU-37 two role columns, Resenär then Följare; a cell steps through its levels and back to the first; each level has its icon
-test("AU-37 columns and cells", () => {
-  assert.deepEqual(PERM_ROLES, ["traveler", "follower"]);
-  assert.equal(nextLevel(["hidden", "read", "add", "write"], "add"), "write");
-  assert.equal(nextLevel(["hidden", "read", "add", "write"], "write"), "hidden");
-  assert.equal(nextLevel(["shown", "hidden"], "shown"), "hidden");
-  assert.deepEqual(LEVEL_ICON, { hidden: "eyeoff", read: "eye", shown: "eye", check: "check", add: "plus", write: "edit" });
+// REQ: AU-40 a traveler's row says the permission, the login status (US-36), and that the traveler does not share costs when so
+test("AU-40 the line under a traveler's name", () => {
+  assert.equal(travelerLine("planner", true, "active"), "Planerare · Har konto");
+  assert.equal(travelerLine("traveler", false, "none"), "Resenär · Inte inbjuden · delar inte på kostnader");
 });
 
-// REQ: AU-38 a traveler's row says the permission, and that the traveler does not share costs when so
-test("AU-38 the line under a traveler's name", () => {
-  assert.equal(travelerLine("planner", true), "Planerare");
-  assert.equal(travelerLine("traveler", false), "Resenär · delar inte på kostnader");
+// REQ: US-36 each login status has its text; without a status the traveler is not invited
+test("US-36 login status texts", () => {
+  assert.equal(travelerLine("traveler", true, "invited"), "Resenär · Inbjuden, har inte loggat in");
+  assert.equal(travelerLine("traveler", true, "disabled"), "Resenär · Kontot är avstängt");
+  assert.equal(travelerLine("traveler", true), "Resenär · Inte inbjuden");
 });
 
-// REQ: AU-36 what each role may see and do in the app follows the content levels; a Planerare has everything
-test("AU-36 permsFor", async () => {
-  const { permsFor, anyWrite } = await import("../src/access.ts");
-  const f = permsFor("link", { access: { follower: { tabs: { nala: true }, content: { todo: "check" } } } });
-  assert.deepEqual([f.scoped, f.pages, f.view.nala.tasks, f.view.nala.budget, anyWrite(f)], [true, ["nala", "up"], "check", "hidden", false]);
-  const tr = permsFor("traveler", { access: { traveler: { content: { money: "hidden" } } } });
-  assert.deepEqual([tr.view.up.expenses, tr.view.mi.expenses, tr.view.nala.budget], ["hidden", "hidden", "hidden"]);
-  const d = permsFor("traveler", {});
-  assert.deepEqual([d.settings, d.pages, d.view.up.expenses, anyWrite(d)], [false, ["dr", "nala", "up", "mi"], "add", false]);
-  const pl = permsFor("planner", {});
-  assert.deepEqual([pl.settings, anyWrite(pl)], [true, true]);
-  const su = permsFor("admin", {});
-  assert.deepEqual([su.scoped, su.superuser, su.settings, su.pages.length, su.view.nala.budget, su.view.up.expenses, su.view.mi.expenses], [false, true, true, 4, "write", "add", "write"]);
+// REQ: AU-41 three switches: Resenärer see money, Resenärer wish and vote, Följare see the whole plan; the defaults are on, off, off
+test("AU-41 the switches and what they store", () => {
+  assert.deepEqual(permSwitches({}), { money: true, wishes: false, followerAll: false });
+  assert.deepEqual(switchAccess({ money: true, wishes: false, followerAll: false }), {});
+  const all = switchAccess({ money: false, wishes: true, followerAll: true });
+  assert.deepEqual(all, {
+    traveler: { content: { money: "hidden", dreams: "write" } },
+    follower: { tabs: { dr: true, nala: true }, content: { dreams: "read", bookings: "read", info: "read" } },
+  });
+  assert.deepEqual(permSwitches({ access: all }), { money: false, wishes: true, followerAll: true });
+  assert.equal(customAccess({ access: all }), false);
+});
+
+// REQ: AU-41 stored permissions the switches cannot give are shown as Anpassade until a switch is changed
+test("AU-41 custom permissions", () => {
+  assert.equal(customAccess({}), false);
+  assert.equal(customAccess({ access: { traveler: { content: { money: "read" } } } }), true);
+  assert.equal(customAccess({ access: { follower: { tabs: { mi: true } } } }), true);
+  assert.equal(customAccess({ access: { traveler: { content: { money: "add" } } } }), false, "a default written out is not custom");
 });

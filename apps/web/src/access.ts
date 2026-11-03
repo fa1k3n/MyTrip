@@ -1,5 +1,5 @@
 // Share links, the credentials sent to the API and what each role may do (AU-01, AU-02, AU-08, AU-20). Pure, so it runs under node --test.
-import { accessFor, ALL_ACCESS, resolve, type AccessConfig, type Rules } from "@trip/schema/src/rules.ts";
+import { accessFor, ALL_ACCESS, DEFAULT_CONTENT, DEFAULT_TABS, ownAccess, resolve, type AccessConfig, type Rules } from "@trip/schema/src/rules.ts";
 import { sv } from "./sv.ts";
 
 export type LinkHash = { kind: "link"; key: string; tripId: string } | { kind: "admin" } | null;
@@ -134,9 +134,21 @@ export const showInstallHint = (ua: string, installed: boolean, closed: boolean)
 /** The link the phone keeps for a trip, so a notice opens that trip (NT-04). */
 export const linkForTrip = (keys: string[], tripId: string) => keys.find((k) => tripOfLink(k) === tripId) ?? null;
 
-/** The permission card's columns: a Planerare always has everything, so only Resenär and Följare are chosen (AU-37). */
-export const PERM_ROLES = ["traveler", "follower"] as const;
-/** The icon of each level in the permission card; a tab row is Synlig or Dold (AU-37). */
-export const LEVEL_ICON = { hidden: "eyeoff", read: "eye", shown: "eye", check: "check", add: "plus", write: "edit" } as const;
-/** The level after `cur` among those a cell allows, round to the first again (AU-37). */
-export const nextLevel = (levels: readonly string[], cur: string) => levels[(levels.indexOf(cur) + 1) % levels.length]!;
+/** AU-41: the three permission switches. */
+export type PermSwitches = { money: boolean; wishes: boolean; followerAll: boolean };
+const tabsOf = (t: { access?: AccessConfig }, r: "traveler" | "follower") => ({ ...DEFAULT_TABS(r), ...ownAccess(t, r).tabs });
+const contentOf = (t: { access?: AccessConfig }, r: "traveler" | "follower") => ({ ...DEFAULT_CONTENT(r), ...ownAccess(t, r).content });
+/** The switches as the trip's permissions show them (AU-41). */
+export const permSwitches = (t: { access?: AccessConfig }): PermSwitches =>
+  ({ money: contentOf(t, "traveler").money !== "hidden", wishes: contentOf(t, "traveler").dreams === "write", followerAll: tabsOf(t, "follower").nala });
+/** The permissions the switches store: only what differs from the defaults, everything else the defaults (AU-41). */
+export function switchAccess(s: PermSwitches): AccessConfig {
+  const content = { ...(s.money ? {} : { money: "hidden" as const }), ...(s.wishes ? { dreams: "write" as const } : {}) };
+  return { ...(Object.keys(content).length ? { traveler: { content } } : {}),
+    ...(s.followerAll ? { follower: { tabs: { dr: true, nala: true }, content: { dreams: "read", bookings: "read", info: "read" } } } : {}) };
+}
+/** Stored permissions the switches cannot give, shown as Anpassade (AU-41). */
+export const customAccess = (t: { access?: AccessConfig }) => {
+  const s = { access: switchAccess(permSwitches(t)) };
+  return (["traveler", "follower"] as const).some((r) => JSON.stringify([tabsOf(t, r), contentOf(t, r)]) !== JSON.stringify([tabsOf(s, r), contentOf(s, r)]));
+};

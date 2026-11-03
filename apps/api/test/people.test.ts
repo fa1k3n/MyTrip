@@ -179,12 +179,13 @@ test("AU-21 the server follows the trip's permissions", async () => {
   assert.equal((await store.load("berlin"))!.revision, 4);
 });
 
-// REQ: AU-22 only the superuser changes permissions; booking references never reach a Följare
-test("AU-22 permissions belong to the superuser", async () => {
+// REQ: AU-22 the superuser, the owner and a Planerare change permissions, a Resenär does not; booking references never reach a Följare
+test("AU-22 permissions belong to those who manage the trip", async () => {
   const { app } = setup();
-  const bo = await person(app, "bo", "planner");
-  assert.equal((await change(app, bo, 1, [{ op: "set", path: "access", value: { planner: { nala: { parts: { budget: "read" } } } } }])).status, 403);
-  assert.equal((await change(app, "a", 1, [{ op: "set", path: "access", value: { follower: { up: { parts: { bookings: "read" } } } } }])).status, 200);
+  const bo = await person(app, "bo", "planner"), anna = await person(app, "anna", "traveler");
+  assert.equal((await change(app, anna, 1, [{ op: "set", path: "access", value: { traveler: { content: { money: "write" } } } }])).status, 403);
+  assert.equal((await change(app, bo, 1, [{ op: "set", path: "access", value: { traveler: { content: { money: "hidden" } } } }])).status, 200);
+  assert.equal((await change(app, "a", 2, [{ op: "set", path: "access", value: { follower: { up: { parts: { bookings: "read" } } } } }])).status, 200);
   const follow = `link.berlin.${(await json(call(app, "/api/trips/berlin/link", "a", "POST"))).secret}`;
   const f = await json(call(app, "/api/trips/berlin", follow));
   assert.deepEqual([f.bookings.length, f.bookings[0].reference], [1, undefined]);

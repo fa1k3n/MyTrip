@@ -91,3 +91,18 @@ test("US-30 the inviter cannot replace the password of an account in use", async
   await call(app, "/api/setup", { method: "POST", body: { user: first.user, secret: first.setup.secret, password: PW } });
   assert.deepEqual(await (await invite("anna", undefined, { renew: true })).json(), { exists: true });
 });
+
+// REQ: US-36 the people list gives each traveler a login status: not invited, invited, has an account, disabled
+test("US-36 login status per traveler", async () => {
+  const { app, admin, olle, tie, invite, tripId } = await setup();
+  const status = async () => Object.fromEntries((await (await call(app, `/api/trips/${tripId}/people`, { cookie: olle })).json())
+    .map((l: { travelerId: string; login: string }) => [l.travelerId, l.login]));
+  await tie("anna", null); await tie("bo", "bo@example.org");
+  assert.deepEqual(await status(), { anna: undefined, bo: "none" }); // no address, no status
+  const { user, setup: link } = await (await invite("bo")).json();
+  assert.equal((await status()).bo, "invited");
+  await call(app, "/api/setup", { method: "POST", body: { user, secret: link.secret, password: PW } });
+  assert.equal((await status()).bo, "active");
+  await call(app, `/api/users/${user}`, { method: "PATCH", cookie: admin, body: { disabled: true } });
+  assert.equal((await status()).bo, "disabled");
+});

@@ -99,3 +99,13 @@ test("AI-42 odd values left out; off and bad input refused", async () => {
   const off = await setup(fake({}), trip(), { receipts: false });
   assert.equal((await off.req("/api/trips/berlin/receipt", "POST", jpeg, "image/jpeg")).status, 409);
 });
+
+// REQ: AI-42 AI-60 the reading asks for the tool without forcing it, which the model refuses with a 400; at most one call
+test("AI-42 AI-60 no forced tool choice", async () => {
+  const ai = fake({ amount: 21.2, currency: "EUR" });
+  const { req, pid } = await setup(ai);
+  await req("/api/trips/berlin/receipt", "POST", jpeg, "image/jpeg");
+  await req(`/api/trips/berlin/mailread/${pid}`, "POST", "{}");
+  assert.equal(ai.seen.length, 2);
+  for (const r of ai.seen) assert.deepEqual(r.tool_choice, { type: "auto", disable_parallel_tool_use: true });
+});

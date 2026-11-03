@@ -1,4 +1,4 @@
-// Reading with AI where the rules give up: a booking mail (AI-60) and a photo of a receipt (AI-42). One forced tool call each; what
+// Reading with AI where the rules give up: a booking mail (AI-60) and a photo of a receipt (AI-42). One tool call each, asked for in the instructions; what
 // comes back is checked field by field and only fills a form that a person saves, so nothing in the trip changes here.
 import type Anthropic from "@anthropic-ai/sdk";
 import type { BookingReading, Trip } from "@trip/schema";
@@ -13,7 +13,7 @@ async function give(call: AiCall, system: string, content: Anthropic.Beta.BetaCo
   const tool: Anthropic.Beta.BetaTool = { name: "give_reading", description: "Give what was read. Leave out what is not clearly there.", input_schema: { type: "object", properties } };
   try {
     const m = await call({ model: MODEL, max_tokens: 2000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "low" },
-      system, tools: [tool], tool_choice: { type: "tool", name: tool.name }, messages: [{ role: "user", content }] });
+      system, tools: [tool], tool_choice: { type: "auto", disable_parallel_tool_use: true }, messages: [{ role: "user", content }] }); // the model refuses a forced tool; the system says to call it
     const cost = costOf(m);
     if (m.stop_reason === "refusal") return { cost, error: "refusal" };
     const use = m.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === tool.name);

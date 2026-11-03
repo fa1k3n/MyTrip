@@ -2,7 +2,9 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
-## Unreleased
+## 0.2.1 – 2026-11-03
+
+Fixes from the first beta trips, and "Kör nu" for wish suggestions in Önska.
 
 ### Changed
 - "Kör nu" for wish suggestions sits in Önska, above the wishes, with the runs left in its tooltip (AI-96).

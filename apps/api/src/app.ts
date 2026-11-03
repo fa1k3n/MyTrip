@@ -5,7 +5,7 @@ import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { checkTransit } from "./transit.ts";
 import { mailForAi, readBookingAi, readReceiptAi, type ReadOut } from "./ai-read.ts";
-import { NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
+import { aiText, NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
 import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
@@ -980,6 +980,18 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const last = all.filter((x) => x.feature === name && x.usd > 0).slice(-10);
     return Math.max(0, Math.floor(left / (last.length ? spent(last) / last.length : AI_RUN_ESTIMATE_USD) + 1e-9));
   };
+  /** AI-14: the memories of the owner's earlier trips as the AI service may see them: per wish its title, category, the counts of each
+   * verdict and the comments, never who; names and numbers removed (AI-04). The latest trips first, at most 60 wishes. */
+  async function earlierMemories(t: Trip) {
+    const owners = await store.owners(), first = firstSuper(await store.users())?.id, ownerOf = (id: string) => owners[id] ?? first;
+    const last = (x: Trip) => x.days.map((d) => d.date).sort().at(-1) ?? "";
+    const earlier = (await store.list()).filter((x) => x.id !== t.id && ownerOf(x.id) === ownerOf(t.id) && x.memories.length).sort((a, b) => last(b).localeCompare(last(a)));
+    return earlier.flatMap((x) => x.dreams.flatMap((w) => {
+      const own = x.memories.filter((m) => m.dreamId === w.id), n = (v: string) => own.filter((m) => m.verdict === v).length;
+      const comments = own.map((m) => m.note && aiText(m.note, x)).filter((c): c is string => !!c);
+      return own.some((m) => m.verdict || m.note) ? [{ title: aiText(w.title, x), category: w.category, again: n("again"), ok: n("ok"), never: n("never"), ...(comments.length ? { comments } : {}) }] : [];
+    })).slice(0, 60);
+  }
   /** Runs one feature for a person and stores the result as proposals: one per suggestion for a helper (AI-01, AI-65, AI-70). */
   async function runFeature(t: Trip, name: string, f: AiFeature, who: string, actor: string) {
     const s = await store.loadSettings(), now = clock(), at = now.toISOString(), month = at.slice(0, 7);
@@ -992,7 +1004,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const own = h ? (await store.proposals(t.id)).filter((p) => p.source?.kind === "ai" && p.source.feature === name && p.status !== "approved") : [];
     const avoid = h ? [...h.known(t), ...own.flatMap((p) => p.ops.map(h.textOf))] : [];
     let r: AiResult;
-    try { r = await runAi(opts.ai!.call, f, t, avoid, at.slice(0, 10)); } catch (e) {
+    try { r = await runAi(opts.ai!.call, f, t, avoid, at.slice(0, 10), f.memories ? await earlierMemories(t) : undefined); } catch (e) {
       console.error(`AI ${name} on ${t.id} failed:`, e instanceof Error ? e.message : e); // shows in the Worker's logs
       r = { error: "failed", cost: NO_COST };
     }

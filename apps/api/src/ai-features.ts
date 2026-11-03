@@ -59,7 +59,9 @@ const draft: AiFeature = {
   area: "changes",
   instructions: `Your job: turn the travelers' description of their dream trip, the trip's purpose, into a first draft of the trip.
 The trip is new and nearly empty. Give it a short Swedish title. Add the travelers the description mentions, with ages when given:
-use names only when the description gives them, otherwise names like "Vuxen 1" or "Barn (7 år)". Place the trip in time: use <today> to turn
+use names only when the description gives them, otherwise names like "Vuxen 1" or "Barn (7 år)".
+Add every person the description names, and as many more as it counts without names: "Erik och Anna åker med sina tre barn" gives
+Erik, Anna, Barn 1, Barn 2 and Barn 3 (with the age in the name when given, as "Barn (7 år)"). Place the trip in time: use <today> to turn
 "höstlovet", "i sommar" or a week number into real dates in the future, and pick a sensible length when none is given.
 Add one day per date with where it is spent, and the legs between places with their means of transport.
 Respect limits the description gives, such as hours of driving per day, and mention them in the day's summary.
@@ -84,7 +86,10 @@ const wishes: AiFeature = {
 the places where the days are spent and the travelers' ages. Use web search to find real places that are open at the time of the trip, each with its official page.
 Put each on a day spent in or near the place, fitting the day's pace: nothing on a long travel day, at most two on a day, and not on a day that is already full.
 Give every activity an estimated start time that fits the day's start and end, the activities already on the day and the travel to it,
-and the way there from the place before (the previous activity, or where the day starts): walking, public transport or car, with a realistic duration.`,
+and the way there from the place before (the previous activity, or where the day starts): walking, public transport or car, with a realistic duration.
+<memories>, when given, lists places from the family's earlier trips with how many said Igen (again), Okej and Inte igen (never again), and their comments.
+Lean towards places and kinds of places they marked Igen, avoid kinds they marked Inte igen, and heed the comments (for example booking ahead or avoiding crowds).`,
+  memories: true, // AI-14
   task: `For each suggestion add three operations, the wish first:
 add dreams/- with { id, title (the place's name, short), category (one of ${WISH_CATEGORIES.join(", ")}), url (its official page) };
 then add days/<index>/activities/- on the day it fits, with { id, text (a short Swedish title), dreamId (the wish's id), placeIds: [the place's id],

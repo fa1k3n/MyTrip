@@ -158,6 +158,11 @@ export function inviteMail(x: { to: string; name: string; trip: string; url: str
   const q = (v: string) => encodeURIComponent(v);
   return `mailto:${q(x.to)}?subject=${q(sv.invite.subject(x.trip))}&body=${q(sv.invite.body(x.name, x.trip, x.url, x.until))}`;
 }
+/** AI-91: the earlier trips whose memories the wish helper used, as one line; empty when none. */
+export function memoriesLine(titles: string[]) {
+  if (!titles.length) return "";
+  return sv.fromMemories(titles.length > 1 ? `${titles.slice(0, -1).join(", ")} och ${titles.at(-1)}` : titles[0]!);
+}
 /** AI-42: a receipt's reading as the expense form's values: the amount as typed in Swedish, only a currency the form offers. */
 export function receiptFill(r: { amount?: number; currency?: string; date?: string; text?: string; category?: string }, currencies: string[]) {
   const amount = r.amount === undefined ? undefined : Number.isInteger(r.amount) ? String(r.amount) : r.amount.toFixed(2).replace(".", ",");

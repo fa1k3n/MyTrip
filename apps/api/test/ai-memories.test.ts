@@ -47,6 +47,10 @@ test("AI-14 the wish helper is given the memories of the owner's earlier trips",
   assert.ok(!sent.includes("Anna tyckte") && !sent.includes("040-123"), "names and numbers removed");
   assert.ok(mem[0]!.comments![0]!.startsWith("Boka i förväg"));
   assert.ok(!sent.includes('"by"'), "never who");
+  // AI-91: which trips' memories were used, to show the people
+  const body = await r.json();
+  assert.deepEqual(body.memoriesFrom, ["berlin"]);
+
 });
 
 // REQ: AI-14 the instructions say how to use the memories; only the wish helper gets them

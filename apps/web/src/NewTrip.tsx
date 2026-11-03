@@ -18,7 +18,7 @@ export function NewTripDialog({ ai, created, helperDone, allDone, close }: {
   ai: boolean;
   created: (id: string, notice?: string, drafted?: Drafted) => void; // closes the dialog and opens the trip
   helperDone: (tripId: string) => void; // what a helper added, also after the dialog has closed (AI-80)
-  allDone: (tripId: string, added: AiAdded) => void; // the notice of what the AI added (AI-82)
+  allDone: (tripId: string, added: AiAdded, memoriesFrom: string[]) => void; // the notice of what the AI added (AI-82), and the trips whose memories it used (AI-91)
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -55,14 +55,15 @@ export function NewTripDialog({ ai, created, helperDone, allDone, close }: {
     if (!offered.length) return go(id, drafted);
     offered.forEach((n) => step(n, { state: "run", since: Date.now() }));
     const added: Required<AiAdded> = { activities: 0, tasks: 0, bookings: 0, wishes: 0, info: 0, packing: 0 };
+    const from = new Set<string>(); // AI-91
     await Promise.all(offered.map(async (n) => { // at the same time; what each one makes is applied as soon as it is done (AI-80)
       const h = await api.ai(id, n, { apply: true });
-      if (h.ok) { helperDone(id); for (const k of Object.keys(added) as (keyof AiAdded)[]) added[k] += h.added?.[k] ?? 0; }
+      if (h.ok) { helperDone(id); for (const k of Object.keys(added) as (keyof AiAdded)[]) added[k] += h.added?.[k] ?? 0; h.memoriesFrom?.forEach((x) => from.add(x)); }
       const n2 = h.ok ? (h.added ? h.added.activities + h.added.tasks + h.added.bookings + (h.added.info ?? 0) + (h.added.packing ?? 0) : h.proposalIds.length) : 0;
       step(n, h.ok ? { state: "done", note: sv.newTripAi.addedCount(n2) } : { state: "failed", note: aiErrorText(h) });
     }));
     go(id, drafted); // all done: to the trip by itself
-    allDone(id, added);
+    allDone(id, added, [...from]);
   };
   const submit = (e: FormEvent) => { e.preventDefault(); void make(ai); };
   return (

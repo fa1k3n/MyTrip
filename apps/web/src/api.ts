@@ -214,7 +214,7 @@ export type TripUsage = { tripId: string; title: string; owner: string; from?: s
 export type HelperStatus = { available: boolean; on: boolean; at?: string; result?: string; remaining: number };
 /** How an AI feature went: a proposal (or none worth making), or why it did not run (AI-03, AI-64, AI-65). */
 export type AiAdded = { activities: number; tasks: number; bookings: number; wishes: number; info?: number; packing?: number }; // info: AI-87, packing: AI-89
-export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string; applied?: boolean; added?: AiAdded } | { ok: false; error: string; scope?: string };
+export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string; applied?: boolean; added?: AiAdded; memoriesFrom?: string[] } | { ok: false; error: string; scope?: string }; // memoriesFrom: AI-91
 
 type AiRead<T> = { ok: true; reading: T } | { ok: false; error: string; scope?: string };
 async function aiCall<T>(path: string, body: BodyInit, type: string): Promise<AiRead<T>> {
@@ -241,8 +241,8 @@ export const api = {
   ai: async (tripId: string, feature: string, body?: { apply: true }): Promise<AiStart> => { // apply: the first run after "Skapa med AI" (AI-80) // AI-65: the server's reason is kept, unlike call()
     try {
       const r = await fetch(`${trip(tripId)}/ai/${encodeURIComponent(feature)}`, { method: "POST", headers: headers(), body: JSON.stringify(body ?? {}) });
-      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; proposalIds?: string[]; reason?: string; error?: string; scope?: string; applied?: boolean | AiAdded };
-      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, proposalIds: b.proposalIds ?? (b.proposalId ? [b.proposalId] : []), reason: b.reason ?? "", ...(b.applied === true ? { applied: true } : b.applied ? { added: b.applied } : {}) } // applied: the draft of a new trip (AI-78)
+      const b = (await r.json().catch(() => ({}))) as { proposalId?: string | null; proposalIds?: string[]; reason?: string; error?: string; scope?: string; applied?: boolean | AiAdded; memoriesFrom?: string[] };
+      return r.ok ? { ok: true, proposalId: b.proposalId ?? null, proposalIds: b.proposalIds ?? (b.proposalId ? [b.proposalId] : []), reason: b.reason ?? "", ...(b.applied === true ? { applied: true } : b.applied ? { added: b.applied } : {}), ...(b.memoriesFrom?.length ? { memoriesFrom: b.memoriesFrom } : {}) } // applied: the draft of a new trip (AI-78)
         : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
     } catch { return { ok: false, error: "network" }; }
   },

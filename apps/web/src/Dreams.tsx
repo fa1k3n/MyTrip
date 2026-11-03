@@ -8,7 +8,7 @@ import { CatIcon, ICONS } from "./CatIcon.tsx";
 import { WISH_BG } from "./palette.ts";
 import { AiKeep, HiddenText, SuggestionActions, TextEye, type Run, type TripViewProps } from "./TripView.tsx";
 import type { WishSuggestion } from "./aiWishes.ts";
-import { dayLabel } from "./format.ts";
+import { dayLabel, memoriesLine } from "./format.ts";
 import { api } from "./api.ts";
 import { MailInButton } from "./MailIn.tsx";
 import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
@@ -70,6 +70,7 @@ function Suggested({ t, list, review }: { t: Trip; list: WishSuggestion[]; revie
   return <section className="sugrow" aria-labelledby="sugrow-h">
     <h2 id="sugrow-h"><AiMark />{sv.aiRun.wishRow}</h2>
     <p className="ro note">{sv.aiRun.wishRowHint}</p>
+    {(() => { const line = memoriesLine([...new Set(list.flatMap((x) => x.memories ?? []))]); return line && <p className="ro note"><AiMark />{line}</p>; })() /* AI-91 */}
     <div className="dreams">{list.map((s, i) => { const day = t.days.find((d) => d.id === s.day); return (
       <DreamCard key={s.id} t={t} d={s.wish} i={i} votes={false}>
         <div className="sugmeta">{day && <small className="ro">{sv.aiRun.onDay(dayLabel(day.date))}</small>}

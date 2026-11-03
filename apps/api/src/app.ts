@@ -17,7 +17,7 @@ export type { User } from "./users.ts";
 export type Proposal = {
   id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
   source?: { kind: "mail"; from: string; subject: string; at: string } // a mail to the trip's inbox (BK-15)
-    | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string }; // an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
+    | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string; memories?: string[] }; // memories: earlier trips used (AI-91); an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
   wish?: WishReading & { source: string }; // the same mail read as a wish, for Gör till önskan (BK-29)
   mailText?: string; // the mail's subject and text without mejl addresses and telephone numbers, for "Läs med AI"; never sent to the browser (AI-60)
@@ -986,11 +986,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const owners = await store.owners(), first = firstSuper(await store.users())?.id, ownerOf = (id: string) => owners[id] ?? first;
     const last = (x: Trip) => x.days.map((d) => d.date).sort().at(-1) ?? "";
     const earlier = (await store.list()).filter((x) => x.id !== t.id && ownerOf(x.id) === ownerOf(t.id) && x.memories.length).sort((a, b) => last(b).localeCompare(last(a)));
-    return earlier.flatMap((x) => x.dreams.flatMap((w) => {
+    const items = earlier.flatMap((x) => x.dreams.flatMap((w) => {
       const own = x.memories.filter((m) => m.dreamId === w.id), n = (v: string) => own.filter((m) => m.verdict === v).length;
       const comments = own.map((m) => m.note && aiText(m.note, x)).filter((c): c is string => !!c);
-      return own.some((m) => m.verdict || m.note) ? [{ title: aiText(w.title, x), category: w.category, again: n("again"), ok: n("ok"), never: n("never"), ...(comments.length ? { comments } : {}) }] : [];
+      return own.some((m) => m.verdict || m.note) ? [{ trip: x.title, title: aiText(w.title, x), category: w.category, again: n("again"), ok: n("ok"), never: n("never"), ...(comments.length ? { comments } : {}) }] : [];
     })).slice(0, 60);
+    return { items: items.map(({ trip: _t, ...m }) => m), from: [...new Set(items.map((m) => m.trip))] }; // from: the trips used, shown to the people (AI-91)
   }
   /** Runs one feature for a person and stores the result as proposals: one per suggestion for a helper (AI-01, AI-65, AI-70). */
   async function runFeature(t: Trip, name: string, f: AiFeature, who: string, actor: string) {
@@ -1004,7 +1005,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const own = h ? (await store.proposals(t.id)).filter((p) => p.source?.kind === "ai" && p.source.feature === name && p.status !== "approved") : [];
     const avoid = h ? [...h.known(t), ...own.flatMap((p) => p.ops.map(h.textOf))] : [];
     let r: AiResult;
-    try { r = await runAi(opts.ai!.call, f, t, avoid, at.slice(0, 10), f.memories ? await earlierMemories(t) : undefined); } catch (e) {
+    const mem = f.memories ? await earlierMemories(t) : undefined, memoriesFrom = mem?.items.length ? mem.from : undefined; // AI-14, AI-91
+    try { r = await runAi(opts.ai!.call, f, t, avoid, at.slice(0, 10), mem?.items); } catch (e) {
       console.error(`AI ${name} on ${t.id} failed:`, e instanceof Error ? e.message : e); // shows in the Worker's logs
       r = { error: "failed", cost: NO_COST };
     }
@@ -1028,13 +1030,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who, feature: name, usd: r.cost.usd, result });
     if (h) await store.saveAiHelper(t.id, name, { ...("error" in r ? {} : { fingerprint }), at, result });
     if ("error" in r) return { error: r.error };
-    const source = { kind: "ai" as const, feature: name, by: actor, at, ...(h ? { item: true } : {}) };
+    const source = { kind: "ai" as const, feature: name, by: actor, at, ...(h ? { item: true } : {}), ...(memoriesFrom ? { memories: memoriesFrom } : {}) };
     const dayOf = (g: Op[]) => { const m = h && g.map((o) => /^days\/(\d+)\//.exec(o.path)).find(Boolean); return m ? t.days[Number(m[1])]?.id : undefined; }; // AI-77
     const proposals: Proposal[] = groups.map((x) => ({
       id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: x, reason: r.reason, status: "pending", at,
       source: { ...source, ...(dayOf(x) ? { day: dayOf(x) } : {}) } }));
     for (const p of proposals) await store.saveProposal(p);
-    return { proposalIds: proposals.map((p) => p.id), reason: r.reason };
+    return { proposalIds: proposals.map((p) => p.id), reason: r.reason, ...(memoriesFrom ? { memoriesFrom } : {}) };
   }
   /** AI-69: after a change, the helpers that are on run again when the data they use changed; the owner pays (AI-03). */
   async function aiTick(id: string) {
@@ -1100,7 +1102,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
         }
       }
       const { info, packing, ...rest } = applied;
-      return c.json({ applied: { ...rest, ...(info ? { info } : {}), ...(packing ? { packing } : {}) }, proposalIds: r.proposalIds, reason: r.reason });
+      return c.json({ applied: { ...rest, ...(info ? { info } : {}), ...(packing ? { packing } : {}) }, proposalIds: r.proposalIds, reason: r.reason, ...("memoriesFrom" in r ? { memoriesFrom: r.memoriesFrom } : {}) });
     }
     const [pid] = r.proposalIds;
     if (f.applyToNew && pid && isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip
@@ -1109,10 +1111,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       if ("revision" in done) {
         p.status = "approved";
         await store.saveProposal(p);
-        return c.json({ applied: true, revision: done.revision, proposalId: pid, proposalIds: r.proposalIds, reason: r.reason });
+        return c.json({ applied: true, revision: done.revision, proposalId: pid, proposalIds: r.proposalIds, reason: r.reason, ...("memoriesFrom" in r ? { memoriesFrom: r.memoriesFrom } : {}) });
       }
     }
-    return c.json({ proposalId: r.proposalIds[0] ?? null, proposalIds: r.proposalIds, reason: r.reason }, r.proposalIds.length ? 202 : 200);
+    return c.json({ proposalId: r.proposalIds[0] ?? null, proposalIds: r.proposalIds, reason: r.reason, ...("memoriesFrom" in r ? { memoriesFrom: r.memoriesFrom } : {}) }, r.proposalIds.length ? 202 : 200);
   });
 
   /** Runs a reading with AI for a person and counts its cost (AI-03); undefined with the reason it did not run. */

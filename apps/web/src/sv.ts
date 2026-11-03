@@ -299,6 +299,8 @@ export const sv = {
     uploading: "Laddar upp…", tooBig: "PDF:en är större än 2 MB.", badType: "Bara PDF, PNG eller JPEG går att lägga till.", badImage: "Bilden gick inte att göra mindre än 2 MB.",
     failed: "Kunde inte ladda upp filen.", loading: "Hämtar biljetten…", error: "Kunde inte visa biljetten.", page: (name: string, n: number) => `${name}, sida ${n}`,
   },
+  crash: { title: "Något gick fel", text: "Appen stötte på ett fel. Det du har sparat finns kvar. Ladda om för att fortsätta.", reload: "Ladda om" }, // CP-07
+  fromMemories: (list: string) => `Bygger på era omdömen från ${list}.`, // AI-91
   aiRead: { // AI-60, AI-42
     mail: "Läs med AI", mailBusy: "AI läser mejlet…", mailDone: (fields: string) => `AI fyllde i ${fields}. Kontrollera innan du sparar.`, mailNothing: "AI hittade inget mer i mejlet.",
     fields: { kind: "typ", name: "namn", from: "första dag", to: "sista dag", checkIn: "incheckning", checkOut: "utcheckning", start: "starttid", address: "adress", price: "pris" } as Record<string, string>,

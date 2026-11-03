@@ -14,7 +14,7 @@ const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.Pl
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
 const TicketView = lazy(() => import("./TicketView.tsx"));
-import { aiDoneText, excerpt, jumpTo, newReply, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
+import { aiDoneText, excerpt, memoriesLine, jumpTo, newReply, scrollBehavior, toggleAll, toggleOne, tripDates, type Open } from "./format.ts";
 import { forecastUrl, parseForecast, pastDays, type Forecast } from "./weather.ts";
 import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
@@ -282,11 +282,11 @@ export function App() {
     else void load();
   };
   /** AI-82: the notice of what the AI added, with Ångra for all of it. */
-  const allDone = async (tripId: string, added: AiAdded) => {
+  const allDone = async (tripId: string, added: AiAdded, from: string[] = []) => {
     const r = aiRun.current, fresh = (await api.trips().catch(() => [])).find((x) => x.id === tripId);
     if (r?.tripId !== tripId || r.undone || !fresh) return;
     setNotice("");
-    setUndo({ text: aiDoneText(added), before: r.before, after: fresh, draft: true });
+    setUndo({ text: [aiDoneText(added), memoriesLine(from)].filter(Boolean).join(" "), before: r.before, after: fresh, draft: true }); // AI-91
   };
   /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
   const draftAi = !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas.changes !== false;
@@ -508,7 +508,7 @@ export function App() {
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
-    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} allDone={(id, added) => void allDone(id, added)} close={() => setNewOpen(false)} /></Suspense>}
+    {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} allDone={(id, added, from) => void allDone(id, added, from)} close={() => setNewOpen(false)} /></Suspense>}
     {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog

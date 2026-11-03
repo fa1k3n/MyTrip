@@ -8,9 +8,10 @@ import { fmtDuration } from "./transport.ts";
 export type Finding = { level: "warn" | "caution"; dayId: string; text: string };
 type CheckTrip = { days: { id: string; date: string }[]; bookings: { from: string; to: string; status: string; kind?: string }[] };
 type TimedAct = { text: string; start?: string; end?: string; durationMin?: number; estimated: boolean; travel?: { vehicle?: string; durationMin: number } };
-type TimeTrip = { days: { id: string; date: string; start?: string; end: string; activities: TimedAct[]; legs?: LegLike[] }[]; bookings: { name: string; from: string; status: string; kind?: string; checkIn?: string }[];
+type TimeTrip = { days: { id: string; date: string; start?: string; end: string; activities: TimedAct[]; legs?: LegLike[] }[];
+  bookings: { name: string; from: string; status: string; kind?: string; checkIn?: string; start?: string }[];
   rules?: { maxTravelDayMin?: number; maxDriveStretchMin?: number; bufferMin?: number } };
-type LegLike = { vehicle: string; origin: string; destination: string; durationMin?: number };
+type LegLike = { vehicle: string; origin: string; destination: string; durationMin?: number; departure?: string };
 
 /** The least time between two fixed times, the way there counted, until the trip can set its own (DQ-10, DM-15). */
 export const BUFFER_MIN = 15;
@@ -96,13 +97,33 @@ export function loadFindings(t: TimeTrip): Finding[] {
   return out;
 }
 
+/** Each departure, of a Resa booked for the day or a leg with a departure time: an activity started before it that ends after it is
+ * serious, less than the trip's buffer before it less serious. What starts at the departure is taken to be the trip itself (DQ-13). */
+export function departFindings(t: TimeTrip): Finding[] {
+  const out: Finding[] = [], buffer = t.rules?.bufferMin ?? BUFFER_MIN;
+  for (const d of t.days) {
+    const day = dayName(d.date);
+    const departs = [...t.bookings.filter((b) => b.kind === "transport" && b.status !== "cancelled" && b.from === d.date && b.start).map((b) => ({ what: b.name, at: b.start! })),
+      ...(d.legs ?? []).filter((l) => l.departure).map((l) => ({ what: `${l.origin} → ${l.destination}`, at: l.departure! }))];
+    for (const x of departs) {
+      const before = d.activities.filter((a) => a.start && toMin(a.start) < toMin(x.at) && activityEnd(a))
+        .map((a) => ({ a, end: toMin(activityEnd(a)!) })).sort((p, q) => q.end - p.end)[0];
+      if (!before) continue;
+      const spare = toMin(x.at) - before.end;
+      if (spare < 0) out.push({ level: "warn", dayId: d.id, text: sv.check.departLate(day, x.what, dot(x.at), before.a.text || sv.hiddenActivity, dot(activityEnd(before.a)!)) });
+      else if (spare < buffer) out.push({ level: "caution", dayId: d.id, text: sv.check.departBuffer(day, x.what, dot(x.at), fmtDuration(spare)) });
+    }
+  }
+  return out;
+}
+
 /** The trip's check as one level: red when anything is serious, yellow when only less serious, else ok. */
 export const checkLevel = (f: Finding[]) => (f.some((x) => x.level === "warn") ? "warn" : f.length ? "caution" : "ok");
 
-/** Everything "Kontrollera resan" finds: the serious first, then by day (DQ-06..DQ-10). */
+/** Everything "Kontrollera resan" finds: the serious first, then by day (DQ-06..DQ-10, DQ-13). */
 export function tripFindings(t: CheckTrip & TimeTrip): Finding[] {
   const order = new Map([...t.days].sort((a, b) => a.date.localeCompare(b.date)).map((d, i) => [d.id, i]));
-  return [...nightFindings(t), ...timeFindings(t), ...loadFindings(t)].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1) || order.get(a.dayId)! - order.get(b.dayId)!);
+  return [...nightFindings(t), ...timeFindings(t), ...loadFindings(t), ...departFindings(t)].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1) || order.get(a.dayId)! - order.get(b.dayId)!);
 }
 
 type Dismissed = { text: string; reason: string; by?: string; at?: string };

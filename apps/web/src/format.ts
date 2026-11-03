@@ -62,7 +62,12 @@ export function bookingDates(b: { from: string; to: string }) {
 }
 
 /** The times of a booking after its dates: check-in and check-out of a Boende, the start of a Biljett (BK-07). */
-export function bookingTimes(b: { kind?: string; checkIn?: string; checkOut?: string; start?: string }) {
+export function bookingTimes(b: { kind?: string; name?: string; checkIn?: string; checkOut?: string; start?: string; origin?: string; destination?: string; arrival?: string }) {
+  if (b.kind === "transport") { // BK-37: "kl. 14.30 Puttgarden → Rødby, framme 15.15", without the places the name already gives
+    const named = !!b.name && [b.origin, b.destination].every((x) => !x || b.name!.includes(x));
+    const where = named ? "" : b.origin && b.destination ? `${b.origin} → ${b.destination}` : b.origin ? `${sv.bookingKinds.fromPlace} ${b.origin}` : b.destination ? `${sv.bookingKinds.toPlace} ${b.destination}` : "";
+    return [[b.start && `kl. ${hhmm(b.start)}`, where].filter(Boolean).join(" "), b.arrival && `${sv.bookingKinds.arrives} ${hhmm(b.arrival)}`].filter(Boolean).join(", ");
+  }
   if (b.kind === "stay") return [b.checkIn && `${sv.bookingKinds.in} ${hhmm(b.checkIn)}`, b.checkOut && `${sv.bookingKinds.out} ${hhmm(b.checkOut)}`].filter(Boolean).join(" · ");
   return b.kind === "ticket" && b.start ? `kl. ${hhmm(b.start)}` : "";
 }

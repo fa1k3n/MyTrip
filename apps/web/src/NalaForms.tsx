@@ -404,7 +404,7 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
     setUploading(false);
     if (pick.current) pick.current.value = "";
   };
-  const kinds: NonNullable<BookingInput["kind"]>[] = ["stay", "ticket", "other", ...(b?.kind === "transport" ? ["transport" as const] : [])];
+  const kinds: NonNullable<BookingInput["kind"]>[] = ["stay", "ticket", "transport", "other"]; // BK-37: Resa
   const acts = ticketActivities(p.t, f.from);
   const submit = async () => {
     const rate = f.price?.trim() ? await rateToday(p.t, f.currency) : undefined; // counted in the budget in the trip's currency (BK-25)
@@ -450,6 +450,16 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
           {acts.map((a) => <option key={a.id} value={a.id}>{a.text || sv.hiddenActivity}</option>)}
         </select></label>
       </div>}
+      {f.kind === "transport" && <> {/* BK-37 */}
+        <div className="two">
+          <label>{sv.bookingKinds.origin}<input {...text("origin")} /></label>
+          <label>{sv.bookingKinds.destination}<input {...text("destination")} /></label>
+        </div>
+        <div className="two">
+          <label>{sv.bookingKinds.departure}<input type="time" {...text("start")} /></label>
+          <label>{sv.bookingKinds.arrival}<input type="time" {...text("arrival")} /></label>
+        </div>
+      </>}
       <label>{sv.status}<select {...text("status")}>
         {(Object.keys(sv.statuses) as (keyof typeof sv.statuses)[]).map((k) => <option key={k} value={k}>{sv.statuses[k]}</option>)}
       </select></label>

@@ -51,7 +51,8 @@ export const TicketFile = z.object({
 export const Booking = z.object({
   id: Id, name: z.string().min(1), from: Date_, to: Date_,
   kind: z.enum(["stay", "ticket", "transport", "other"]).optional(), // DM-12, BK-07; missing: other
-  checkIn: Time.optional(), checkOut: Time.optional(), start: Time.optional(), // Boende; Biljett (BK-07)
+  checkIn: Time.optional(), checkOut: Time.optional(), start: Time.optional(), // Boende; Biljett, and a Resa's departure (BK-07, BK-37)
+  origin: z.string().max(120).optional(), destination: z.string().max(120).optional(), arrival: Time.optional(), // Resa: from, to and arrival (BK-37)
   activityId: Id.optional(), // the activity a Biljett is for, on its first date (BK-08)
   files: z.array(TicketFile).optional(), // BK-09
   status: z.enum(["tobook", "ready", "paid", "cancelled"]), // tobook: Att boka, still to be booked (BK-20)

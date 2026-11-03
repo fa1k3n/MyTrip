@@ -123,3 +123,12 @@ test("AI-60 weekdays become the trip's days", async () => {
   const r2 = (await (await near.req(`/api/trips/berlin/mailread/${near.pid}`, "POST", "{}")).json()).reading;
   assert.deepEqual([r2.from, r2.to], ["2027-10-31", "2027-11-02"], "a day next to the trip stays");
 });
+
+// REQ: AI-60 BK-38 the AI reads a Resa's places, departure and arrival
+test("AI-60 a Resa read with AI", async () => {
+  const ai = fake({ kind: "transport", name: "Färja Puttgarden–Rødby", from: "2026-10-25", origin: "Puttgarden", destination: "Rødby", start: "14:30", arrival: "15:15" });
+  const { req, pid } = await setup(ai);
+  const { reading } = await (await req(`/api/trips/berlin/mailread/${pid}`, "POST", "{}")).json();
+  assert.deepEqual([reading.origin, reading.destination, reading.start, reading.arrival], ["Puttgarden", "Rødby", "14:30", "15:15"]);
+  assert.ok(JSON.stringify(ai.seen[0]!.tools).includes("transport"));
+});

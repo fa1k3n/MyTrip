@@ -165,7 +165,7 @@ export function KindIcon({ kind }: { kind?: string }) {
   const k = (kind ?? "other") as keyof typeof kindIcon, label = sv.bookingKinds[k];
   return <span className="kind" role="img" aria-label={label} title={label}><Icon name={kindIcon[k] ?? "file"} /></span>;
 }
-const kindIcon = { stay: "bed", ticket: "ticket", other: "file", transport: "file" } as const;
+const kindIcon = { stay: "bed", ticket: "ticket", other: "file", transport: "route" } as const; // BK-37
 /** Opens a booking's ticket files, when it has any (BK-10). Not an editing control. */
 export const TicketButton = ({ b, edit }: { b: Trip["bookings"][number]; edit?: (d: EditDlg) => void }) =>
   edit && hasTickets(b) ? <IconButton icon="ticket" look="bare" tip="left" label={`${sv.tickets.show}: ${b.name}`} onClick={() => edit({ kind: "tickets", bookingId: b.id })} /> : null;

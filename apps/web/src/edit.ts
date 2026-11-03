@@ -269,6 +269,7 @@ export type BookingInput = {
   name: string; from: string; to: string; status: "tobook" | "paid" | "ready" | "cancelled"; reference: string; placeId: string;
   note?: string; // undefined: keep, "": remove (BK-06)
   kind?: "stay" | "ticket" | "other" | "transport"; checkIn?: string; checkOut?: string; start?: string; activityId?: string; // undefined: keep (BK-07, BK-08)
+  origin?: string; destination?: string; arrival?: string; // a Resa; undefined: keep (BK-37)
   files?: TicketFile[]; // undefined: keep (BK-09)
   price?: string; currency?: string; // the booking's own budget item; undefined: keep, "": remove (BK-25)
   rate?: Rate; // fetched when saved, for a price in another currency (BK-25, BG-07)
@@ -297,9 +298,11 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const time = (v: string | undefined, keep?: string) => (v === undefined ? keep : v.trim() || undefined);
   const times = input.kind === undefined ? {} : { // only the times and the link that belong to the kind (BK-07, BK-08)
     checkIn: kind === "stay" ? time(input.checkIn, old?.checkIn) : undefined, checkOut: kind === "stay" ? time(input.checkOut, old?.checkOut) : undefined,
-    start: kind === "ticket" ? time(input.start, old?.start) : undefined, activityId: kind === "ticket" ? time(input.activityId, old?.activityId) : undefined,
+    start: kind === "ticket" || kind === "transport" ? time(input.start, old?.start) : undefined, activityId: kind === "ticket" ? time(input.activityId, old?.activityId) : undefined,
+    origin: kind === "transport" ? time(input.origin, old?.origin) : undefined, destination: kind === "transport" ? time(input.destination, old?.destination) : undefined,
+    arrival: kind === "transport" ? time(input.arrival, old?.arrival) : undefined, // BK-37
   };
-  if ([times.checkIn, times.checkOut, times.start].some((x) => x !== undefined && !isTime(x))) return fail(sv.errors.activityTime);
+  if ([times.checkIn, times.checkOut, times.start, times.arrival].some((x) => x !== undefined && !isTime(x))) return fail(sv.errors.activityTime);
   if (times.activityId && !ticketActivities(t, input.from).some((a) => a.id === times.activityId)) return fail(sv.errors.activityDate);
   const price = input.price?.trim() ? parseAmount(input.price) : undefined;
   if (Number.isNaN(price)) return fail(sv.badAmount);
@@ -311,7 +314,7 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
     if (!r.ok) return r;
     placeOps = r.ops; placeId = (r.ops[0] as { value: { id: string } }).value.id;
   }
-  const { files: _f, checkIn: _ci, checkOut: _co, start: _s, activityId: _a, ...rest } = old ?? {};
+  const { files: _f, checkIn: _ci, checkOut: _co, start: _s, activityId: _a, origin: _o, destination: _d, arrival: _ar, ...rest } = old ?? {};
   const booking = clean({
     ...(input.kind === undefined ? old : rest), id: old?.id ?? uniqueId(name, [...allIds(t), ...(placeId ? [placeId] : [])]), name, from: input.from, to: input.to, status: input.status,
     reference: input.reference.trim() || undefined, placeId,
@@ -350,10 +353,11 @@ function readPlace(t: Pick<Trip, "places"> | undefined, f: BookingInput, r: Book
 
 /** The fields read from a mail or a pasted confirmation fill in the form; what was not read stays (BK-17, BK-18). */
 export function readingToForm(f: BookingInput, r: BookingReading, t?: Pick<Trip, "places">): BookingInput {
-  const kind = r.kind === "stay" || r.kind === "ticket" ? r.kind : r.kind ? "other" : f.kind;
+  const kind = r.kind === "stay" || r.kind === "ticket" || r.kind === "transport" ? r.kind : r.kind ? "other" : f.kind;
   return {
     ...f, kind, name: r.name ?? f.name, from: r.from ?? f.from, to: r.to ?? r.from ?? f.to, reference: r.reference ?? f.reference,
     status: r.status ?? f.status, checkIn: r.checkIn ?? f.checkIn, checkOut: r.checkOut ?? f.checkOut, start: r.start ?? f.start,
+    ...(r.origin && { origin: r.origin }), ...(r.destination && { destination: r.destination }), ...(r.arrival && { arrival: r.arrival }), // BK-37
     ...(r.price && { price: priceText(r.price.value), currency: r.price.currency }), // BK-25
     ...readPlace(t, f, r), // BK-36
   };
@@ -367,6 +371,7 @@ export function bookingForm(t: Trip, b?: Booking): BookingInput {
   return {
     name: b?.name ?? "", from: b?.from ?? first, to: b?.to ?? first, status: b?.status ?? "ready", reference: b?.reference ?? "", placeId: b?.placeId ?? "",
     note: b?.note ?? "", kind: b?.kind ?? "other", checkIn: b?.checkIn ?? "", checkOut: b?.checkOut ?? "", start: b?.start ?? "", activityId: b?.activityId ?? "",
+    origin: b?.origin ?? "", destination: b?.destination ?? "", arrival: b?.arrival ?? "",
     files: b?.files ?? [], ...priceField(t, b),
   };
 }

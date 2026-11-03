@@ -2,7 +2,8 @@
 // mail has any, otherwise words in the text. What cannot be read is left out, so the reviewer fills it in.
 
 export type BookingReading = {
-  kind?: "stay" | "ticket" | "other"; name?: string; from?: string; to?: string;
+  kind?: "stay" | "ticket" | "transport" | "other"; name?: string; from?: string; to?: string;
+  origin?: string; destination?: string; arrival?: string; // a Resa; its departure is `start` (BK-38)
   checkIn?: string; checkOut?: string; start?: string; reference?: string; status?: "cancelled"; address?: string;
   price?: { value: number; currency: string }; // BK-24
   phone?: string; website?: string; // the place's, for its place (BK-35, BK-36)
@@ -82,11 +83,13 @@ function priceAfter(text: string, words: string): BookingReading["price"] {
 }
 const price = (text: string) => priceAfter(text, TOTAL_WORDS) ?? priceAfter(text, PRICE_WORDS);
 
+const TRANSPORT = /\b(?:färjan?|ferry|fähre|tåget|tåg|train|zug|flyg|flight|flug|buss|bus|avgång|departure|abfahrt|ankunft)\b/gi;
+const DEPART = String.raw`avgång|avgår|departure|departs|abfahrt|départ`, ARRIVE = String.raw`ankomst|framme|arrival|arrives|ankunft|arrivée`;
 const STAY = /hotell|hotel|incheckning|check-in|checkin|utcheckning|vandrarhem|hostel|stuga|nätter|\bnatt\b|dubbelrum|enkelrum|\blogi\b|boende/gi;
 const TICKET = /biljett|ticket|entré|inträde|evenemang/gi;
 function kind(text: string): BookingReading["kind"] {
-  const stay = text.match(STAY)?.length ?? 0, ticket = text.match(TICKET)?.length ?? 0;
-  return stay > ticket ? "stay" : ticket > stay ? "ticket" : undefined;
+  const stay = text.match(STAY)?.length ?? 0, ticket = text.match(TICKET)?.length ?? 0, transport = text.match(TRANSPORT)?.length ?? 0;
+  return transport > stay && transport > ticket ? "transport" : stay > ticket ? "stay" : ticket > stay ? "ticket" : undefined;
 }
 
 /** Forwarding and reply prefixes such as Fwd:, VB: and Re: at the start of a subject. */
@@ -191,6 +194,14 @@ function fromLd(html: string): BookingReading {
     phone: str(what.telephone) ?? str(obj(what.location).telephone), website: url && /^https?:\/\//i.test(url) ? site(url) : undefined }; // BK-35
   if (type === "LodgingReservation")
     return clean({ kind: "stay", ...base, from: dateOf(r.checkinTime), to: dateOf(r.checkoutTime), checkIn: timeOf(r.checkinTime), checkOut: timeOf(r.checkoutTime) });
+  const place = (...vs: unknown[]) => vs.map((v) => str(obj(v).name) ?? str(obj(v).iataCode) ?? str(v)).find(Boolean);
+  if (/^(Train|Bus|Flight|Boat)Reservation$/.test(type)) { // BK-38: a Resa, from and to with its departure and arrival
+    const origin = place(what.departureStation, what.departureBusStop, what.departureAirport, what.departureBoatTerminal);
+    const destination = place(what.arrivalStation, what.arrivalBusStop, what.arrivalAirport, what.arrivalBoatTerminal);
+    const from = dateOf(what.departureTime);
+    return clean({ kind: "transport", ...base, name: base.name ?? (origin && destination ? `${origin} → ${destination}` : undefined), origin, destination,
+      from, to: dateOf(what.arrivalTime) ?? from, start: timeOf(what.departureTime), arrival: timeOf(what.arrivalTime) });
+  }
   const at = what.startDate ?? r.startTime ?? what.departureTime;
   const from = dateOf(at);
   return clean({ kind: type === "EventReservation" ? "ticket" : "other", ...base, from, to: dateOf(what.endDate) ?? from, start: timeOf(at) });
@@ -214,7 +225,8 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
     kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject, text) : undefined) ?? textName(text), reference: reference(text), price: price(text),
     phone: phone(text), website: website(text, mail.html ?? "", mail.from), // BK-35
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
-    ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
+    ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) }
+      : k === "transport" ? { start: timeAfter(text, DEPART), arrival: timeAfter(text, ARRIVE) } : {}), // BK-38
   });
   return clean({ ...fromText, ...(mail.html ? fromLd(mail.html) : {}) });
 }

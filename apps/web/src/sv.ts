@@ -313,11 +313,13 @@ export const sv = {
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
   check: { // DQ-08: "Kontrollera resan"
     title: "Kontrollera resan", ok: "Inga problem hittade.", warn: "Resan har allvarliga problem", caution: "Resan har något att se över", allOk: "Resan ser bra ut",
-    what: "Kontrollerar nu: boende varje natt, att tiderna hinns med, incheckning, för fulla dagar och körtid.",
+    what: "Kontrollerar nu: boende varje natt, att tiderna och avgångarna hinns med, incheckning, för fulla dagar och restid.",
     full: (day: string, need: string, has: string) => `${day}: dagen är för full. Aktiviteter och resor tar ${need}, dagen är ${has}.`, // DQ-06
     travel: (day: string, min: string, max: string) => `${day}: ${min} restid, mer än ${max} per dag.`, // DQ-07
     stretch: (day: string, what: string, min: string, max: string) => `${day}: ${what} är ${min} bilkörning i sträck, mer än ${max} utan paus.`,
     wayTo: (name: string) => `vägen till ${name}`,
+    departLate: (day: string, what: string, at: string, before: string, end: string) => `${day}: ${what} går ${at}, men ${before} slutar ${end}.`, // DQ-13
+    departBuffer: (day: string, what: string, at: string, spare: string) => `${day}: bara ${spare} marginal före ${what} ${at}.`,
     rules: "Planeringsregler", editRules: "Ändra planeringsregler", noRules: "Marginal 15 min, ingen gräns för restid", // DM-15
     ruleDay: "Max restid per dag (timmar)", ruleStretch: "Max bilkörning utan paus (timmar)", ruleBuffer: "Marginal mellan fasta tider (minuter)",
     rulesHint: "Används av Kontrollera resan. Restid är all resa utom promenader. Lämna tomt för ingen gräns; marginalen är 15 minuter om inget anges, 0 stänger av den.", fromAi: "Satt av AI från resans beskrivning", // AI-93
@@ -342,7 +344,7 @@ export const sv = {
   fromMemories: (list: string) => `Bygger på era omdömen från ${list}.`, // AI-91
   aiRead: { // AI-60, AI-42
     mail: "Läs med AI", mailBusy: "AI läser mejlet…", mailDone: (fields: string) => `AI fyllde i ${fields}. Kontrollera innan du sparar.`, mailNothing: "AI hittade inget mer i mejlet.",
-    fields: { kind: "typ", name: "namn", from: "första dag", to: "sista dag", checkIn: "incheckning", checkOut: "utcheckning", start: "starttid", address: "adress", price: "pris" } as Record<string, string>,
+    fields: { kind: "typ", name: "namn", from: "första dag", to: "sista dag", checkIn: "incheckning", checkOut: "utcheckning", start: "starttid", address: "adress", price: "pris", origin: "från", destination: "till", arrival: "ankomst" } as Record<string, string>,
     receipt: "Läs kvitto", receiptBusy: "AI läser kvittot…", receiptDone: "Ifyllt från kvittot med AI. Kontrollera innan du sparar.", receiptNothing: "AI kunde inte läsa kvittot. Fyll i själv.",
     badPhoto: "Det där gick inte att läsa som foto.",
   },
@@ -362,6 +364,7 @@ export const sv = {
   },
   bookingKinds: { // BK-07, BK-08
     label: "Typ", stay: "Boende", ticket: "Biljett", other: "Övrigt", transport: "Resa", in: "in", out: "ut",
+    origin: "Från", destination: "Till", departure: "Avgång", arrival: "Ankomst", fromPlace: "från", toPlace: "till", arrives: "framme", // BK-37
     checkIn: "Incheckning", checkOut: "Utcheckning", start: "Starttid", activity: "Gäller aktiviteten", noActivity: "Ingen särskild",
   },
   noTasks: "Inga uppgifter ännu.", tasksShared: "Bockarna sparas i resan och syns för alla som har tillgång till den.", overdue: "försenad",

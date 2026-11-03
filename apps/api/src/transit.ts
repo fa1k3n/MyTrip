@@ -7,7 +7,7 @@ export type Step =
   | { kind: "ride"; line: string; vehicle: string; headsign?: string; from: string; to: string; dep?: string; arr?: string; stops?: number };
 // nofrom: no place before, the phone's position is needed; far: no trip on a date so far ahead that Google may have no timetable yet;
 // example: the date of the nearest same weekday whose trip is shown instead (TR-24)
-export type Transit = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: Step[]; example?: string };
+export type Transit = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: Step[]; example?: string; from?: string }; // from: TR-27
 
 /** Google's kinds of vehicle as the app's: bus, tram, metro, train, ferry, or other. */
 const KIND: Record<string, string> = {
@@ -64,10 +64,11 @@ export async function checkTransit(t: Trip, dayId: string, activityId: string, o
   if (!origin) return { status: "nofrom" }; // no place before: from where the phone is, as the link does (TR-21)
   const now = (o.now ?? (() => new Date()))().getTime(), at = w.start ? zoned(w.date, w.start, t.timezone) : 0;
   const ask = (when: { arrivalTime: string } | { departureTime: string }) => routes(o, { origin, destination: { address: w.to }, travelMode: "TRANSIT", ...when, languageCode: "sv-SE" });
+  const named = (r: Transit): Transit => (r.status === "ok" && w.fromName ? { ...r, from: w.fromName } : r); // TR-27; from the phone: no name
   const first = await ask(at > now + 60_000 ? { arrivalTime: new Date(at).toISOString() } : { departureTime: new Date(now + 60_000).toISOString() });
-  if (first.status !== "none" || !w.start || at <= now + FAR_MS) return first;
+  if (first.status !== "none" || !w.start || at <= now + FAR_MS) return named(first);
   const example = nearestWeekday(w.date, now, t.timezone), again = await ask({ arrivalTime: new Date(zoned(example, w.start, t.timezone)).toISOString() });
-  return again.status === "ok" ? { ...again, example } : { status: "none", far: true };
+  return again.status === "ok" ? named({ ...again, example }) : { status: "none", far: true };
 }
 
 async function routes(o: TrafficOpts, body: Record<string, unknown>): Promise<Transit> {

@@ -125,3 +125,15 @@ test("TR-24 far ahead without any trip, and near dates ask once", async () => {
   assert.deepEqual(await (await near.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json(), { status: "none" });
   assert.equal(n, 1);
 });
+
+// REQ: TR-27 the answer names the place the trip is counted from; from the phone's position it names none
+test("TR-27 the answer says where the trip starts", async () => {
+  const fetch = (async () => new Response(JSON.stringify(answer), { status: 200 })) as unknown as typeof globalThis.fetch;
+  const t = trip(), first = trip();
+  first.days[0]!.activities = [first.days[0]!.activities[1]!];
+  const app = createApp(memoryStore([t]), tokens, { routesKey: "k", fetch, now: () => new Date("2026-11-19T12:00:00Z") });
+  assert.equal((await (await app.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json()).from, "Hotell Mitte");
+  const here = createApp(memoryStore([first]), tokens, { routesKey: "k", fetch, now: () => new Date("2026-11-19T12:00:00Z") });
+  const r = await (await here.request("/api/trips/berlin/days/d1/activities/a2/transit?from=52.5321,13.4013", { headers: { authorization: "Bearer a" } })).json();
+  assert.deepEqual([r.status, r.from], ["ok", undefined]);
+});

@@ -81,6 +81,8 @@ export const sv = {
   transit: { // TR-23
     show: "Visa linjer", hide: "Dölj linjer", asking: "Söker resa…", locating: "Söker var du är…",
     noPosition: "Ingen plats före den här på dagen, och telefonen gav inte sin position. Tillåt platsen, eller använd Visa resvägen.", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.", off: "Linjer är inte påslagna i det här Basläger än. Använd Visa resvägen.", // TR-25
+    from: (place: string) => `Från ${place}`, fromHere: "Från där du är nu", // TR-27
+    noFrom: "Ingen plats före den här på dagen. Lägg till hotellets adress, så räknas resan därifrån.",
     far: "Google har ingen tidtabell så långt fram än. Försök igen närmare resan, eller använd Visa resvägen.", // TR-24
     example: (day: string) => `Google har ingen tidtabell för resdagen än. Så här går det samma tid ${day}:`, failed: "Kunde inte hämta linjerna just nu.",
     walk: (min: number) => `Gå ${min} min`, toward: (h: string) => `mot ${h}`, stops: (n: number) => (n === 1 ? "1 hållplats" : `${n} hållplatser`),

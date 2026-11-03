@@ -68,7 +68,9 @@ export function stepText(s: TransitStep) {
   return `${head}: ${clock(s.dep)}${s.from} – ${clock(s.arr)}${s.to}${s.stops ? `, ${sv.transit.stops(s.stops)}` : ""}`;
 }
 /** The server's answer for "Visa linjer" (TR-23, TR-24). */
-export type TransitAnswer = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: TransitStep[]; example?: string };
+export type TransitAnswer = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: TransitStep[]; example?: string; from?: string };
+/** TR-27: where the trip is counted from, as the steps' first line: the place before or the stay, else the phone's position. */
+export const transitFrom = (r: TransitAnswer) => (r.status !== "ok" ? undefined : r.from ? sv.transit.from(r.from) : sv.transit.fromHere);
 /** What is said with or instead of the steps: none found, none so far ahead, or the trip of the nearest same weekday (TR-24). */
 export function transitNote(r: TransitAnswer) {
   if (r.status === "ok") return r.example ? sv.transit.example(dayLabel(r.example)) : undefined;

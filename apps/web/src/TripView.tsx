@@ -13,7 +13,7 @@ import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
 import { api, isOffline } from "./api.ts";
 import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
 import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
-import { fmtDuration, stepIcon, stepText, transitNote, wayUrl, type TransitStep } from "./transport.ts";
+import { fmtDuration, stepIcon, stepText, transitFrom, transitNote, wayUrl, type TransitStep } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
@@ -130,17 +130,19 @@ function AiNewBar({ t, run, openDays, setTab }: { t: Trip; run: Run; openDays: (
 
 /** TR-20: the way to an activity from the place before, as a row before it: the vehicle's icon and the time. In Uppleva, a way by
  * public transport also gets "Visa linjer", which asks the server only when pressed (TR-23), and so does Nåla (TR-26). */
-export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["travel"]; li?: boolean; href?: string; lines?: { tripId: string; dayId: string; aid: string } }) => {
-  const [open, setOpen] = useState(false), [got, setGot] = useState<TransitStep[] | "asking" | "locating" | "none" | "failed" | "noPosition" | null>(null);
+export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["travel"]; li?: boolean; href?: string; lines?: { tripId: string; dayId: string; aid: string; here?: boolean } }) => {
+  const [open, setOpen] = useState(false), [got, setGot] = useState<TransitStep[] | "asking" | "locating" | "none" | "failed" | "noPosition" | "noFrom" | null>(null);
   const [note, setNote] = useState<string>(); // TR-24: why none was found, or that the steps are an example
+  const [start, setStart] = useState<string>(); // TR-27: where the trip is counted from
   if (!travel) return null;
   const transit = !!lines && !!href && (travel.vehicle === "transit" || travel.vehicle === "train");
   const toggle = () => {
     setOpen(!open);
-    if (open || (got && got !== "failed" && got !== "noPosition")) return;
+    if (open || (got && got !== "failed" && got !== "noPosition" && got !== "noFrom")) return;
     setGot("asking");
     const ask = (from?: { lat: number; lng: number }) => api.transit(lines!.tripId, lines!.dayId, lines!.aid, from).then((r) => {
-      if (r.status !== "nofrom") { setNote(transitNote(r)); return setGot(r.status === "ok" ? r.steps : r.status === "error" ? "failed" : "none"); }
+      if (r.status !== "nofrom") { setNote(transitNote(r)); setStart(transitFrom(r)); return setGot(r.status === "ok" ? r.steps : r.status === "error" ? "failed" : "none"); }
+      if (!lines!.here) return setGot("noFrom"); // the position only in Uppleva on today's day (TR-27)
       if (from || !navigator.geolocation) return setGot("noPosition");
       setGot("locating"); // no place before it on the day: from where the phone is, as the link (TR-21, TR-23)
       navigator.geolocation.getCurrentPosition((p) => void ask({ lat: p.coords.latitude, lng: p.coords.longitude }), () => setGot("noPosition"), { timeout: 15_000, maximumAge: 120_000 });
@@ -151,8 +153,8 @@ export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["trav
     {href && <a className="btn ghost icon bare tip-right" href={href} target="_blank" rel="noopener noreferrer" aria-label={sv.showWay} data-tip={sv.showWay}><Icon name="compass" /></a> /* TR-21 */}
     {transit && (open || !isOffline()) && <IconButton icon="list" look="bare" tip="right" pressed={open} label={open ? sv.transit.hide : sv.transit.show} onClick={toggle} />}
     {transit && open && <div className="steps" role="status" aria-label={sv.transit.label}>
-      {got === "asking" ? <p>{sv.transit.asking}</p> : got === "locating" ? <p>{sv.transit.locating}</p> : got === "noPosition" ? <p>{sv.transit.noPosition}</p> : got === "none" ? <p>{note}</p> : got === "failed" ? <p>{sv.transit.failed}</p>
-        : got && <>{note && <p>{note}</p>}<ol>{got.map((x, i) => <li key={i} className={x.kind}><CatIcon id={stepIcon(x)} /><span>{stepText(x)}</span></li>)}</ol></>}
+      {got === "asking" ? <p>{sv.transit.asking}</p> : got === "locating" ? <p>{sv.transit.locating}</p> : got === "noPosition" ? <p>{sv.transit.noPosition}</p> : got === "noFrom" ? <p>{sv.transit.noFrom}</p> : got === "none" ? <p>{note}</p> : got === "failed" ? <p>{sv.transit.failed}</p>
+        : got && <>{start && <p className="from">{start}</p>}{note && <p>{note}</p>}<ol>{got.map((x, i) => <li key={i} className={x.kind}><CatIcon id={stepIcon(x)} /><span>{stepText(x)}</span></li>)}</ol></>}
     </div>}</>;
   return li ? <li className="travel">{row}</li> : <div className="travel">{row}</div>;
 };

@@ -197,7 +197,7 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
           {wish && <Verdicts t={t} id={wish.id} title={wish.title} by={p.memoryBy} writes run={p.run} />}
         </span>
       </li>;
-      const way = a.travel && <TravelRow key={`way-${a.id}`} travel={a.travel} li href={wayUrl(t, day.id, a.id)} lines={{ tripId: t.id, dayId: day.id, aid: a.id }} />; // TR-20, TR-21
+      const way = a.travel && <TravelRow key={`way-${a.id}`} travel={a.travel} li href={wayUrl(t, day.id, a.id)} lines={{ tripId: t.id, dayId: day.id, aid: a.id, here: day.date === p.today }} />; // TR-20, TR-21; the position only today (TR-27)
       return i === at ? [line, way, card] : [way, card];
     })}
     {at === day.activities.length && line}

@@ -165,11 +165,17 @@ function fromLd(html: string): BookingReading {
   return clean({ kind: type === "EventReservation" ? "ticket" : "other", ...base, from, to: dateOf(what.endDate) ?? from, start: timeOf(at) });
 }
 
-/** A booking read from a mail's subject, text and HTML; dates within the trip's dates are preferred (BK-16). */
+/** The header lines of a forwarded or quoted mail that give when it was sent: their dates are no booking dates (BK-16). */
+const SENT_LINE = /^[ \t>]*(?:date|datum|sent|skickat|gesendet|envoyé|fecha|data|verzonden|sendt|dato|päivämäärä)[ \t]*:.*$/gim;
+const DAY = 864e5, NEAR = 30 * DAY;
+/** A booking read from a mail's subject, text and HTML; dates within the trip's dates are preferred, and dates more than 30 days
+ * from them are left out (BK-16). */
 export function readBooking(mail: { subject?: string; text?: string; html?: string }, tripDates: string[] = []): BookingReading {
   const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n");
   const sorted = [...tripDates].sort(), year = sorted[0] ? +sorted[0].slice(0, 4) : undefined;
-  const all = dates(text, year), inTrip = all.filter((d) => sorted.length && d >= sorted[0]! && d <= sorted[sorted.length - 1]!);
+  const first = sorted[0], last = sorted[sorted.length - 1];
+  const all = dates(text.replace(SENT_LINE, ""), year).filter((d) => !first || (Date.parse(d) >= Date.parse(first) - NEAR && Date.parse(d) <= Date.parse(last!) + NEAR));
+  const inTrip = all.filter((d) => first && d >= first && d <= last!);
   const use = inTrip.length ? inTrip : all;
   const k = kind(`${mail.subject ?? ""}\n${text}`), checkIn = timeAfter(text, CHECK_IN);
   const stay = k === "stay" || (!k && !!checkIn);

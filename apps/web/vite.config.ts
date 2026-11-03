@@ -12,5 +12,5 @@ const serviceWorker = (): Plugin => ({
   generateBundle(_, bundle) { this.emitFile({ type: "asset", fileName: "sw.js", source: swSource(swFiles(Object.keys(bundle))) }); },
 });
 
-export default defineConfig({ define: { __APP_VERSION__: JSON.stringify(version) }, // US-38
+export default defineConfig({ define: { __APP_VERSION__: JSON.stringify(version), __APP_BUILD__: JSON.stringify(process.env.APP_BUILD ?? "") }, // US-38; US-42: set by deploy.sh
   plugins: [react(), tailwindcss(), serviceWorker()], server: { proxy: { "/api": process.env.TRIP_API_URL ?? "http://localhost:8787" } } });

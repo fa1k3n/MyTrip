@@ -2,6 +2,12 @@
 import { sv } from "./sv.ts";
 declare const __APP_VERSION__: string | undefined;
 export const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+declare const __APP_BUILD__: string | undefined;
+/** The deploy's build id, the platform's commit; empty when not built by the deploy (US-42). */
+export const APP_BUILD = typeof __APP_BUILD__ === "string" ? __APP_BUILD__ : "";
+/** The version with the build id as semver build metadata, "0.2.0+1bca182a" (US-42). */
+export const fullVersion = (version: string, build: string) => (build ? `${version}+${build}` : version);
+export const APP_FULL_VERSION = fullVersion(APP_VERSION, APP_BUILD);
 
 /** US-41: the changelog with all that is new, in the public repository. */
 export const CHANGELOG_URL = "https://github.com/fa1k3n/MyTrip/blob/main/CHANGELOG.md";

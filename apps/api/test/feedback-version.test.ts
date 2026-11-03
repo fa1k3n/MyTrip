@@ -23,3 +23,13 @@ test("US-38 notes carry the version", async () => {
   const notes = await json(call(app, "/api/feedback", { cookie: admin }));
   assert.deepEqual(notes.map((n: { text: string; version?: string }) => [n.text, n.version]), [["Fin app", "0.2.0"], ["Hej", undefined]]);
 });
+
+// REQ: US-42 a note keeps the version with its build id
+test("US-42 notes carry the build id", async () => {
+  const app = createApp(memoryStore([]), tokens, { auth, now: () => new Date("2026-11-03T10:00:00Z") });
+  const admin = cookieOf(await call(app, "/api/login", { method: "POST", body: { password: auth.adminPassword } }));
+  const { user, setup: s } = await json(call(app, "/api/users", { method: "POST", cookie: admin, body: { name: "Olle", email: "olle@example.org" } }));
+  const olle = cookieOf(await call(app, "/api/setup", { method: "POST", body: { user: user.id, secret: s.secret, password: "ett långt lösenord", consent: true } }));
+  await call(app, "/api/feedback", { method: "POST", cookie: olle, body: { text: "Fin app", page: "up", version: "0.2.0+1bca182a" } });
+  assert.equal((await json(call(app, "/api/feedback", { cookie: admin })))[0].version, "0.2.0+1bca182a");
+});

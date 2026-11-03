@@ -72,9 +72,10 @@ The trip is new and nearly empty. Give it a short Swedish title. Add the travele
 use names only when the description gives them, otherwise names like "Vuxen 1" or "Barn (7 år)".
 Add every person the description names, and as many more as it counts without names: "Erik och Anna åker med sina tre barn" gives
 Erik, Anna, Barn 1, Barn 2 and Barn 3 (with the age in the name when given, as "Barn (7 år)").
-When the trip already has a traveler r1, that is the one who wrote the description: when the description includes the writer ("vi", "jag", "oss",
-or a person it names as a traveler shown only as "resenär"), r1 is that person, so add only the others: "Vi är två vuxna" adds one more adult.
-Never add r1 again and never remove it (AI-94). Place the trip in time: use <today> to turn
+When the trip already has a traveler r1, that is the one who wrote the description, whose own name is shown only as "resenär".
+Every name written in the description is another traveler, never r1: add them all. r1 counts as one of the travelers only where the description
+says "vi", "jag" or "oss", or "resenär" stands for a name: "Vi är två vuxna" adds one more adult, "resenär och Anna" adds Anna,
+and "Erik och Anna åker med sina tre barn" adds all five and keeps r1. Never add r1 again and never remove it (AI-94). Place the trip in time: use <today> to turn
 "höstlovet", "i sommar" or a week number into real dates in the future, and pick a sensible length when none is given.
 Add one day per date with where it is spent, and the legs between places with their means of transport.
 Respect limits the description gives, such as hours of travel or driving per day, and mention them in the day's summary.

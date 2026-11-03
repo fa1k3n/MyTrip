@@ -82,3 +82,10 @@ test("AI-94 the draft keeps the creator and adds the others", async () => {
   assert.ok(!sent.join("").includes("Olle"), "the creator's name never reaches the AI service (AI-04)");
   assert.match(FEATURES.draft!.instructions, /r1/); // the AI is told that r1 wrote the description
 });
+
+// REQ: AI-94 a name written in the description is never the creator: "Erik och Anna åker med sina tre barn" adds all five
+test("AI-94 the draft never takes a named person for the creator", () => {
+  const text = FEATURES.draft!.instructions;
+  assert.match(text, /Every name written in the description is another traveler/);
+  assert.match(text, /Erik och Anna åker med sina tre barn" adds all five and keeps r1/);
+});

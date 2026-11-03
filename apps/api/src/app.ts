@@ -519,7 +519,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
 
   app.get("/api/me", async (c) => {
     const u = c.get("user");
-    if (u) return c.json({ role: c.get("role"), user: { id: u.id, name: u.name, superuser: u.superuser }, trips: await membersOf(u), consent: !!u.consentAt }); // US-22, US-23, US-26
+    if (u) return c.json({ role: c.get("role"), user: { id: u.id, name: u.name, superuser: u.superuser }, trips: await membersOf(u), consent: !!u.consentAt }); // US-22, US-40, US-26
     return c.json(!scoped(c) ? { role: c.get("role") }
       : { role: c.get("role"), tripId: c.get("tripId"), ...(c.get("travelerId") ? { travelerId: c.get("travelerId") } : {}) });
   });
@@ -578,13 +578,15 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const b = await c.req.json<{ title?: string; purpose?: string }>().catch(() => ({ title: undefined, purpose: undefined }));
     const title = b.title?.trim();
     if (!title) return c.json({ error: "title required" }, 400);
+    const creator = c.get("user") ?? (c.get("role") === "admin" ? firstSuper(await store.users()) : undefined); // US-13, US-18
+    const first = creator?.name.trim().split(/\s+/)[0]; // US-39: the creator is the first traveler, a Planerare tied to the account
     const trip = Trip.parse({
       id: `${slug(title)}-${crypto.randomUUID().slice(0, 6)}`, revision: 1, title, purpose: b.purpose ?? "", timezone: "Europe/Stockholm",
-      stops: [], days: [], places: [], bookings: [], tasks: [], travelers: [],
+      stops: [], days: [], places: [], bookings: [], tasks: [], travelers: first ? [{ id: slug(first), name: first, packing: [] }] : [],
     });
+    if (creator && first) await store.savePersonLinks([...await store.personLinks(), { tripId: trip.id, travelerId: slug(first), role: "planner", secret: newSecret(), account: creator.email }]);
     await store.save(trip);
-    const owner = c.get("user")?.id ?? (c.get("role") === "admin" ? firstSuper(await store.users())?.id : undefined); // US-13, US-18
-    if (owner) await store.saveOwner(trip.id, owner);
+    if (creator) await store.saveOwner(trip.id, creator.id);
     await store.appendLog({ at: new Date().toISOString(), tripId: trip.id, actor: c.get("user")?.name ?? "user", reason: "create", ops: [] });
     return c.json(trip, 201);
   });
@@ -1115,8 +1117,12 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   /** Every id in the trip, so a suggestion gets one of its own (DM-09). */
   const allIds = (t: Trip) => [...t.days, ...t.places, ...t.bookings, ...t.tasks, ...t.travelers, ...t.dreams, ...t.budget, ...t.expenses, ...t.payments, ...t.info,
     ...t.days.flatMap((d) => d.activities)].map((x) => x.id);
-  /** A trip with nothing in it yet but its title and purpose, which an AI draft may fill at once (AI-78). */
-  const isEmptyTrip = (t: Trip) => [t.travelers, t.days, t.stops, t.bookings, t.tasks, t.dreams, t.expenses, t.places].every((x) => !x.length);
+  /** A trip with nothing in it yet but its title, purpose and creator, which an AI draft may fill at once (AI-78, AI-94). */
+  const isEmptyTrip = async (t: Trip) => {
+    const users = await store.users(), ownerId = (await store.owners())[t.id] ?? firstSuper(users)?.id, owner = users.find((u) => u.id === ownerId);
+    const creator = (await people(t.id)).find((l) => owner && l.account === owner.email)?.travelerId;
+    return t.travelers.every((x) => x.id === creator && !x.packing.length) && [t.days, t.stops, t.bookings, t.tasks, t.dreams, t.expenses, t.places].every((x) => !x.length);
+  };
   /** Who may start AI on a trip: those who plan it, with AI allowed for their account (AI-65, US-16). */
   const mayStart = (c: Context<Env>) => { const u = c.get("user"); return manager(c) && (!u || u.superuser || u.ai); };
   // AI-68, AI-72: the trip's helpers: whether each can run and is on, its latest run and about how many runs are left.
@@ -1167,7 +1173,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ applied: { ...rest, ...(info ? { info } : {}), ...(packing ? { packing } : {}) }, proposalIds: r.proposalIds, reason: r.reason, ...("memoriesFrom" in r ? { memoriesFrom: r.memoriesFrom } : {}) });
     }
     const [pid] = r.proposalIds;
-    if (f.applyToNew && pid && isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip
+    if (f.applyToNew && pid && await isEmptyTrip(t)) { // AI-78: pressing "Skapa med AI" approved the draft of the new trip
       const p = (await store.proposals(t.id)).find((x) => x.id === pid)!;
       const done = await apply(t, p.ops, `ai (${actorName(c, t)})`, p.reason || "ai draft");
       if ("revision" in done) {

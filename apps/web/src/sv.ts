@@ -122,7 +122,7 @@ export const sv = {
     usage: "Användning (beta)", usageLead: "Per resa: vilka som är aktiva, hur många dagar de öppnat varje sida, Uppleva under resans dagar och antal ändringar. Bara konton som godkänt betan räknas.",
     noUsage: "Ingen användning än.", upDuring: "Uppleva under resan", changes: "ändringar", memories: (n: number) => `${n} betyg i Minnas`, days: "dagar",
   },
-  roles: { owner: "Skapare", planner: "Planerare", traveler: "Resenär", by: (n: string) => `Skapad av ${n}` }, // US-23, US-24
+  roles: { owner: "Skapare", planner: "Planerare", traveler: "Resenär", by: (n: string) => `Skapad av ${n}` }, // US-40, US-24
   fullApp: "Öppna hela appen i Safari", pagesLabel: "Sidor", // PW-24
   installHint: "Lägg appen på hemskärmen, så fungerar den också utan nät: tryck på ⋯ och Dela (eller på Dela-knappen), välj Lägg till på hemskärmen och slå på Öppna som webbapp.", // PW-12
   notice: { // NT-01..NT-05: the texts of notices, also used by the server

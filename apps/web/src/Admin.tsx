@@ -385,7 +385,7 @@ function Invite({ t, x, to, ready, mark, children }: { t: Trip; x: Trip["travele
   </div>;
 }
 
-/** The role icons of US-23 for the permission toggle. */
+/** The role icons of US-40 for the permission toggle. */
 const ROLE_ICON = { traveler: "luggage", planner: "compass" } as const;
 /** AU-41: the permissions as three switches, each saved at once on the latest trip; a trip with permissions the switches cannot give
  * says so until a switch is changed. */

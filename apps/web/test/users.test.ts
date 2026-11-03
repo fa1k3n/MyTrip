@@ -40,8 +40,8 @@ test("US-14 the owner has full rights on the trip without being the superuser", 
   assert.equal(permsFor("account", {}).scoped, false); // a user has the start page
 });
 
-// REQ: US-23 US-24 role icons on the trip cards
-test("US-23 US-24 the role icons of a trip card", () => {
+// REQ: US-40 US-24 role icons on the trip cards
+test("US-40 US-24 the role icons of a trip card", () => {
   assert.deepEqual(roleIcons(me, "egen"), ["owner", "traveler"]);
   assert.deepEqual(roleIcons(me, "berlin"), ["planner"]);
   assert.deepEqual(roleIcons(me, "nope"), []);

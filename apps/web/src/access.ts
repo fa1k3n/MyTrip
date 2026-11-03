@@ -61,7 +61,7 @@ export const whoChip = (me: Me) => ("user" in me ? me.user.name : sv.admin);
  * landing page's login icon), a password link (#u=), Google's answer (#login=…), #admin; so does a link that no longer works. */
 export const landsOnAbout = (hash: string, hadLink: boolean, admin: boolean) => !hadLink && !admin && (hash === "" || hash === "#");
 export const ABOUT_PAGE = "/om.html";
-/** The user's roles on a trip, as icons on its card on Drömmar (US-23). */
+/** The user's roles on a trip, as icons on its card on Drömmar (US-40). */
 export const roleIcons = (me: Me, tripId: string) => ("user" in me ? me.trips[tripId]?.roles ?? [] : []);
 /** The password link of an account (US-04): the secret after #, as for the share links. */
 export const setupUrl = (origin: string, user: string, secret: string) => `${origin}/#u=${user}.${secret}`;

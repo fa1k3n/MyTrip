@@ -60,7 +60,7 @@ export function memberships(u: User, users: User[], trips: { id: string; travele
     const owner = owners[t.id] ?? first, own = owner === u.id;
     const tie = people.find((l) => l.tripId === t.id && l.account === u.email && t.travelers.some((x) => x.id === l.travelerId));
     if (!u.superuser && !own && !tie) continue;
-    const roles: Membership["roles"] = [...(own ? ["owner" as const] : []), ...(tie ? [own ? "traveler" as const : tie.role] : [])];
+    const roles: Membership["roles"] = [...(own ? ["owner" as const] : []), ...(tie ? [tie.role] : [])];
     const ownerName = !own && u.superuser ? users.find((x) => x.id === owner)?.name : undefined;
     out[t.id] = { role: u.superuser ? "admin" : own ? "owner" : tie!.role, roles, ...(tie ? { travelerId: tie.travelerId } : {}), ...(ownerName ? { owner: ownerName } : {}) };
   }

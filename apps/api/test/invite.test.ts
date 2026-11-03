@@ -98,7 +98,7 @@ test("US-36 login status per traveler", async () => {
   const status = async () => Object.fromEntries((await (await call(app, `/api/trips/${tripId}/people`, { cookie: olle })).json())
     .map((l: { travelerId: string; login: string }) => [l.travelerId, l.login]));
   await tie("anna", null); await tie("bo", "bo@example.org");
-  assert.deepEqual(await status(), { anna: undefined, bo: "none" }); // no address, no status
+  assert.deepEqual(await status(), { olle: "active", anna: undefined, bo: "none" }); // no address, no status; olle is the creator (US-39)
   const { user, setup: link } = await (await invite("bo")).json();
   assert.equal((await status()).bo, "invited");
   await call(app, "/api/setup", { method: "POST", body: { user, secret: link.secret, password: PW } });

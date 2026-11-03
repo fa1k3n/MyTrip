@@ -308,7 +308,7 @@ test("US-18 the admin password still works and its new trips belong to the first
   assert.deepEqual(await json(call(app, "/api/me", { cookie: admin })), { role: "admin" });
   const eva = await account(app, admin, "Eva", "eva@example.org");
   const made = await json(call(app, "/api/trips", { method: "POST", cookie: admin, body: { title: "Ny" } }));
-  assert.deepEqual((await json(call(app, "/api/me", { cookie: eva.cookie }))).trips[made.id].roles, ["owner"]);
+  assert.deepEqual((await json(call(app, "/api/me", { cookie: eva.cookie }))).trips[made.id].roles, ["owner", "planner"]); // Eva, the first superuser, is also its first traveler (US-39)
 });
 
 /** Ties a traveler of a trip to an address, as the trip's settings do (US-21). */
@@ -351,17 +351,6 @@ test("US-22 a user tied to a traveler gets the trip as that traveler, with its p
   assert.equal((await call(app, "/api/trips/berlin/changes", { method: "POST", cookie: anna.cookie, body: { baseRevision: 2, ops: [{ op: "set", path: "purpose", value: "x" }] } })).status, 200);
   await tie(app, admin, "berlin", "anna", null);
   assert.deepEqual(await tripIds(app, anna.cookie), []); // untied: the trip is gone for her
-});
-
-// REQ: US-22 US-23 an owner tied to a traveler of their own trip keeps the owner's rights and shows both roles
-test("US-22 US-23 an owner who travels on their own trip is Skapare and Resenär", async () => {
-  const { app, admin } = await setup();
-  await account(app, admin, "Eva", "eva@example.org");
-  const olle = await account(app, admin, "Olle", "olle@example.org");
-  const made = await json(call(app, "/api/trips", { method: "POST", cookie: olle.cookie, body: { title: "Olles resa" } }));
-  await call(app, `/api/trips/${made.id}/changes`, { method: "POST", cookie: olle.cookie, body: { baseRevision: 1, ops: [{ op: "add", path: "travelers/-", value: { id: "olle", name: "Olle", packing: [] } }] } });
-  assert.equal((await tie(app, olle.cookie, made.id, "olle", "olle@example.org", "planner")).ok, true);
-  assert.deepEqual((await json(call(app, "/api/me", { cookie: olle.cookie }))).trips[made.id], { role: "owner", roles: ["owner", "traveler"], travelerId: "olle" });
 });
 
 // REQ: US-20 accounts are kept apart from the trips and the log

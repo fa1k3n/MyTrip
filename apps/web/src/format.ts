@@ -157,6 +157,11 @@ export function inviteMail(x: { to: string; name: string; trip: string; url: str
   const q = (v: string) => encodeURIComponent(v);
   return `mailto:${q(x.to)}?subject=${q(sv.invite.subject(x.trip))}&body=${q(sv.invite.body(x.name, x.trip, x.url, x.until))}`;
 }
+/** US-37: the mail to someone who already has an account: they are on the trip, with the login page and no password. */
+export function addedMail(x: { to: string; name: string; trip: string; url: string }) {
+  const q = (v: string) => encodeURIComponent(v);
+  return `mailto:${q(x.to)}?subject=${q(sv.invite.addedSubject(x.trip))}&body=${q(sv.invite.addedBody(x.name, x.trip, x.url))}`;
+}
 /** AI-91: the earlier trips whose memories the wish helper used, as one line; empty when none. */
 export function memoriesLine(titles: string[]) {
   if (!titles.length) return "";

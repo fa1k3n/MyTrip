@@ -1,10 +1,10 @@
 // The trip's settings page, the admin login and the share link. Loaded on demand (PF-01).
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, installed, type PersonLinkInfo, type SetupLink } from "./api.ts";
+import { api, ApiError, installed, type PersonLinkInfo } from "./api.ts";
 import { customAccess, linkFromText, missingLinks, permSwitches, personUrl, setupUrl, shareUrl, switchAccess, type PermSwitches } from "./access.ts";
 import { renameTraveler, tripRange } from "./edit.ts";
-import { inviteMail, travelerLine, tripDates } from "./format.ts";
+import { addedMail, inviteMail, travelerLine, tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { Icon, IconButton } from "./Icons.tsx";
@@ -348,27 +348,33 @@ function TravelerDialog({ t, x, link, put, mark, share, run, invite, close }: { 
 
 const until = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
 const validAddress = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-/** US-30, US-31: the address field with Bjud in beside it: an account and a password link to mail, copy or show, also anew for an
- * account that never logged in. */
+/** US-30, US-31, US-37: the address field with Bjud in beside it: an account and a password link to mail, copy or show, also anew for
+ * an account that never logged in; for an account that can already log in, the login page to mail, copy or show; a disabled one is said. */
+type Sent = { kind: "setup"; url: string; until: string } | { kind: "added"; url: string } | { kind: "disabled" };
 function Invite({ t, x, to, ready, mark, children }: { t: Trip; x: Trip["travelers"][number]; to: string; ready: () => Promise<boolean>; mark: (login: Login) => void; children: ReactNode }) {
-  const [got, setGot] = useState<{ user: string; setup: SetupLink } | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState<Sent | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
   const go = async () => {
     if (!(await ready())) return;
+    setNote(""); setCopied(false);
     try {
       const r = await api.invite(t.id, x.id);
-      if ("setup" in r) { setGot(r); setNote(""); setCopied(false); mark("invited"); return; }
-      setNote(svAdmin.people.hasAccount(x.name)); mark("active");
-    } catch { setNote(svAdmin.people.inviteFailed); }
+      if ("setup" in r) { setSent({ kind: "setup", url: setupUrl(location.origin, r.user, r.setup.secret), until: until(r.setup.expires) }); mark("invited"); }
+      else setSent(r.disabled ? { kind: "disabled" } : { kind: "added", url: `${location.origin}/#login` }); // the status came with the saved address (US-36)
+    } catch { setSent(null); setNote(svAdmin.people.inviteFailed); }
   };
-  const url = got && setupUrl(location.origin, got.user, got.setup.secret);
-  const copy = async () => { try { await navigator.clipboard.writeText(url!); setCopied(true); } catch { /* no clipboard */ } };
+  const url = sent && sent.kind !== "disabled" ? sent.url : "";
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); } catch { /* no clipboard */ } };
+  const [mailHref, mailLabel, copyLabel] = sent?.kind === "setup"
+    ? [inviteMail({ to, name: x.name, trip: t.title, url, until: sent.until }), svAdmin.people.mail(x.name), svAdmin.people.copyInvite(x.name)]
+    : [addedMail({ to, name: x.name, trip: t.title, url }), svAdmin.people.mailAdded(x.name), svAdmin.people.copyLogin];
   return <div className="invite">
     <div className="row mid">{children}<IconButton icon="mail" tip="left" label={svAdmin.people.invite(x.name)} disabled={!to} onClick={() => go()} /></div>
-    {got && url && <div className="setuplink" role="status">
-      <p>{svAdmin.people.invited(x.name, until(got.setup.expires))}</p>
+    {sent?.kind === "disabled" && <p className="ro" role="status">{svAdmin.people.disabled(x.name)}</p>}
+    {url && <div className="setuplink" role="status">
+      <p>{sent?.kind === "setup" ? svAdmin.people.invited(x.name, sent.until) : svAdmin.people.hasAccount(x.name)}</p>
       <span className="end">
-        <a className="btn ghost icon bare tip-left" href={inviteMail({ to, name: x.name, trip: t.title, url, until: until(got.setup.expires) })} aria-label={svAdmin.people.mail(x.name)} data-tip={svAdmin.people.mail(x.name)}><Icon name="mail" /></a>
-        <IconButton icon="copy" look="bare" tip="left" label={svAdmin.people.copyInvite(x.name)} onClick={copy} />
+        <a className="btn ghost icon bare tip-left" href={mailHref} aria-label={mailLabel} data-tip={mailLabel}><Icon name="mail" /></a>
+        <IconButton icon="copy" look="bare" tip="left" label={copyLabel} onClick={copy} />
         <IconButton icon="qr" look="bare" tip="left" label={svAdmin.qr.show(x.name)} onClick={() => setQr(true)} />
       </span>
       {copied && <p className="ro">{svAdmin.people.copied2}</p>}

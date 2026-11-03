@@ -1223,7 +1223,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ user: id, setup: await newSetup(made) }, 201);
     }
     if (!u.superuser && !u.disabled && !u.passwordHash && !u.googleId) return c.json({ user: u.id, setup: await newSetup(u) });
-    return c.json({ exists: true }); // a forgotten password is mailed (US-35)
+    return c.json(u.disabled ? { exists: true, disabled: true } : { exists: true }); // US-37; a forgotten password is mailed (US-35)
   });
   app.post("/api/users", async (c) => {
     const b = await c.req.json<{ name?: unknown; email?: unknown }>().catch(() => ({} as { name?: unknown; email?: unknown }));

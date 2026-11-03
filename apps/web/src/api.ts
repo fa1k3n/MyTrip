@@ -264,7 +264,7 @@ export const api = {
   setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"], account?: string | null) => // account left out: kept (US-21)
     call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify(account === undefined ? { role } : { role, account }) }),
   invite: (id: string, travelerId: string) => // US-30
-    call<{ user: string; setup: SetupLink } | { exists: true }>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/invite`, { method: "POST" }),
+    call<{ user: string; setup: SetupLink } | { exists: true; disabled?: true }>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/invite`, { method: "POST" }),
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => kept<Trip[]>("trips", "/api/trips"),

@@ -106,3 +106,14 @@ test("US-36 login status per traveler", async () => {
   await call(app, `/api/users/${user}`, { method: "PATCH", cookie: admin, body: { disabled: true } });
   assert.equal((await status()).bo, "disabled");
 });
+
+// REQ: US-37 an invitation that finds a disabled account says so; one that can log in only says it exists
+test("US-37 a disabled account is told apart", async () => {
+  const { app, admin, tie, invite } = await setup();
+  await tie("bo", "bo@example.org");
+  const { user, setup: link } = await (await invite("bo")).json();
+  await call(app, "/api/setup", { method: "POST", body: { user, secret: link.secret, password: PW } });
+  assert.deepEqual(await (await invite("bo")).json(), { exists: true });
+  await call(app, `/api/users/${user}`, { method: "PATCH", cookie: admin, body: { disabled: true } });
+  assert.deepEqual(await (await invite("bo")).json(), { exists: true, disabled: true });
+});

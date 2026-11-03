@@ -1,7 +1,7 @@
 // UI-19, UI-23: makes the narration of a film with ElevenLabs, one MP3 per scene: Om Basläger (public/om.html) into public/om-audio/,
-// or with the argument "ai" the AI film (public/ai.html) into public/ai-audio/.
+// or with the film's name (ai, nala, installningar) that film's page into public/<name>-audio/.
 // The key is read from the environment and never written anywhere; it lives in .env.local at the root of the private repo:
-//   node --env-file=../../../.env.local om-voice.mjs [ai]
+//   node --env-file=../../../.env.local om-voice.mjs [ai|nala|installningar]
 // Without ELEVENLABS_VOICE it lists the voices of the account. A text already recorded with the same voice is reused, also when
 // the scene has moved, so only new or changed texts cost characters.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -22,7 +22,7 @@ if (!voice) {
 }
 
 const film = process.argv[2] ?? "om";
-if (!/^[a-z]+$/.test(film)) { console.error("Filmens namn: om eller ai."); process.exit(1); }
+if (!/^[a-z]+$/.test(film)) { console.error("Filmens namn: om, ai, nala eller installningar."); process.exit(1); }
 const page = readFileSync(new URL(`./public/${film}.html`, import.meta.url), "utf8");
 const texts = [...page.matchAll(/^ {4}text: "((?:[^"\\]|\\.)*)",$/gm)].map((m) => JSON.parse(`"${m[1]}"`));
 if (!texts.length) { console.error(`Hittade inga scener i public/${film}.html.`); process.exit(1); }

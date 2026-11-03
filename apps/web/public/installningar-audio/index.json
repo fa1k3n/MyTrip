@@ -1,0 +1,50 @@
+{
+  "voice": "kpTdKfohzvarfFPnwuHW",
+  "model": "eleven_v4",
+  "scenes": [
+    {
+      "file": "01.mp3",
+      "text": "Kugghjulet i resan öppnar Resans inställningar. Där bestämmer Anna vilka som är med, vad de får se och hur de kommer in."
+    },
+    {
+      "file": "02.mp3",
+      "text": "Överst står resans namn, datum, maxbudget och länken till ert delade album, med en liten rubrik över varje värde. Pennan till höger ändrar."
+    },
+    {
+      "file": "03.mp3",
+      "text": "Under Vilka som är med har varje person en rad. Terrakotta är Planerare, som får ändra allt, och grönt är Resenär. Under namnet står om personen är inbjuden, och sist kommer raden Följare."
+    },
+    {
+      "file": "04.mp3",
+      "text": "För att bjuda in Erik trycker Anna på kuvertet på hans rad. Då öppnas hans dialog vid Inloggning, och hon skriver hans mejladress i fältet."
+    },
+    {
+      "file": "05.mp3",
+      "text": "Sen trycker Anna på kuvertet bredvid adressen. Erik får ett konto och en lösenordslänk, som Anna skickar med telefonens mejlapp, kopierar eller visar som QR-kod. Erik öppnar länken och väljer ett lösenord."
+    },
+    {
+      "file": "06.mp3",
+      "text": "På Eriks rad står nu Inbjuden, har inte loggat in. När han har valt sitt lösenord står det Har konto, och sen ser han resan varje gång han loggar in, på telefonen eller datorn."
+    },
+    {
+      "file": "07.mp3",
+      "text": "Glömmer Erik lösenordet trycker han på Glömt lösenordet? på inloggningen och skriver sin mejladress. Då får han en ny länk med mejl och väljer ett nytt lösenord, utan att Anna behöver göra något."
+    },
+    {
+      "file": "08.mp3",
+      "text": "Mia är för liten för ett eget konto. Anna stänger av Delar på kostnader, så delar Mia inte på gemensamma utlägg. Längst ner finns Mias personliga länk, som Anna visar som QR-kod och skannar med Mias surfplatta."
+    },
+    {
+      "file": "09.mp3",
+      "text": "Farmor följer inte med men vill se hur det går. På raden Följare finns resans följarlänk. Den som har den ser dagarna men aldrig bokningsnummer. Har länken spridits för långt byter Anna den, och den gamla slutar fungera direkt."
+    },
+    {
+      "file": "10.mp3",
+      "text": "Under Behörigheter finns tre reglage. Ser resenärerna pengar och får lägga till utlägg? Får de önska och rösta? Och ska Följare se hela planen eller bara dagarna? Planerare kan alltid allt."
+    },
+    {
+      "file": "11.mp3",
+      "text": "Resans inkorg är en egen mejladress. Bokningsbekräftelser och tips som mejlas dit blir förslag i resan. Nu är alla med, och höstlovet i Hamburg kan börja."
+    }
+  ]
+}

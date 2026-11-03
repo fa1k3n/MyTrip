@@ -27,8 +27,10 @@ export const svAdmin = {
     invite: (n: string) => `Bjud in ${n}`, // US-30, US-31
     invited: (n: string, d: string) => `Inbjudan för ${n} är klar. Länken gäller till ${d}.`,
     mail: (n: string) => `Mejla inbjudan till ${n}`, copyInvite: (n: string) => `Kopiera inbjudningslänken för ${n}`, copied2: "Kopierad.",
-    hasAccount: (n: string) => `${n} har redan ett konto och ser resan när hen loggar in. Har hen glömt lösenordet finns "Glömt lösenordet?" på inloggningen.`,
+    hasAccount: (n: string) => `${n} har redan ett konto och ser resan när hen loggar in. Skicka gärna ett meddelande om att hen är med.`,
     inviteFailed: "Inbjudan gick inte att göra. Försök igen.",
+    mailAdded: (n: string) => `Mejla ${n} att hen är med`, copyLogin: "Kopiera länken till inloggningen", // US-37
+    disabled: (n: string) => `Kontot för ${n} är avstängt. Den som sköter Basläger kan öppna det igen.`,
   },
   inbox: { // BK-26
     title: "Resans inkorg", replace: "Byt adress", copy: "Kopiera adressen", copied: "Kopierad.",

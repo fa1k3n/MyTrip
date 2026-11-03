@@ -291,6 +291,9 @@ export const sv = {
     subject: (trip: string) => `Inbjudan till ${trip} i Basläger`,
     body: (name: string, trip: string, url: string, until: string) =>
       `Hej ${name}!\n\nDu är inbjuden till ${trip} i Basläger. Öppna länken, välj ett lösenord och logga in, så ser du resan:\n\n${url}\n\nLänken gäller till ${until}. Lägg gärna till Basläger på hemskärmen efteråt, så har du resan i telefonen även utan nät.`,
+    addedSubject: (trip: string) => `Du är med i ${trip} i Basläger`, // US-37: an account that can already log in
+    addedBody: (name: string, trip: string, url: string) =>
+      `Hej ${name}!\n\nDu är med i ${trip} i Basläger. Logga in som vanligt, så ser du resan:\n\n${url}\n\nHar du glömt lösenordet finns "Glömt lösenordet?" på inloggningen.`,
   },
   prevDay: "Föregående dag", nextDay: "Nästa dag",
   gap: "Lucka", clash: "Krock", moveActivity: "Flytta", moveHint: "Dra för att flytta, eller använd piltangenterna", dropHere: "Släpp en aktivitet här",

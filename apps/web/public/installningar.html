@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<!-- UI-31: Resans inställningar, a film in the player and style of Om Basläger (UI-13) on the trip settings and how travelers are invited. Fictional family; loads nothing from other sites (SP-07). -->
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bjud in till resan</title>
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#F5F2EB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1F1D1B" media="(prefers-color-scheme: dark)">
+<style>
+/* Layout: the film plays like an embedded video (UI-17): a 16:9 frame, controls over its lower edge, chapters in a drawer. */
+:root{
+  --bg:#F5F2EB; --card:#fff; --ink:#2C2A29; --mute:#6B6560; --acc:#C87A53; --acct:#9A4F2B; --sage:#7A9A82; --sageT:#3F6249; --line:#E4DED2; --sky:#EFE7D9;
+  --display:Fraunces,Georgia,serif; --body:"Instrument Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1F1D1B;--card:#2A2826;--ink:#F3EFE8;--mute:#B5ADA3;--acct:#E0A27F;--sageT:#A5C4AC;--line:#3E3A36;--sky:#26231F;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1F1D1B;--card:#2A2826;--ink:#F3EFE8;--mute:#B5ADA3;--acct:#E0A27F;--sageT:#A5C4AC;--line:#3E3A36;--sky:#26231F;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body)}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* UI-20: the landing page for visitors, with a small login icon at the top right */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font:700 1.5rem var(--display);color:var(--ink);text-decoration:none}
+.login{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.login svg{width:20px;height:20px}
+.login:hover{border-color:var(--acc);color:var(--acct)}
+.logo:focus-visible,.login:focus-visible{outline:3px solid var(--sage);outline-offset:2px;border-radius:12px}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:clamp(1.6rem,4vw,2.3rem)}
+.kick{color:var(--mute);font-size:.95rem;margin:0}
+.roles{display:flex;gap:14px;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.roles li{display:flex;align-items:center;gap:8px;font-size:.95rem}
+.mark{display:inline-flex;width:30px;height:30px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid var(--acc);color:var(--acct);background:color-mix(in srgb,var(--acc) 16%,var(--card))}
+.mark.s{border-color:var(--sage);color:var(--sageT);background:color-mix(in srgb,var(--sage) 18%,var(--card))}
+.mark.f{border-color:var(--line);color:var(--mute);background:var(--card)}
+.mark svg{width:16px;height:16px}
+section h2{font-size:1.3rem;margin-bottom:6px}
+
+/* the player (UI-17) */
+.player{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:18px;overflow:hidden;background:var(--sky);box-shadow:0 2px 14px rgba(44,42,41,.08);
+  container-type:inline-size;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;--lift:62px}
+.player:focus-visible{outline:3px solid var(--sage);outline-offset:3px}
+.stage{position:absolute;inset:0;cursor:pointer}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.scene[hidden]{display:none}
+.player.paused .scene *{animation-play-state:paused!important}
+.player.idle,.player.idle .stage{cursor:none}
+/* UI-15: the player fills the screen, with the Fullscreen API where it exists, else (iPhone) the whole window */
+.player:fullscreen,.player.full{position:fixed;inset:0;z-index:20;width:100%;height:100%;max-width:none;aspect-ratio:auto;border-radius:0;box-shadow:none}
+.player:fullscreen .stage,.player.full .stage{inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.cap{position:absolute;left:50%;bottom:var(--lift);transform:translateX(-50%);width:max-content;max-width:min(92%,58ch);margin:0;padding:.28em .7em;border-radius:8px;
+  background:rgba(28,26,25,.78);color:#fff;font:500 clamp(12px,2.3cqi,22px)/1.38 var(--body);text-align:center;pointer-events:none;transition:bottom .2s}
+.cap:empty,.player.nocap .cap{display:none}
+.player.idle{--lift:14px}
+.bigplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:clamp(56px,11cqi,84px);height:clamp(56px,11cqi,84px);border-radius:50%;border:0;
+  background:var(--acc);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 24px rgba(44,42,41,.25)}
+.bigplay svg{width:42%;height:42%}
+.bigplay:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.flash{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(28,26,25,.55);color:#fff;display:grid;place-items:center;opacity:0;pointer-events:none}
+.flash svg{width:28px;height:28px}
+.flash.go{animation:flash .6s ease-out}
+@keyframes flash{from{opacity:1;transform:scale(.8)}to{opacity:0;transform:scale(1.25)}}
+.controls{position:absolute;left:0;right:0;bottom:0;padding:22px max(8px,env(safe-area-inset-right,0px)) max(4px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+  background:linear-gradient(transparent,rgba(28,26,25,.62));color:#fff;transition:opacity .25s}
+.player.idle .controls{opacity:0;pointer-events:none}
+.track{display:flex;gap:3px;padding:0 6px}
+.seg{position:relative;flex:1;height:18px;border:0;padding:0;background:transparent;cursor:pointer}
+.seg::before,.seg .fill{content:"";position:absolute;left:0;top:7px;height:4px;border-radius:2px}
+.seg::before{right:0;background:rgba(255,255,255,.38)}
+.seg .fill{background:var(--acc);width:0}
+.seg:hover::before,.seg:hover .fill{top:6px;height:6px}
+.seg:focus-visible{outline:2px solid #fff;outline-offset:1px;border-radius:3px}
+.row{display:flex;align-items:center;gap:2px}
+.cb{width:40px;height:40px;flex:none;border:0;border-radius:50%;background:transparent;color:#fff;display:grid;place-items:center;cursor:pointer}
+.cb svg{width:22px;height:22px}
+.cb:hover{background:rgba(255,255,255,.14)}
+.cb:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+#cc[aria-pressed="false"]{opacity:.55}
+.where{font:600 13px var(--body);margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+@container (max-width:520px){#prev,#next{display:none}.cb{width:36px;height:36px}.cb svg{width:20px;height:20px}}
+@container (max-width:360px){.where{visibility:hidden}}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:82%;overflow:auto;background:var(--card);color:var(--ink);border-radius:16px 16px 0 0;
+  padding:10px 12px max(12px,env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(0,0,0,.2);transform:translateY(100%);visibility:hidden;
+  transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s .28s}
+.drawer.open{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1)}
+.dhead{display:flex;align-items:center;justify-content:space-between;padding:0 4px 4px}
+.dhead h3{font-size:1.05rem}
+.dhead .cb{color:var(--ink)}.dhead .cb:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}.dhead .cb:focus-visible{outline-color:var(--sage)}
+.chaplist{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.chapbtn{display:grid;grid-template-columns:2rem 1fr;align-items:baseline;gap:4px 8px;width:100%;min-height:44px;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.chapbtn:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.chapbtn[aria-current="true"]{background:color-mix(in srgb,var(--sage) 22%,var(--card))}
+.chapbtn:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
+.chapbtn .n{font:700 1rem var(--display);color:var(--acct)}
+.chapbtn b{font-weight:700}.chapbtn small{grid-column:2;color:var(--mute);font-size:.85rem}
+
+/* the drawing */
+.ink{stroke:var(--ink);stroke-width:4;stroke-linecap:round;fill:none}
+.skin{fill:#EAD9C3}.eye{fill:#2C2A29}.smile{fill:none;stroke:#2C2A29;stroke-width:1.8;stroke-linecap:round}
+.leg{fill:var(--ink)}.arm{stroke-width:9;stroke-linecap:round;fill:none}
+.ground{stroke:var(--line);stroke-width:4}
+.lbl{font:600 15px var(--body);fill:var(--mute);text-anchor:middle}
+.big{font:700 64px var(--display);fill:var(--ink)}
+.mid{font:700 26px var(--display);fill:var(--ink)}
+.t{font:600 15px var(--body);fill:var(--ink)}
+.tm{font:600 13px var(--body);fill:var(--mute)}
+.card{fill:var(--card);filter:url(#soft)}
+.acc{fill:var(--acc)}.sage{fill:var(--sage)}
+.badge circle{stroke-width:2.5}
+.badge.o circle,.badge.p circle{fill:var(--card);stroke:var(--acc)}.badge.o path,.badge.p path,.badge.p circle.in{stroke:var(--acct)}
+.badge.r circle{fill:var(--card);stroke:var(--sage)}.badge.r path,.badge.r circle.in{stroke:var(--sageT)}
+.badge.f circle{fill:var(--card);stroke:var(--mute)}.badge.f path{stroke:var(--mute)}
+.badge path,.badge circle.in{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.heart{fill:var(--acc)}
+.dash{stroke:var(--mute);stroke-width:2.5;stroke-dasharray:6 7;fill:none}
+
+/* motion: every element rests in its final place; the animation only plays it in */
+@keyframes pop{from{transform:scale(0);opacity:0}70%{transform:scale(1.15);opacity:1}to{transform:scale(1)}}
+@keyframes drop{from{transform:translateY(-260px);opacity:0}to{transform:none;opacity:1}}
+@keyframes rise{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+@keyframes wave{0%,100%{transform:rotate(0)}50%{transform:rotate(-28deg)}}
+@keyframes fly{from{transform:translate(-330px,-120px) rotate(-20deg);opacity:0}20%{opacity:1}to{transform:none;opacity:1}}
+@keyframes move{0%,25%{transform:translate(-300px,0)}75%,100%{transform:none}}
+@keyframes ring{from{stroke-dashoffset:302}}
+@keyframes now{from{transform:translateY(-70px)}}
+@keyframes coin{0%{transform:translate(0,0) scale(.4);opacity:0}30%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+@keyframes orbit{to{transform:rotate(360deg)}}
+.on .pop{animation:pop .6s cubic-bezier(.3,1.4,.5,1) both;transform-box:fill-box;transform-origin:center}
+.on .drop{animation:drop .9s cubic-bezier(.22,1,.36,1) both}
+.on .rise{animation:rise .7s ease-out both}
+.on .wave{animation:wave 1.1s ease-in-out infinite;transform-box:view-box}
+.on .fly{animation:fly 1.6s cubic-bezier(.22,1,.36,1) both}
+.on .move{animation:move 3.4s ease-in-out both}
+@keyframes dragin{0%{transform:translate(240px,-40px) rotate(4deg);opacity:0}20%{opacity:1}100%{transform:none;opacity:1}}
+.on .slideup{animation:dragin 1.8s cubic-bezier(.22,1,.36,1) .3s both} /* an activity dragged into its place */
+@keyframes lift{0%,100%{transform:none}50%{transform:translate(-8px,-4px)}}
+.on .lift{animation:lift 1.1s ease-in-out .5s 2} /* a wish picked up */
+.on .ring{animation:ring 2.2s ease-out both}
+.on .now{animation:now 6s linear both}
+.on .coin{animation:coin 1.4s ease-out both}
+.on .orbit{animation:orbit 8s linear infinite;transform-box:view-box;transform-origin:400px 230px}
+/* UI-18: the figures breathe, blink, swing their arms, tilt their heads, walk in, hop, cheer and use their phones */
+@keyframes breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-1.5px) scaleY(1.03)}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes sway{0%,100%{transform:rotate(5deg)}50%{transform:rotate(-7deg)}}
+@keyframes tilt{0%,70%,100%{transform:rotate(0)}80%{transform:rotate(-7deg)}90%{transform:rotate(5deg)}}
+@keyframes walkin{from{transform:translateX(var(--from))}to{transform:none}}
+@keyframes step{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.on .idle{animation:breathe 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.on .eye{animation:blink 4.4s infinite;transform-box:fill-box;transform-origin:center}
+.on .sway{animation:sway 2.8s ease-in-out infinite;transform-box:view-box}
+.on .headg{animation:tilt 6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.on .walk{animation:walkin 1.9s cubic-bezier(.3,.7,.4,1) both}
+.on .walk .l1{animation:step .32s ease-in-out 6}
+.on .walk .l2{animation:step .32s ease-in-out .16s 6}
+@keyframes out{to{opacity:0;transform:scale(.9)}}
+.on .pop.out{animation:pop .6s cubic-bezier(.3,1.4,.5,1) both,out .4s ease-in forwards}
+@keyframes hop{0%,55%,100%{transform:translateY(0)}72%{transform:translateY(-12px)}}
+@keyframes cheer{0%,100%{transform:rotate(0)}50%{transform:rotate(12deg)}}
+@keyframes glow{0%,100%{opacity:.45}50%{opacity:1}}
+.on .hop{animation:hop 1.5s ease-in-out infinite}
+.on .cheer{animation:cheer .7s ease-in-out infinite;transform-box:view-box}
+.on .screen{animation:glow 1.1s ease-in-out infinite}
+.on .spin{animation:orbit 1.1s linear infinite;transform-box:fill-box;transform-origin:center}
+.plus{border:1.5px dashed var(--acc);border-radius:16px;padding:14px 16px;background:color-mix(in srgb,var(--acc) 7%,var(--card))}
+.plus p{margin:4px 0 0}.does{margin:0;padding-left:20px}.does li{margin:2px 0}
+/* UI-24: the films, as cards */
+.filmlist{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.film{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;padding:10px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);text-decoration:none;min-height:44px}
+a.film:hover{border-color:var(--acc)}a.film:focus-visible{outline:3px solid var(--sage);outline-offset:2px}
+.film .thumb{width:96px;height:54px;border-radius:8px;background:var(--sky)}
+.ftxt{display:grid;gap:2px}.ftxt b{font-family:var(--display)}.ftxt small{color:var(--mute);font-size:.85rem;line-height:1.4}
+.film.current{border-style:dashed;border-color:var(--sage)}.here{font-size:.8rem;font-weight:600;color:var(--sageT)}
+@media (prefers-reduced-motion:reduce){.on *{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="topbar">
+    <a class="logo" href="/">Basläger</a>
+    <a class="login" href="/#login" aria-label="Logga in" title="Logga in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></a>
+  </nav>
+  <header>
+    <h1>Bjud in till resan</h1>
+    <p class="kick">Resans inställningar: vilka som är med och vad de ser</p>
+  </header>
+
+  <div class="player paused" id="player" tabindex="0" aria-label="Filmen om resans inställningar och hur du bjuder in. Mellanslag spelar och pausar, pilarna byter kapitel.">
+    <div class="stage" id="stage" role="img" aria-label="Animerad film om hur resenärer bjuds in till en resa"></div>
+    <p class="cap" id="cap" aria-hidden="true"></p>
+    <p class="sr" id="said" aria-live="polite"></p>
+    <div class="flash" id="flash" aria-hidden="true"></div>
+    <button class="bigplay" id="bigplay" type="button" aria-label="Spela filmen"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg></button>
+    <div class="controls" id="controls">
+      <div class="track" id="track"></div>
+      <div class="row">
+        <button class="cb" id="play" type="button" aria-label="Spela"></button>
+        <button class="cb" id="prev" type="button" aria-label="Föregående kapitel"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="cb" id="next" type="button" aria-label="Nästa kapitel"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+        <button class="cb" id="voice" type="button" aria-pressed="false" hidden aria-label="Berättarröst"></button>
+        <span class="where" id="where"></span>
+        <button class="cb" id="cc" type="button" aria-pressed="true" aria-label="Undertexter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.5 10.2a2.4 2.4 0 1 0 0 3.6M17 10.2a2.4 2.4 0 1 0 0 3.6" stroke-linecap="round"/></svg></button>
+        <button class="cb" id="chapbtn" type="button" aria-expanded="false" aria-controls="drawer" aria-label="Kapitel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.6" y2="6"/><line x1="3.5" y1="12" x2="3.6" y2="12"/><line x1="3.5" y1="18" x2="3.6" y2="18"/></svg></button>
+        <button class="cb" id="full" type="button" aria-pressed="false" aria-label="Helskärm"></button>
+      </div>
+    </div>
+    <div class="drawer" id="drawer" role="dialog" aria-label="Kapitel">
+      <div class="dhead"><h3>Kapitel</h3><button class="cb" id="dclose" type="button" aria-label="Stäng kapitlen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <ol class="chaplist" id="chaplist"></ol>
+    </div>
+  </div>
+
+  <section>
+    <h2>Det här finns i Resans inställningar</h2>
+    <ul class="does">
+      <li>Resans namn, datum, maxbudget och delade album, var och en med en penna.</li>
+      <li>Vilka som är med: en rad per person med behörighet och om hen är inbjuden. Kuvertet på raden bjuder in med mejladress, och lösenordslänken skickas med din mejlapp, kopieras eller visas som QR-kod.</li>
+      <li>Har någon glömt lösenordet finns Glömt lösenordet? på inloggningen. Barn utan konto får en personlig länk.</li>
+      <li>Följarlänken för vänner som inte följer med, tre reglage för vad resenärer och följare ser, och resans inkorg för bokningar.</li>
+    </ul>
+  </section>
+  <section class="films" aria-labelledby="films-h">
+    <h2 id="films-h">Lär dig Basläger</h2>
+    <ul class="filmlist">
+      <li><a class="film" href="/om.html"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><path d="M38 46 L48 26 L58 46 Z" style="fill:var(--acc)"/><path d="M48 26 L45 46 L51 46 Z" style="fill:var(--acct)"/><g transform="translate(20 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(30 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(70 46) scale(0.75)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acct)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(80 46) scale(0.7)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Om Basläger</b><small>ca 3 min · Hur en resa går från dröm till minne: roller, Önska, Nåla, Uppleva och Minnas.</small></span></a></li>
+      <li><a class="film" href="/ai.html"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><path d="M38 46 L48 26 L58 46 Z" style="fill:var(--acc)"/><path d="M48 26 L45 46 L51 46 Z" style="fill:var(--acct)"/><path transform="translate(62 6) scale(.75)" d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z" fill="none" style="stroke:var(--acc)" stroke-width="2" stroke-linejoin="round"/><g transform="translate(22 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(74 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Skapa resan med AI</b><small>ca 2 min · Från några rader om er dröm till dagar, rutt och förslag som passar.</small></span></a></li>
+      <li><a class="film" href="/nala.html"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><rect x="30" y="14" width="30" height="26" rx="4" style="fill:var(--card)"/><rect x="34" y="19" width="22" height="4" rx="2" style="fill:var(--line)"/><rect x="34" y="27" width="22" height="4" rx="2" style="fill:var(--line)"/><path transform="translate(60 4) scale(.8)" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" fill="none" style="stroke:var(--acc)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><g transform="translate(18 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(78 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Så funkar Nåla</b><small>ca 3 min · Dagar och aktiviteter, att flytta och nåla fast, önskningar, bokningar och överraskningar.</small></span></a></li>
+      <li><div class="film current" aria-current="page"><svg class="thumb" viewBox="0 0 96 54" aria-hidden="true"><line x1="6" y1="46" x2="90" y2="46" style="stroke:var(--line)" stroke-width="2"/><g transform="translate(36 8) scale(.9)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--acc)"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g><g transform="translate(58 24) scale(.7)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--sageT)"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></g><g transform="translate(18 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--acc)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g><g transform="translate(82 46) scale(1)"><rect x="-5" y="-17" width="10" height="13" rx="5" style="fill:var(--sage)"/><circle cy="-21" r="4.5" style="fill:#EAD9C3"/><rect x="-4" y="-5" width="3" height="5" style="fill:var(--ink)"/><rect x="1" y="-5" width="3" height="5" style="fill:var(--ink)"/></g></svg><span class="ftxt"><b>Bjud in till resan</b><small>ca 3 min · Resans inställningar: bjud in resenärer, följarlänken, behörigheter och inkorgen.</small><span class="here">Den här filmen</span></span></div></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// Icons: Lucide (ISC) crown, compass, luggage, link, thumbs; "Igen" is two thumbs as in the app's Minnas.
+const THUMB = '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>';
+const ICON = {
+  crown: '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>',
+  compass: '<path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle class="in" cx="12" cy="12" r="10"/>',
+  luggage: '<path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"/><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14"/><path d="M10 20h4"/><circle class="in" cx="16" cy="20" r="2"/><circle class="in" cx="8" cy="20" r="2"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  ok: THUMB,
+  again: `<g transform="translate(8.2 -0.6) scale(.7)">${THUMB}</g><g transform="translate(-1 6.4) scale(.7)">${THUMB}</g>`,
+  never: '<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>',
+};
+const svgIcon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n].replace(' class="in"', "")}</svg>`;
+
+/** A role badge: a round mark with the role's icon, as on the trip cards. */
+const badge = (kind, x, y, delay = 0, r = 17) => {
+  const icon = { o: "crown", p: "compass", r: "luggage", f: "link" }[kind];
+  return `<g transform="translate(${x} ${y})"><g class="badge ${kind} pop" style="animation-delay:${delay}s"><circle r="${r}"/><g transform="translate(-10 -10) scale(.84)">${ICON[icon]}</g></g></g>`;
+};
+let figs = 0;
+/** A figure in soft shapes (style 1): a round body in the person's colour, a face, short legs; x on the ground y.
+ * o: scale, colour token, what the figure does (act: "wave", "reach", "point", "cheer" or "phone"), hopping, walking in from
+ * `walk` px, a name. Each figure moves a little out of step with the others (UI-18). */
+const fig = (x, y, o = {}) => {
+  const s = o.s ?? 1, c = `var(${o.c ?? "--acc"})`, d = ((figs++ * 0.71) % 2.6).toFixed(2);
+  const act = o.act ?? (o.wave ? "wave" : o.reach ? "reach" : "");
+  const arm = (side, cls, x2, y2, delay) => `<line class="arm ${cls}" style="stroke:${c};transform-origin:${side * 9}px -58px;animation-delay:-${delay}s" x1="${side * 9}" y1="-58" x2="${x2}" y2="${y2}"/>`;
+  const hang = (side, delay) => arm(side, "sway", side * 19, -36, delay);
+  const left = act === "cheer" ? arm(-1, "cheer", -21, -84, d) : act === "phone" ? arm(-1, "", 2, -48, 0) : hang(-1, d);
+  const right = act === "wave" ? arm(1, "wave", 22, -84, d) : act === "reach" ? arm(1, "", 30, -62, 0) : act === "point" ? arm(1, "", 30, -80, 0)
+    : act === "cheer" ? arm(1, "cheer", 21, -84, (d * 1.3 + .4).toFixed(2)) : act === "phone" ? arm(1, "", 12, -50, 0) : hang(1, (d * 1.3 + .5).toFixed(2));
+  const phone = act === "phone" ? `<rect x="2" y="-66" width="13" height="21" rx="3" style="fill:var(--ink)"/><rect class="screen" x="4" y="-63.5" width="9" height="15" rx="1.5" style="fill:var(--acc)"/>` : "";
+  let body = `<g class="idle" style="animation-delay:-${d}s">
+      <rect class="leg l1" x="-11" y="-28" width="9" height="28" rx="4.5"/><rect class="leg l2" x="2" y="-28" width="9" height="28" rx="4.5"/>${left}
+      <rect x="-17" y="-70" width="34" height="48" rx="17" style="fill:${c}"/>${right}${phone}
+      <g class="headg" style="animation-delay:-${(d * 2).toFixed(2)}s"><circle class="skin" cy="-84" r="15"/>
+        <circle class="eye" cx="-5" cy="-86" r="1.9" style="animation-delay:-${d}s"/><circle class="eye" cx="5" cy="-86" r="1.9" style="animation-delay:-${d}s"/>
+        <path class="smile" d="M-4.5 -79.5 q4.5 3.5 9 0"/></g>
+    </g>`;
+  if (o.hop || act === "cheer") body = `<g class="hop" style="animation-delay:-${d}s">${body}</g>`;
+  if (o.walk) body = `<g class="walk" style="--from:${o.walk}px">${body}</g>`;
+  const label = o.name ? `<text class="lbl${o.walk ? " rise" : ""}" style="animation-delay:1.7s" x="${x}" y="${y + 24}">${o.name}</text>` : "";
+  return `<g transform="translate(${x} ${y}) scale(${s})">${body}</g>${label}`;
+};
+const ground = '<line class="ground" x1="0" y1="392" x2="800" y2="392"/>';
+const card = (x, y, w, h, extra = "") => `<rect class="card" x="${x}" y="${y}" width="${w}" height="${h}" rx="16" ${extra}/>`;
+const tent = (x, y, k = 1) => `<g transform="translate(${x} ${y}) scale(${k})"><path d="M0 0 L60 -90 L120 0 Z" class="acc"/><path d="M60 -90 L44 0 L76 0 Z" style="fill:var(--acct)"/><line class="ink" x1="60" y1="-90" x2="60" y2="-104"/><path d="M60 -104 l18 6 l-18 6 z" class="sage"/></g>`;
+/** A Minnas verdict as in the app: two thumbs for Igen, one for Okej, thumb down for Inte igen. */
+const verdict = (kind, x, y, delay) => {
+  const fill = kind === "never" ? "var(--line)" : "var(--sage)", ink = kind === "never" ? "var(--mute)" : "#fff";
+  return `<g transform="translate(${x} ${y})"><g class="pop" style="animation-delay:${delay}s"><circle cx="20" cy="20" r="24" style="fill:${fill}"/>
+    <g transform="translate(8 8)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:${ink}">${ICON[kind]}</g></g></g>`;
+};
+
+ICON.sparkle = '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/>';
+/** The AI mark of the app: a Lucide sparkle in terracotta. */
+const spark = (x, y, s = 1, delay = 0) => `<g transform="translate(${x} ${y}) scale(${s})"><g class="pop" style="animation-delay:${delay}s"><g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--acc)">${ICON.sparkle}</g></g></g>`;
+/** A finished step: a sage circle with a tick. */
+const doneMark = (x, y, delay = 0, r = 11) => `<g transform="translate(${x} ${y})"><g class="pop" style="animation-delay:${delay}s"><circle r="${r}" class="sage"/><polyline points="${-r * .45} 0 ${-r * .1} ${r * .35} ${r * .5} ${-r * .35}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></g>`;
+/** A running step: a ring that turns, as the app's spinner. */
+const spin = (x, y) => `<g transform="translate(${x} ${y})"><circle r="9" fill="none" style="stroke:var(--line)" stroke-width="3.5"/><circle class="spin" r="9" fill="none" style="stroke:var(--acc)" stroke-width="3.5" stroke-dasharray="14 43"/></g>`;
+/** A suggested row as in the app: a light sage row with the sparkle, a time and a text. */
+const sug = (x, y, w, time, text, delay = 0) => `<g class="rise" style="animation-delay:${delay}s"><rect x="${x}" y="${y}" width="${w}" height="40" rx="10" class="sage" style="opacity:.22"/>
+  ${spark(x + 10, y + 9, .9)}<text class="tm" x="${x + 40}" y="${y + 25}">${time}</text><text class="t" x="${x + (time ? 92 : 40)}" y="${y + 25}">${text}</text></g>`;
+
+// Icons of the app (Lucide, ISC): settings, eye, copy, pencil, refresh, lock, mail, qr-code.
+Object.assign(ICON, {
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  lock: '<circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/>',
+  qr: '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>',
+});
+/** A line icon of 24 units at x, y, scaled by s, in a colour. */
+const li = (n, x, y, s = 1, col = "var(--mute)") => `<g transform="translate(${x} ${y}) scale(${s})" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:${col}">${ICON[n]}</g>`;
+/** An icon button as in the app: a rounded square with a line icon; on: pressed, in terracotta. */
+const ibtn = (n, x, y, on = false) => `<rect x="${x}" y="${y}" width="40" height="40" rx="11" style="fill:${on ? "var(--acc)" : "var(--card)"};stroke:${on ? "var(--acc)" : "var(--line)"};stroke-width:1.5"/>${li(n, x + 8, y + 8, 1, on ? "var(--card)" : "var(--ink)")}`;
+/** A ring that pops round a button to show it is pressed. */
+const tap = (x, y, r, delay) => `<g transform="translate(${x} ${y})"><circle class="pop" style="animation-delay:${delay}s;stroke:var(--acc);fill:none" r="${r}" stroke-width="3"/></g>`;
+/** A person's row as in Vilka som är med: the round mark with the initial (Planerare terracotta, Resenär sage, Följare grey with an
+ * eye), the name, the line under it and the row's button. */
+const prow = (x, y, w, kind, name, line, o = {}) => {
+  const tone = { p: ["--acc", "--acct"], r: ["--sage", "--sageT"], f: ["--line", "--mute"] }[kind];
+  const mark = kind === "f" ? li("eye", x + 12, y + 14, .85, "var(--mute)") : `<text class="t" x="${x + 22}" y="${y + 29}" text-anchor="middle" style="fill:var(${tone[1]})">${name[0]}</text>`;
+  return `<g${o.cls ? ` class="${o.cls}"` : ""}${o.delay != null ? ` style="animation-delay:${o.delay}s"` : ""}>
+    <circle cx="${x + 22}" cy="${y + 24}" r="18" style="fill:${kind === "f" ? "var(--card)" : `color-mix(in srgb,var(${tone[0]}) 18%,var(--card))`};stroke:var(${tone[0]})" stroke-width="1.5"/>${mark}
+    <text class="t" x="${x + 52}" y="${y + 19}">${name}</text><text class="tm" x="${x + 52}" y="${y + 38}"${o.lineCol ? ` style="fill:${o.lineCol}"` : ""}>${line}</text>
+    ${o.icon === false ? "" : li(o.icon ?? "mail", x + w - 34, y + 12, 1, "var(--ink)")}
+    ${o.last ? "" : `<line x1="${x}" y1="${y + 52}" x2="${x + w}" y2="${y + 52}" style="stroke:var(--line)" stroke-width="1.5"/>`}</g>`;
+};
+/** A switch as in the app; flip: it is turned on after `flip` seconds. */
+const sw = (x, y, on, flip) => {
+  const knob = (o) => `<rect width="44" height="24" rx="12" style="fill:${o ? "var(--sageT)" : "var(--mute)"}"/><circle cx="${o ? 32 : 12}" cy="12" r="9" style="fill:var(--bg)"/>`;
+  return `<g transform="translate(${x} ${y})">${knob(on && flip == null)}${flip != null ? `<g class="pop" style="animation-delay:${flip}s">${knob(true)}</g>` : ""}</g>`;
+};
+/** A text field as in the app. */
+const field = (x, y, w, text, delay) => `<rect x="${x}" y="${y}" width="${w}" height="34" rx="9" style="fill:var(--bg);stroke:var(--line)"/>
+  <text class="t${text ? " rise" : ""}" x="${x + 12}" y="${y + 22}"${delay != null ? ` style="animation-delay:${delay}s"` : ""}>${text}</text>`;
+/** A QR code, always dark on light as the app draws it (AU-31): three finder squares and a fixed pattern. */
+const qr = (x, y, s) => {
+  const n = 13, c = s / n, cells = [];
+  const finder = (i, j) => (i < 4 && j < 4) || (i > n - 5 && j < 4) || (i < 4 && j > n - 5);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (!finder(i, j) && (i * 7 + j * 11 + i * j) % 3 === 0) cells.push(`<rect x="${x + i * c}" y="${y + j * c}" width="${c}" height="${c}"/>`);
+  const box = (bx, by) => `<rect x="${bx}" y="${by}" width="${c * 3}" height="${c * 3}" fill="none" stroke="#2C2A29" stroke-width="${c * .9}"/><rect x="${bx + c}" y="${by + c}" width="${c}" height="${c}"/>`;
+  return `<rect x="${x - 8}" y="${y - 8}" width="${s + 16}" height="${s + 16}" rx="8" style="fill:#F5F2EB"/><g fill="#2C2A29">${cells.join("")}${box(x + c * .45, y + c * .45)}${box(x + s - c * 3.45, y + c * .45)}${box(x + c * .45, y + s - c * 3.45)}</g>`;
+};
+/** A mail flying to someone. */
+const letter = (x, y, delay) => `<g transform="translate(${x} ${y})"><g class="fly" style="animation-delay:${delay}s"><rect x="-4" y="-4" width="48" height="40" rx="10" style="fill:var(--card);stroke:var(--acc);stroke-width:1.5"/>${li("mail", 8, 4, 1.15, "var(--acct)")}</g></g>`;
+const btn = (x, y, w, text) => `<rect x="${x}" y="${y}" width="${w}" height="38" rx="11" class="acc"/><text class="t" x="${x + w / 2}" y="${y + 24}" text-anchor="middle" style="fill:var(--ink)">${text}</text>`;
+const h = (x, y, text, size = 22) => `<text class="mid" x="${x}" y="${y}" style="font-size:${size}px">${text}</text>`;
+
+const SCENES = [
+  { chap: "Inställningar", title: "Där resan delas",
+    text: "Kugghjulet i resan öppnar Resans inställningar. Där bestämmer Anna vilka som är med, vad de får se och hur de kommer in.",
+    svg: () => `${ground}<g transform="translate(364 22)"><g class="pop">${li("gear", 0, 0, 3, "var(--acc)")}</g></g>
+      <text class="mid rise" style="animation-delay:.4s;font-size:30px" x="400" y="148" text-anchor="middle">Resans inställningar</text>
+      ${["Resan", "Vilka som är med", "Behörigheter", "Inkorgen"].map((n, i) => `<g class="rise" style="animation-delay:${.9 + i * .35}s">${card(62 + i * 172, 182, 160, 82)}
+        <text class="t" x="${142 + i * 172}" y="214" text-anchor="middle">${n}</text>${[0, 1].map((k) => `<rect x="${82 + i * 172}" y="${228 + k * 14}" width="${120 - k * 40}" height="7" rx="3.5" style="fill:var(--line)"/>`).join("")}</g>`).join("")}
+      ${fig(120, 392, { name: "Anna", act: "point", walk: -260 })}${fig(680, 392, { name: "Erik", c: "--sage", walk: 300 })}` },
+  { chap: "Resan", title: "Namn, datum och budget",
+    text: "Överst står resans namn, datum, maxbudget och länken till ert delade album, med en liten rubrik över varje värde. Pennan till höger ändrar.",
+    svg: () => `${ground}${fig(80, 392, { name: "Anna", act: "phone" })}
+      <g class="rise">${card(150, 36, 500, 300)}${h(172, 72, "Resan")}
+        ${[["Namn", "Höstlov i Hamburg"], ["Datum", "25–29 okt"], ["Maxbudget", "18 000 kr"], ["Länk till delat album", "bilder.exempel.se"]].map(([l, v], i) => `<g class="rise" style="animation-delay:${.4 + i * .3}s">
+          <text class="tm" x="172" y="${104 + i * 58}">${l}</text><text class="t" x="172" y="${124 + i * 58}"${i === 3 ? ' style="fill:var(--acct)"' : ""}>${v}</text>
+          ${li("pencil", 604, 98 + i * 58, 1, "var(--ink)")}${i < 3 ? `<line x1="172" y1="${138 + i * 58}" x2="630" y2="${138 + i * 58}" style="stroke:var(--line)" stroke-width="1.5"/>` : ""}</g>`).join("")}</g>
+      ${tap(616, 168, 22, 2.2)}` },
+  { chap: "Vilka som är med", title: "En rad för varje person",
+    text: "Under Vilka som är med har varje person en rad. Terrakotta är Planerare, som får ändra allt, och grönt är Resenär. Under namnet står om personen är inbjuden, och sist kommer raden Följare.",
+    svg: () => `${ground}
+      ${card(150, 24, 500, 344)}${h(172, 58, "Vilka som är med")}
+      ${prow(170, 72, 460, "p", "Anna", "Planerare · Har konto", { cls: "rise", delay: .3, lineCol: "var(--sageT)" })}
+      ${prow(170, 128, 460, "r", "Erik", "Resenär · Inte inbjuden", { cls: "rise", delay: .6 })}
+      ${prow(170, 184, 460, "r", "Olle", "Resenär · Inte inbjuden", { cls: "rise", delay: .9 })}
+      ${prow(170, 240, 460, "r", "Mia", "Resenär · Inte inbjuden · delar inte på kostnader", { cls: "rise", delay: 1.2 })}
+      ${prow(170, 296, 460, "f", "Följare", "Alla med länken kan läsa resan", { cls: "rise", delay: 1.8, icon: "link", last: true })}
+      ${fig(80, 392, { name: "Anna", act: "point" })}${fig(720, 392, { name: "Erik", c: "--sage", wave: true })}` },
+  { chap: "Bjud in", title: "Kuvertet på raden",
+    text: "För att bjuda in Erik trycker Anna på kuvertet på hans rad. Då öppnas hans dialog vid Inloggning, och hon skriver hans mejladress i fältet.",
+    svg: () => `${ground}
+      ${card(30, 50, 330, 76)}${prow(46, 62, 298, "r", "Erik", "Resenär · Inte inbjuden", { last: true })}${tap(322, 86, 24, .8)}
+      <g class="rise" style="animation-delay:1.4s">${card(400, 30, 370, 320)}${h(422, 66, "Ändra Erik")}
+        <text class="t" x="422" y="110" style="font-weight:700">Inloggning</text><line x1="510" y1="105" x2="748" y2="105" style="stroke:var(--line)" stroke-width="1.5"/>
+        <text class="tm" x="422" y="136">Inte inbjuden</text>
+        ${field(422, 152, 270, "erik@exempel.se", 2.4)}${ibtn("mail", 706, 149)}
+        <text class="tm" x="422" y="212">Med ett konto ser hen resan när hen loggar in.</text>
+        <text class="tm" x="422" y="252">Utan konto: dela en personlig länk</text>${li("link", 724, 236, 1, "var(--ink)")}
+        ${btn(422, 290, 90, "Spara")}</g>
+      ${fig(190, 392, { name: "Anna", act: "phone" })}` },
+  { chap: "Skicka länken", title: "Mejl, kopiera eller QR-kod",
+    text: "Sen trycker Anna på kuvertet bredvid adressen. Erik får ett konto och en lösenordslänk, som Anna skickar med telefonens mejlapp, kopierar eller visar som QR-kod. Erik öppnar länken och väljer ett lösenord.",
+    svg: () => `${ground}${fig(80, 392, { name: "Anna", act: "phone" })}
+      ${card(150, 30, 440, 290)}${h(172, 66, "Ändra Erik")}
+      ${field(172, 92, 330, "erik@exempel.se")}${ibtn("mail", 516, 89, true)}${tap(536, 109, 26, .6)}
+      <g class="rise" style="animation-delay:1.3s"><line x1="172" y1="146" x2="568" y2="146" style="stroke:var(--line)" stroke-width="1.5"/>
+        <text class="t" x="172" y="176">Inbjudan för Erik är klar.</text><text class="tm" x="172" y="198">Länken gäller till 2 nov.</text>
+        ${[["mail", "Mejla"], ["copy", "Kopiera"], ["qr", "QR-kod"]].map(([n, l], i) => `<g class="pop" style="animation-delay:${1.8 + i * .3}s">${ibtn(n, 196 + i * 120, 220)}</g><text class="tm" x="${216 + i * 120}" y="290" text-anchor="middle">${l}</text>`).join("")}</g>
+      ${letter(630, 220, 3)}${fig(720, 392, { name: "Erik", c: "--sage", act: "phone" })}` },
+  { chap: "Har konto", title: "Statusen på raden",
+    text: "På Eriks rad står nu Inbjuden, har inte loggat in. När han har valt sitt lösenord står det Har konto, och sen ser han resan varje gång han loggar in, på telefonen eller datorn.",
+    svg: () => `${ground}
+      <g class="rise">${card(40, 50, 360, 76)}${prow(56, 62, 328, "r", "Erik", "Resenär · Inbjuden, har inte loggat in", { last: true, icon: false })}</g>
+      <path class="dash rise" style="animation-delay:1s" d="M220 140 C 220 170, 250 180, 290 186"/>
+      <g class="rise" style="animation-delay:1.6s">${card(150, 176, 360, 76)}${prow(166, 188, 328, "r", "Erik", "Resenär · Har konto", { last: true, icon: false, lineCol: "var(--sageT)" })}</g>
+      <g class="pop" style="animation-delay:2.4s"><rect x="560" y="40" width="160" height="250" rx="22" style="fill:var(--ink)"/><rect x="572" y="56" width="136" height="218" rx="12" style="fill:var(--bg)"/>
+        ${li("lock", 622, 76, 1.5, "var(--sageT)")}<rect x="588" y="132" width="104" height="24" rx="7" style="fill:var(--card);stroke:var(--line)"/><rect x="588" y="166" width="104" height="24" rx="7" style="fill:var(--card);stroke:var(--line)"/>
+        <rect x="588" y="204" width="104" height="30" rx="9" class="acc"/></g>
+      ${fig(640, 392, { name: "Erik", c: "--sage", act: "cheer" })}${fig(90, 392, { name: "Anna", wave: true })}` },
+  { chap: "Glömt lösenordet", title: "En ny länk med mejl",
+    text: "Glömmer Erik lösenordet trycker han på Glömt lösenordet? på inloggningen och skriver sin mejladress. Då får han en ny länk med mejl och väljer ett nytt lösenord, utan att Anna behöver göra något.",
+    svg: () => `${ground}
+      <g class="rise">${card(150, 30, 360, 300)}${h(172, 68, "Logga in", 24)}
+        <text class="tm" x="172" y="100">Mejladress</text>${field(172, 108, 316, "erik@exempel.se")}
+        <text class="tm" x="172" y="164">Lösenord</text>${field(172, 172, 316, "")}
+        ${btn(172, 222, 316, "Logga in")}
+        <text class="t" x="330" y="300" text-anchor="middle" style="fill:var(--acct)">Glömt lösenordet?</text><line x1="262" y1="306" x2="398" y2="306" style="stroke:var(--acc)" stroke-width="2"/></g>
+      ${tap(330, 296, 30, 1.2)}${letter(570, 200, 2.2)}
+      ${fig(680, 392, { name: "Erik", c: "--sage", act: "phone" })}` },
+  { chap: "Barnen", title: "Utan eget konto",
+    text: "Mia är för liten för ett eget konto. Anna stänger av Delar på kostnader, så delar Mia inte på gemensamma utlägg. Längst ner finns Mias personliga länk, som Anna visar som QR-kod och skannar med Mias surfplatta.",
+    svg: () => `${ground}${fig(80, 392, { name: "Anna", act: "point" })}
+      ${card(150, 24, 400, 320)}${h(172, 60, "Ändra Mia")}
+      <text class="tm" x="172" y="92">Behörighet</text><text class="t" x="172" y="114">Resenär</text>
+      <g transform="translate(172 132)"><g class="rise" style="animation-delay:.6s">${sw(0, 0, true)}<g class="pop" style="animation-delay:1.2s"><rect width="44" height="24" rx="12" style="fill:var(--mute)"/><circle cx="12" cy="12" r="9" style="fill:var(--bg)"/></g></g></g>
+      <text class="t" x="228" y="150">Delar på kostnader</text>
+      <text class="tm" x="172" y="182">Stäng av för till exempel barn.</text>
+      <text class="t" x="172" y="226" style="font-weight:700">Inloggning</text><text class="tm" x="172" y="250">Inte inbjuden</text>
+      <text class="tm" x="172" y="292">Utan konto: dela en personlig länk</text>${li("link", 508, 276, 1, "var(--ink)")}${tap(520, 288, 22, 2.2)}
+      <g class="pop" style="animation-delay:3s"><rect x="580" y="70" width="190" height="230" rx="18" style="fill:var(--ink)"/><rect x="592" y="82" width="166" height="206" rx="10" style="fill:var(--bg)"/>${qr(625, 125, 100)}</g>
+      ${fig(690, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+  { chap: "Följare", title: "Farmor följer med på avstånd",
+    text: "Farmor följer inte med men vill se hur det går. På raden Följare finns resans följarlänk. Den som har den ser dagarna men aldrig bokningsnummer. Har länken spridits för långt byter Anna den, och den gamla slutar fungera direkt.",
+    svg: () => `${ground}
+      ${card(40, 30, 380, 76)}${prow(56, 42, 348, "f", "Följare", "Alla med länken kan läsa resan", { icon: "link", last: true })}${tap(382, 66, 24, .6)}
+      <g class="rise" style="animation-delay:1.2s">${card(40, 118, 380, 166)}${h(62, 150, "Länk för Följare", 20)}
+        ${qr(70, 176, 84)}<text class="tm" x="186" y="186">Bokningsnummer visas</text><text class="tm" x="186" y="204">aldrig för Följare.</text>
+        ${ibtn("copy", 186, 222)}${ibtn("refresh", 238, 222)}</g>
+      <path class="dash rise" style="animation-delay:2.2s" d="M430 200 C 500 170, 540 180, 584 200"/>
+      <g class="pop" style="animation-delay:2.8s"><rect x="590" y="60" width="130" height="190" rx="18" style="fill:var(--ink)"/><rect x="600" y="72" width="110" height="166" rx="10" style="fill:var(--bg)"/>
+        <rect x="610" y="84" width="40" height="40" rx="9" style="fill:var(--card)"/><text class="t" x="630" y="110" text-anchor="middle">26</text>
+        ${[0, 1, 2].map((i) => `<rect x="610" y="${136 + i * 32}" width="90" height="24" rx="7" style="fill:var(--card)"/>`).join("")}</g>
+      ${fig(150, 392, { name: "Anna", act: "point" })}${fig(670, 392, { name: "Farmor", c: "--mute", act: "phone", walk: 300 })}` },
+  { chap: "Behörigheter", title: "Tre reglage",
+    text: "Under Behörigheter finns tre reglage. Ser resenärerna pengar och får lägga till utlägg? Får de önska och rösta? Och ska Följare se hela planen eller bara dagarna? Planerare kan alltid allt.",
+    svg: () => `${ground}
+      <g class="rise">${card(150, 36, 500, 260)}${h(172, 72, "Behörigheter")}<text class="tm" x="172" y="98">Planerare kan alltid allt.</text>
+        ${[["Resenärer ser pengar och lägger till utlägg", true], ["Resenärer önskar och röstar", false, 2.2], ["Följare ser hela planen", false]].map(([l, on, flip], i) => `<g class="rise" style="animation-delay:${.5 + i * .4}s">
+          ${sw(172, 122 + i * 56, on, flip)}<text class="t" x="230" y="${139 + i * 56}">${l}</text></g>`).join("")}</g>
+      ${tap(194, 190, 30, 2.2)}
+      ${fig(80, 392, { name: "Anna", act: "reach" })}${fig(560, 392, { name: "Olle", s: .72, c: "--acct", act: "cheer" })}${fig(620, 392, { name: "Mia", s: .66, c: "--sage", act: "cheer" })}` },
+  { chap: "Inkorgen", title: "Mejla in bokningar",
+    text: "Resans inkorg är en egen mejladress. Bokningsbekräftelser och tips som mejlas dit blir förslag i resan. Nu är alla med, och höstlovet i Hamburg kan börja.",
+    svg: () => `${ground}
+      <g class="rise">${card(150, 30, 500, 150)}${h(172, 66, "Resans inkorg")}<text class="tm" x="172" y="92">Mejla bokningar och tips hit, så blir de förslag i resan.</text>
+        <text class="t" x="172" y="140">inkorg-7k2qfm4x…@exempel.se</text>${ibtn("copy", 538, 116)}${ibtn("refresh", 590, 116)}</g>
+      ${letter(700, 60, .8)}
+      <g class="rise" style="animation-delay:2.2s"><rect x="150" y="200" width="500" height="64" rx="12" style="fill:var(--card);stroke:var(--acc);stroke-width:1.5"/>${li("mail", 166, 220, 1, "var(--acct)")}
+        <text class="t" x="202" y="228">Bokning från mejl att granska</text><text class="tm" x="202" y="250">Hotell Elbblick · 25–27 okt</text></g>
+      ${fig(230, 392, { name: "Anna", act: "cheer" })}${fig(320, 392, { name: "Erik", c: "--sage", act: "cheer" })}
+      ${fig(470, 392, { name: "Olle", s: .72, c: "--acct", hop: true })}${fig(530, 392, { name: "Mia", s: .66, c: "--sage", hop: true })}` },
+];
+
+// ---- the player (UI-17): starts paused on a still frame; a tap on the film plays or pauses it
+const $ = (id) => document.getElementById(id);
+const player = $("player"), stage = $("stage"), cap = $("cap"), said = $("said"), flash = $("flash"), bigplay = $("bigplay");
+const playBtn = $("play"), voiceBtn = $("voice"), ccBtn = $("cc"), chapBtn = $("chapbtn"), fullBtn = $("full"), drawer = $("drawer"), where = $("where");
+const I = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  again: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+  mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>',
+  full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>',
+  leave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>',
+};
+stage.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#2C2A29" flood-opacity=".12"/></filter></defs></svg>` + SCENES.map((s, i) => `<svg class="scene" viewBox="0 0 800 450" aria-hidden="true" ${i ? "hidden" : ""}>${s.svg()}</svg>`).join("");
+const scenes = [...stage.querySelectorAll(".scene")];
+$("track").innerHTML = SCENES.map((s, i) => `<button class="seg" type="button" aria-label="Kapitel ${i + 1}: ${s.chap}"><span class="fill"></span></button>`).join("");
+const segs = [...document.querySelectorAll(".seg")], fills = segs.map((b) => b.querySelector(".fill"));
+$("chaplist").innerHTML = SCENES.map((s, i) => `<li><button class="chapbtn" type="button"><span class="n">${i + 1}</span><b>${s.chap}</b><small>${s.title}</small></button></li>`).join("");
+const chapBtns = [...document.querySelectorAll(".chapbtn")];
+const sentences = SCENES.map((s) => s.text.match(/[^.!?]+[.!?]*/g).map((t) => t.trim()));
+
+let at = 0, playing = false, begun = false, ended = false, started = 0, elapsed = 0, capOn = true;
+const SILENT_MS = (i) => Math.max(8000, SCENES[i].text.length * 65); // without a voice: time to read the subtitles
+
+// ---- the narration (UI-14, UI-17): recorded files from /installningar-audio/ when made from the scene's current text, else the device's Swedish voice
+const speech = "speechSynthesis" in window ? window.speechSynthesis : null;
+const audio = new Audio(); // one element, so the iPhone lets it play on after the first tap
+let voice = null, voiceOn = true, spoken = false, turn = 0, recorded = SCENES.map(() => null);
+const hasVoice = () => !!voice || recorded.some(Boolean);
+const showVoice = () => {
+  voiceBtn.hidden = !hasVoice(); // neither: the subtitles remain
+  const on = voiceOn && hasVoice();
+  voiceBtn.setAttribute("aria-pressed", String(on));
+  voiceBtn.setAttribute("aria-label", on ? "Berättarröst på" : "Berättarröst av");
+  voiceBtn.innerHTML = on ? I.sound : I.mute;
+};
+function pickVoice() {
+  const all = speech ? speech.getVoices() : [];
+  voice = all.find((v) => /^sv([-_]|$)/i.test(v.lang) && v.localService) ?? all.find((v) => /^sv([-_]|$)/i.test(v.lang)) ?? null;
+  showVoice();
+}
+fetch("/installningar-audio/index.json").then((r) => (r.ok ? r.json() : null)).then((ix) => {
+  recorded = SCENES.map((s, i) => (ix?.scenes?.[i]?.text === s.text ? `/installningar-audio/${ix.scenes[i].file}` : null)); // a changed text is read by the device
+  showVoice();
+}).catch(() => {});
+function synth(i, mine) {
+  if (!speech || !voice) { spoken = true; return; }
+  sentences[i].forEach((t, n) => { // sentence by sentence: one long utterance is cut short in some browsers
+    const u = new SpeechSynthesisUtterance(t);
+    u.voice = voice; u.lang = voice.lang; u.rate = .95;
+    if (n === sentences[i].length - 1) u.onend = () => { if (mine === turn) spoken = true; };
+    speech.speak(u);
+  });
+}
+/** Narrates a scene from its start; spoken turns true when it is done. */
+function speak(i) {
+  hush();
+  spoken = false;
+  const mine = turn;
+  if (!recorded[i]) return synth(i, mine);
+  audio.src = recorded[i];
+  audio.onended = () => { if (mine === turn) spoken = true; };
+  audio.onerror = () => { if (mine === turn) synth(i, mine); };
+  audio.play().catch(() => { if (mine === turn) synth(i, mine); });
+}
+const hush = () => { turn++; if (speech) speech.cancel(); audio.pause(); };
+const narrating = () => voiceOn && hasVoice();
+const usesFile = () => narrating() && recorded[at] && audio.src.endsWith(recorded[at]);
+/** How far into the scene we are, 0..1: by the recording when there is one, else by time. */
+function progress() {
+  if (usesFile() && audio.duration > 0) return Math.min(1, audio.currentTime / audio.duration);
+  const length = narrating() ? SCENES[at].text.length * 70 : SILENT_MS(at);
+  return Math.min(1, elapsed / length);
+}
+
+function show(i, animate = true) {
+  at = Math.max(0, Math.min(SCENES.length - 1, i));
+  scenes.forEach((s, n) => { s.toggleAttribute("hidden", n !== at); s.classList.remove("on"); }); // an SVG element has no hidden property
+  void scenes[at].getBoundingClientRect(); // restart the scene's animations
+  if (animate && playing) scenes[at].classList.add("on"); // paused or without: the scene rests in its final state, a still frame, never half drawn
+  stage.setAttribute("aria-label", `Kapitel ${at + 1} av ${SCENES.length}: ${SCENES[at].title}`);
+  where.textContent = `${at + 1}/${SCENES.length} · ${SCENES[at].chap}`;
+  chapBtns.forEach((b, n) => b.setAttribute("aria-current", String(n === at)));
+  fills.forEach((f, n) => { f.style.width = n < at ? "100%" : "0"; });
+  elapsed = 0; started = performance.now(); ended = false;
+  cap.textContent = capOn && begun ? sentences[at][0] : "";
+  if (begun) said.textContent = `${SCENES[at].title}. ${SCENES[at].text}`;
+  if (playing && narrating()) speak(at); else hush();
+}
+function setPlaying(p) {
+  if (p && !begun) { begun = true; show(at); }
+  if (p && ended) show(0);
+  playing = p;
+  if (p && !scenes[at].classList.contains("on")) { void scenes[at].getBoundingClientRect(); scenes[at].classList.add("on"); } // a scene chosen while paused plays from its start
+  player.classList.toggle("paused", !p);
+  bigplay.hidden = p || begun && !ended;
+  playBtn.innerHTML = p ? I.pause : ended ? I.again : I.play;
+  playBtn.setAttribute("aria-label", p ? "Pausa" : ended ? "Spela igen" : "Spela");
+  if (p) {
+    started = performance.now() - elapsed;
+    if (narrating()) { if (usesFile() && audio.currentTime > 0 && !audio.ended) audio.play().catch(() => speak(at)); else { elapsed = 0; started = performance.now(); speak(at); } }
+  } else { if (speech) speech.cancel(); audio.pause(); } // a recording resumes where it stopped; the device's voice reads the scene again
+  wake();
+}
+function toggle() {
+  setPlaying(!playing);
+  flash.innerHTML = playing ? I.play : I.pause;
+  flash.classList.remove("go"); void flash.offsetWidth; flash.classList.add("go");
+}
+function finish() {
+  fills[at].style.width = "100%";
+  ended = true; playing = false;
+  player.classList.add("paused");
+  bigplay.hidden = false; bigplay.innerHTML = I.again; bigplay.setAttribute("aria-label", "Spela igen");
+  playBtn.innerHTML = I.again; playBtn.setAttribute("aria-label", "Spela igen");
+  hush(); wake();
+}
+
+// the controls hide while the film plays and come back on any movement, tap or key
+let idleTimer = 0;
+function wake() {
+  player.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (playing && !drawer.classList.contains("open")) player.classList.add("idle"); }, 2600);
+}
+["pointermove", "pointerdown", "keydown", "focusin"].forEach((e) => player.addEventListener(e, wake));
+
+// chapters: in a drawer from below, closed until asked for
+function setDrawer(open) {
+  drawer.classList.toggle("open", open);
+  chapBtn.setAttribute("aria-expanded", String(open));
+  if (open) (chapBtns[at] ?? chapBtns[0]).focus(); else if (drawer.contains(document.activeElement)) chapBtn.focus();
+  wake();
+}
+const jump = (i) => { if (!begun) { begun = true; show(i); setPlaying(true); } else { if (ended) { ended = false; } show(i); if (!playing) setPlaying(true); } };
+
+stage.addEventListener("click", () => (drawer.classList.contains("open") ? setDrawer(false) : toggle()));
+bigplay.addEventListener("click", () => { setPlaying(true); stage.focus?.(); });
+playBtn.addEventListener("click", () => setPlaying(!playing));
+$("prev").addEventListener("click", () => jump(at - 1));
+$("next").addEventListener("click", () => (at < SCENES.length - 1 ? jump(at + 1) : finish()));
+segs.forEach((b, i) => b.addEventListener("click", () => jump(i)));
+chapBtns.forEach((b, i) => b.addEventListener("click", () => { setDrawer(false); jump(i); }));
+chapBtn.addEventListener("click", () => setDrawer(!drawer.classList.contains("open")));
+$("dclose").addEventListener("click", () => setDrawer(false));
+voiceBtn.addEventListener("click", () => { // started by a tap, which iPhone needs before it speaks
+  voiceOn = !voiceOn; showVoice();
+  if (!playing) return;
+  if (narrating()) { elapsed = 0; started = performance.now(); speak(at); } else hush();
+});
+ccBtn.addEventListener("click", () => {
+  capOn = !capOn;
+  ccBtn.setAttribute("aria-pressed", String(capOn));
+  player.classList.toggle("nocap", !capOn);
+});
+
+// UI-15: full screen, or the whole window where the browser cannot (iPhone); Esc or the button leaves it.
+const isFull = () => document.fullscreenElement === player || player.classList.contains("full");
+const showFull = () => {
+  const on = isFull();
+  fullBtn.setAttribute("aria-pressed", String(on));
+  fullBtn.setAttribute("aria-label", on ? "Lämna helskärm" : "Helskärm");
+  fullBtn.innerHTML = on ? I.leave : I.full;
+  document.body.style.overflow = player.classList.contains("full") ? "hidden" : "";
+};
+fullBtn.addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (player.classList.contains("full")) player.classList.remove("full");
+  else if (player.requestFullscreen) player.requestFullscreen().catch(() => player.classList.add("full")).finally(showFull);
+  else player.classList.add("full");
+  showFull();
+});
+document.addEventListener("fullscreenchange", showFull);
+
+// keys as in a video player, while the player has focus
+player.addEventListener("keydown", (e) => {
+  const onButton = e.target instanceof HTMLButtonElement;
+  if (e.key === "Escape") {
+    if (drawer.classList.contains("open")) setDrawer(false);
+    else if (player.classList.contains("full")) { player.classList.remove("full"); showFull(); }
+    return;
+  }
+  if ((e.key === " " || e.key === "k") && !onButton) { e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowRight" && !drawer.classList.contains("open")) { e.preventDefault(); $("next").click(); }
+  else if (e.key === "ArrowLeft" && !drawer.classList.contains("open")) { e.preventDefault(); jump(at - 1); }
+  else if (e.key === "f") fullBtn.click();
+  else if (e.key === "m" && !voiceBtn.hidden) voiceBtn.click();
+  else if (e.key === "c") ccBtn.click();
+});
+
+function tick(now) {
+  if (playing) {
+    elapsed = now - started;
+    const f = progress();
+    fills[at].style.width = `${f * 100}%`;
+    if (capOn) { // one sentence at a time, as subtitles: by the share of the scene's characters read so far
+      const parts = sentences[at], total = SCENES[at].text.length;
+      let sum = 0, n = 0;
+      for (; n < parts.length - 1; n++) { sum += parts[n].length; if (f * total < sum) break; }
+      if (cap.textContent !== parts[n]) cap.textContent = parts[n];
+    }
+    const done = narrating() ? spoken && elapsed > 2500 : elapsed >= SILENT_MS(at);
+    if (done) { if (at < SCENES.length - 1) show(at + 1); else finish(); }
+  }
+  requestAnimationFrame(tick);
+}
+if (speech) { pickVoice(); speech.addEventListener?.("voiceschanged", pickVoice); }
+show(0, false); setPlaying(false); bigplay.hidden = false; showVoice(); showFull(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

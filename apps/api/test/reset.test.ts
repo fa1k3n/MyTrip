@@ -98,3 +98,18 @@ test("US-35 Brevo mailer", async () => {
   const down = brevoMailer({ apiKey: "x", from: "noreply@resa.example.org" }, (async () => { throw new Error("net"); }) as unknown as typeof fetch);
   assert.equal(await down.send({ to: "a@example.org", name: "A", subject: "s", text: "t" }), false);
 });
+
+// REQ: US-35 a new password set with a password link logs out the account's other sessions; the new one stays
+test("US-35 a new password logs out the other sessions", async () => {
+  const { app, sent, reset } = await setup();
+  const old = cookieOf(await call(app, "/api/login", { method: "POST", body: { email: "eva@example.org", password: PW } }));
+  assert.equal((await call(app, "/api/me", { cookie: old })).status, 200);
+  await reset("eva@example.org"); await settle();
+  assert.equal((await call(app, "/api/me", { cookie: old })).status, 200, "asking for a link logs nobody out");
+  const [, user, secret] = /#u=([\w-]+)\.([\w-]+)/.exec(sent[0]!.text)!;
+  const fresh = cookieOf(await call(app, "/api/setup", { method: "POST", body: { user, secret, password: "ett annat långt lösenord" } }));
+  assert.equal((await call(app, "/api/me", { cookie: old })).status, 401);
+  assert.equal((await call(app, "/api/me", { cookie: fresh })).status, 200);
+  const again = cookieOf(await call(app, "/api/login", { method: "POST", body: { email: "eva@example.org", password: "ett annat långt lösenord" } }));
+  assert.equal((await call(app, "/api/me", { cookie: again })).status, 200);
+});

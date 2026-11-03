@@ -326,10 +326,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return (fails.get(key)?.n ?? 0) >= MAX_FAILS;
   };
   const failed = (key: string) => { const g = fails.get(key) ?? { n: 0, since: Date.now() }; fails.set(key, { ...g, n: g.n + 1 }); };
-  /** The session cookie: `admin.<exp>` for the admin password, `user.<id>.<exp>` for an account (AU-04, US-11). */
-  const startSession = async (c: Context<Env>, who: string, strict = true) => {
+  /** The session cookie: `admin.<exp>` for the admin password, `user.<id>.<exp>.<generation>` for an account (AU-04, US-11, US-35). */
+  const startSession = async (c: Context<Env>, who: string | User, strict = true) => {
     const exp = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
-    await setSignedCookie(c, "session", `${who}.${exp}`, sessionKey!, { httpOnly: true, secure: true, sameSite: strict ? "Strict" : "Lax", path: "/api", maxAge: SESSION_DAYS * 86400 });
+    const value = typeof who === "string" ? `${who}.${exp}` : `user.${who.id}.${exp}.${who.sessions ?? 0}`;
+    await setSignedCookie(c, "session", value, sessionKey!, { httpOnly: true, secure: true, sameSite: strict ? "Strict" : "Lax", path: "/api", maxAge: SESSION_DAYS * 86400 });
   };
   const loggedIn = (u: User) => store.saveUser({ ...u, lastLogin: clock().toISOString() });
 
@@ -346,7 +347,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       if (!ok) { failed(ip); failed(acct); return c.json({ error: "wrong address or password" }, 401); } // the same answer either way (US-07)
       fails.delete(ip); fails.delete(acct);
       await loggedIn(u!);
-      await startSession(c, `user.${u!.id}`);
+      await startSession(c, u!);
       return c.body(null, 204);
     }
     if (!adminPassword || !sessionKey) return c.json({ error: "login is off" }, 404);
@@ -378,8 +379,10 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!u) return c.json({ error: "gone" }, 410);
     if (typeof password !== "string" || [...password].length < PASSWORD_MIN) return c.json({ error: "too short" }, 400);
     const { setup: _used, ...rest } = u;
-    await store.saveUser({ ...rest, passwordHash: await hashPassword(password), lastLogin: clock().toISOString(), ...(consent ? { consentAt: clock().toISOString() } : {}) }); // US-26
-    await startSession(c, `user.${u.id}`);
+    const next: User = { ...rest, passwordHash: await hashPassword(password), lastLogin: clock().toISOString(), sessions: (u.sessions ?? 0) + 1, // US-35: the others are out
+      ...(consent ? { consentAt: clock().toISOString() } : {}) }; // US-26
+    await store.saveUser(next);
+    await startSession(c, next);
     return c.body(null, 204);
   });
 
@@ -431,7 +434,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const u = users.find((x) => x.googleId === id.sub) ?? users.find((x) => x.email === id.email && !x.googleId);
     if (!u || u.disabled) return c.redirect("/#login=nokonto", 302);
     await loggedIn({ ...u, googleId: id.sub });
-    await startSession(c, `user.${u.id}`);
+    await startSession(c, u);
     return c.redirect("/", 302);
   });
 
@@ -439,11 +442,11 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   app.use("/api/*", async (c, next) => {
     if (sessionKey) {
       const v = await getSignedCookie(c, sessionKey, "session");
-      const [kind, a, b] = v ? v.split(".") : [];
+      const [kind, a, b, gen] = v ? v.split(".") : [];
       if (kind === "admin" && Number(a) * 1000 > Date.now()) { c.set("role", "admin"); return next(); }
       if (kind === "user" && Number(b) * 1000 > Date.now()) {
         const u = (await store.users()).find((x) => x.id === a); // checked on every request, so a disabled account is out at once
-        if (u && !u.disabled) { c.set("user", u); c.set("role", u.superuser ? "admin" : "account"); return next(); }
+        if (u && !u.disabled && Number(gen ?? 0) === (u.sessions ?? 0)) { c.set("user", u); c.set("role", u.superuser ? "admin" : "account"); return next(); }
       }
     }
     const t = (c.req.header("authorization") ?? "").replace(/^Bearer /, "");

@@ -6,6 +6,7 @@ export type User = {
   passwordHash?: string; googleId?: string; lastLogin?: string; setup?: { hash: string; expires: string };
   consentAt?: string; // when the beta notice was accepted (US-26)
   invitedBy?: string; // the account that invited it from a trip (US-30)
+  sessions?: number; // the session generation: a new password moves it, so older sessions stop working (US-35)
   resets?: string[]; // when password links were mailed for a forgotten password, the last day kept (US-35)
 };
 /** The Google OAuth client of the instance (US-10). */

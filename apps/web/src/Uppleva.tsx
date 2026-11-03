@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
 import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.ts";
-import { addChoices, clashes, durationText, hasEnded, nowAt, swipeStep, upDayTime, upTime } from "./upday.ts";
+import { addChoices, clashes, durationText, focusActivity, hasEnded, nowAt, swipeStep, upDayTime, upTime } from "./upday.ts";
 import { verdictWish } from "./memories.ts";
 import { Verdicts } from "./Verdicts.tsx"; // UP-50
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
@@ -172,13 +172,18 @@ function Timeline({ p, day, add }: { p: TripViewProps; day: Day; add: boolean })
   const newActivity = () => { setMenu(false); p.edit({ kind: "activity", dayId: day.id }); };
   const newExpense = () => { setMenu(false); p.addShortExpense(currency, undefined, { // the trip's wishes, the day's first, the one going on now guessed (UP-47)
     choices: wishChoices(day, t.dreams), guess: guessWish(day.activities, now) }); };
+  // UP-56: on opening and on a new day the view goes to the activity under way or the next, else the top of the day
+  useEffect(() => {
+    const id = focusActivity(day.activities, now), el = id ? document.querySelector(`[data-act="${id}"]`) : null;
+    if (el) el.scrollIntoView({ block: "start" }); else window.scrollTo({ top: 0 });
+  }, [day.id]); // eslint-disable-line react-hooks/exhaustive-deps -- not on every tick of the clock
   const line = now && <li className="nowline" key="now"><span>{sv.up.now} {now.replace(":", ".")}</span></li>;
   return <><ol className={`upday${choices.length ? " withfab" : ""}`}>
     {day.activities.map((a, i) => {
       const c = clash.get(a.id), b = ticketFor(t, a.id), place = a.placeIds[0], dur = durationText(a, false); // UP-36
       const hid = who.get(a.id), eye = p.edit && (() => p.edit({ kind: "hidden", dayId: day.id, id: a.id }));
       const wish = rates ? verdictWish(t.dreams, a, hasEnded(day.activities, i, now)) : undefined;
-      const card = <li key={a.id} className={`card upact ${c ? "warn" : ""} ${hid ? "hiddenrow" : ""}`}>
+      const card = <li key={a.id} data-act={a.id} className={`card upact ${c ? "warn" : ""} ${hid ? "hiddenrow" : ""}`}>
         {hid && <span className="upeye"><Eye t={t} who={hid} open={eye} /></span> /* top right, not in the title (UP-32) */}
         <span className="upwhen">
           <time>{upTime(a)}</time>

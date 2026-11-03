@@ -55,3 +55,10 @@ export const upTime = (a: { start?: string; estimated: boolean }) => (a.start ? 
 /** The day's time in Uppleva's heading, without "ca" (UP-36). */
 export const upDayTime = <D extends { start: string; end: string }>(d: D) => `${hh(d.start)}–${hh(d.end)}`;
 
+
+/** The activity Uppleva scrolls to: the one under way, else the next to start; none on another day or when the day is over, so the
+ * view stays at the top of the day (UP-56). Untimed activities are passed over. */
+export function focusActivity<A extends Timed>(list: A[], now: string | undefined) {
+  if (!now) return undefined;
+  return list.find((a, i) => a.start && !hasEnded(list, i, now))?.id;
+}

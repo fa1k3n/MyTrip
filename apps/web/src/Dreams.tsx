@@ -11,6 +11,7 @@ import type { WishSuggestion } from "./aiWishes.ts";
 import { dayLabel, memoriesLine } from "./format.ts";
 import { api } from "./api.ts";
 import { MailInButton } from "./MailIn.tsx";
+import { RunNow } from "./RunNow.tsx";
 import { cardImage, creditMark, plannedWishes, wishDetail } from "./wishes.ts";
 
 const pictures = new Map<string, Promise<string>>(); // object URLs of wish images, fetched once per page (DB-09)
@@ -86,7 +87,7 @@ export default function Dreams({ t, write, vote, addDream, editImage, open, sugg
   suggestions?: WishSuggestion[]; review?: TripViewProps["review"]; run: Run }) {
   const planned = plannedWishes(t); // DB-19
   return <>
-    <div className="dreambar"><MailInButton t={t} may /></div>{/* BK-27; the server answers only those who may have the address */}
+    <div className="dreambar"><MailInButton t={t} may />{review && <RunNow t={t} name="wishes" />}</div>{/* BK-27; the server answers only those who may have the address; AI-96 */}
     {review && <Suggested t={t} list={suggestions} review={review} />}
     <div className="dreams">{t.dreams.map((d, i) => <DreamCard key={d.id} t={t} d={d} i={i} planned={!d.hidden && planned.has(d.id)} vote={write ? () => vote(i) : undefined} open={() => open(d.id)}>
       {write && !d.hidden && <div className="wishtools"><IconButton icon="image" look="bare" tip="right" label={sv.wish.image(d.title)} onClick={() => editImage(d.id)} />

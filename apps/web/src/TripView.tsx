@@ -1,5 +1,6 @@
 // Class names follow design/prototype.html, so the prototype CSS applies; additions live at the end of index.css.
 import { Fragment, lazy, Suspense, useEffect, useState, type DragEvent } from "react";
+import { PROPOSALS_CHANGED } from "./aiStart.ts";
 import { WISH_DRAG } from "./drag.ts";
 import type { Op, Trip } from "@trip/schema";
 import { activityTime, dateBadge, dayTime, dayTitle, stopLabel, todayId, anyOpen, timelineStops, titleHiddenFrom, dayTextWho, textWho, toggleAllLabel, tripDates, type Open } from "./format.ts";
@@ -319,12 +320,14 @@ export function TripView(p: TripViewProps) {
   const days = [...(preview?.next ?? t).days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
   const [wishSugs, setWishSugs] = useState<WishSuggestion[]>([]); // AI-71, AI-77: read again after each change of the trip
+  const [runs, setRuns] = useState(0); // and after each AI run, which changes only the proposals (AI-96)
+  useEffect(() => { const f = () => setRuns((n) => n + 1); addEventListener(PROPOSALS_CHANGED, f); return () => removeEventListener(PROPOSALS_CHANGED, f); }, []);
   useEffect(() => {
     if (!reviews || (tab !== "dr" && tab !== "nala")) { setWishSugs([]); return; }
     let live = true;
     api.proposals(t.id).then((ps) => { if (live) setWishSugs(wishSuggestions(ps as unknown as WishProposal[])); }, () => {});
     return () => { live = false; };
-  }, [t, reviews, tab]);
+  }, [t, reviews, tab, runs]);
   let main;
   if (tab === "dr") main = <Suspense fallback={<p className="ro">{sv.loading}</p>}><Dreams t={t} write={perms.view.dr.dreams === "write"} vote={p.vote} addDream={p.addDream} editImage={p.editImage} open={(id) => p.edit({ kind: "wish", id })}
     suggestions={reviews ? wishSugs : []} review={p.review} run={p.run} /></Suspense>;

@@ -175,6 +175,14 @@ export function helperLine(s: { at?: string; result?: string; remaining: number 
   return `${s.result === "error" ? r.failed(when) : r.last(when) + (s.result === "nothing" ? r.nothing : "")} · ${left}`;
 }
 
+/** Kör nu on a helper's card: only while AI is on for the instance and the trip, and the helper is offered and switched on; no
+ * status means the person may not start AI (AI-96). */
+export const runNowShown = (st: { enabled: boolean; helpers: Record<string, { available: boolean; on: boolean }> } | null, tripAi: boolean, name: string) =>
+  !!st?.enabled && tripAi && !!st.helpers[name]?.available && !!st.helpers[name]!.on;
+/** Kör nu's tooltip with about how many runs are left (AI-96). */
+export const runNowTip = (label: string, h: { result?: string; remaining: number }) =>
+  `${sv.aiRun.runNow(label)} · ${h.result === "cap" || h.remaining <= 0 ? sv.aiRun.capped : sv.aiRun.left(h.remaining)}`;
+
 /** US-31: the invitation as a mailto link for the phone's own mail app; spaces as %20, which every mail app reads. */
 export function inviteMail(x: { to: string; name: string; trip: string; url: string; until: string }) {
   const q = (v: string) => encodeURIComponent(v);

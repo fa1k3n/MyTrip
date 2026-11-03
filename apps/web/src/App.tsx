@@ -10,6 +10,7 @@ import { EDIT_KINDS, editTitle, type EditDlg } from "./editKinds.ts";
 
 // Dialog contents load on first use, which keeps the page file under 200 KB (PF-01).
 const EditDialog = lazy(() => import("./NalaForms.tsx").then((m) => ({ default: m.EditDialog })));
+import { confirmPlaceOps } from "./place.ts";
 const PlaceView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.PlaceView })));
 const TransportView = lazy(() => import("./Panels.tsx").then((m) => ({ default: m.TransportView })));
 const HiddenView = lazy(() => import("./HiddenView.tsx"));
@@ -529,7 +530,8 @@ export function App() {
     >
       {dlg && <span className="dlg-x"><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={() => setDlg(null)} /></span>}
       <Suspense fallback={<p className="ro">{sv.loading}</p>}>
-      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && perms(t).view.nala.plan === "write" && view === "trip" && tab === "nala" ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined} />}
+      {dlg?.kind === "place" && t && <PlaceView t={t} id={dlg.id} edit={t && perms(t).view.nala.plan === "write" && view === "trip" && tab === "nala" ? () => setDlg({ kind: "placeEdit", id: dlg.id }) : undefined}
+        confirm={t && perms(t).view.nala.plan === "write" ? () => run((cur) => confirmPlaceOps(cur, dlg.id), "place checked") : undefined} />}
       {dlg?.kind === "transport" && t && <TransportView key={dlg.dayId} t={t} dayId={dlg.dayId} />}
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}

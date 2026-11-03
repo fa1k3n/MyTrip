@@ -8,19 +8,21 @@ const offline = () => !navigator.onLine || offlineState() !== null;
 const NeedsNet = () => <p className="ro mapoff">{sv.offline.needsNet}</p>;
 import { dayTime } from "./format.ts";
 import { directionsUrl, fmtDuration, mapEmbedUrl, routeOf, vehicleTimes, type Traffic } from "./transport.ts";
-import { IconButton } from "./Icons.tsx";
+import { AiMark, Icon, IconButton } from "./Icons.tsx";
 import { placeView } from "./place.ts";
 import { CatIcons, LineIcon } from "./CatIcon.tsx";
 
 const VEHICLE_IDS: Record<string, string[]> = { "🚗": ["car"], "🚢": ["ferry"], "🚆": ["train"], "🚇🚶": ["transit", "walk"] };
 import { sv } from "./sv.ts";
 
-export function PlaceView({ t, id, edit }: { t: Trip; id: string; edit?: () => void }) {
+export function PlaceView({ t, id, edit, confirm }: { t: Trip; id: string; edit?: () => void; confirm?: () => void }) {
   const place = t.places.find((x) => x.id === id);
   if (!place) return null;
   const v = placeView(place);
   return <>
     <div className="dh"><h3>{v.name}</h3>{edit && <IconButton icon="edit" look="bare" tip="left" label={sv.editPlace} onClick={edit} mut />}</div>
+    {v.unchecked && <p className="ro note unchecked"><span><AiMark label={sv.placeCheck.fromAi} /> {sv.placeCheck.text}</span> {/* DQ-01, DQ-02 */}
+      {confirm && <button type="button" className="btn ghost" onClick={confirm}><Icon name="check" /> {sv.placeCheck.confirm}</button>}</p>}
     <p className="adr">{v.address}</p>
     {v.notes && <p className="ro">{v.notes}</p>}
     <p className="links">

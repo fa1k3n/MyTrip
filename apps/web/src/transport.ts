@@ -21,6 +21,9 @@ export function fmtDuration(min: number) {
   return h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
 }
 
+/** The way to an activity, an estimate like every travel time (DQ-05). */
+export const travelText = (min: number) => `ca ${fmtDuration(min)}`;
+
 /** Total time per vehicle, identified by icon only (TR-01, TR-02). Days without a motorised leg show transit and walking (TR-05). */
 export function vehicleTimes(day: Day): { icon: string; text: string }[] {
   const legs = day.legs.filter((l) => motorised.includes(l.vehicle));

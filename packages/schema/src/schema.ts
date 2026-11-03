@@ -9,6 +9,7 @@ export const Place = z.object({
   id: Id, name: z.string().min(1), address: z.string().min(1),
   phone: z.string().optional(), notes: z.string().optional(),
   website: z.string().url().optional(), bookingUrl: z.string().url().optional(), bookingLabel: z.string().optional(),
+  ai: z.boolean().optional(), // from the AI service: its address and facts not yet checked by a person (DQ-01, DQ-02)
 });
 export const Activity = z.object({
   id: Id, text: z.string().min(1), placeIds: z.array(Id).default([]),

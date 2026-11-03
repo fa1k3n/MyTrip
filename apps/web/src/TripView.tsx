@@ -13,7 +13,7 @@ import { AiMark, BetaButton, Gear, Icon, IconButton } from "./Icons.tsx";
 import { api, isOffline } from "./api.ts";
 import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWishes.ts";
 import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
-import { fmtDuration, stepIcon, stepText, transitFrom, transitNote, wayUrl, type TransitStep } from "./transport.ts";
+import { fmtDuration, travelText, stepIcon, stepText, transitFrom, transitNote, wayUrl, type TransitStep } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
 import { byDay, splitDismissed, tripFindings } from "./tripCheck.ts";
 
@@ -150,7 +150,7 @@ export const TravelRow = ({ travel, li, href, lines }: { travel?: Activity["trav
     }, () => setGot("failed"));
     ask();
   };
-  const row = <><CatIcon id={travel.vehicle} /><span>{fmtDuration(travel.durationMin)}</span>
+  const row = <><CatIcon id={travel.vehicle} /><span>{travelText(travel.durationMin)}</span>
     {href && <a className="btn ghost icon bare tip-right" href={href} target="_blank" rel="noopener noreferrer" aria-label={sv.showWay} data-tip={sv.showWay}><Icon name="compass" /></a> /* TR-21 */}
     {transit && (open || !isOffline()) && <IconButton icon="list" look="bare" tip="right" pressed={open} label={open ? sv.transit.hide : sv.transit.show} onClick={toggle} />}
     {transit && open && <div className="steps" role="status" aria-label={sv.transit.label}>

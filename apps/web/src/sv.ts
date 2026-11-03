@@ -307,6 +307,7 @@ export const sv = {
   date: "Datum", summaryLabel: "Sammanfattning (en mening, utan klockslag)", icons: "Egna ikoner, en eller två (visas när aktiviteterna saknar kategori)",
   start: "Start", end: "Slut", estimate: "ca", location: "Ort (för vädret)", time: "Tid", what: "Vad",
   placeLabel: "Plats", noPlace: "Ingen plats", newPlace: "Ny plats…", placeName: "Platsens namn", address: "Adress",
+  placeCheck: { fromAi: "Från AI", text: "Uppgifterna kommer från AI. Kontrollera adressen på kartan eller platsens webbplats.", confirm: "Kontrollerad" }, // DQ-01, DQ-02
   datePlaceholder: "dd/mm/åååå", pickDate: "Välj i kalendern", // LC-05
   firstDate: "Första datum", lastDate: "Sista datum", status: "Status", reference: "Bokningsnummer",
   statuses: { tobook: "Att boka", paid: "Betald", ready: "Klar", cancelled: "Avbokad" }, paidMark: "Betald", owner: "Ansvarig",

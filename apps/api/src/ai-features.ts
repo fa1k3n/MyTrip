@@ -121,7 +121,8 @@ the day's activities and travel, for example "Hagenbeck och hamnrundtur"; never 
     known: (t: Trip) => t.dreams.map((w) => w.title),
     textOf: (o) => String(valueOf(o).title ?? valueOf(o).text ?? ""),
     finish: (o) => (o.path === "dreams/-" ? { ...o, value: { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } }
-      : ON_DAY.test(o.path) ? { ...o, value: { ...valueOf(o), estimated: true, ai: true } } : o),
+      : ON_DAY.test(o.path) ? { ...o, value: { ...valueOf(o), estimated: true, ai: true } }
+      : o.path === "places/-" ? { ...o, value: { ...valueOf(o), ai: true } } : o), // DQ-01, DQ-02: its address and facts to check
     group: (ops, t) => {
       const titled = new Set<string>(); // a day's new title goes with its first suggestion, only for a day with an AI title (AI-86)
       const title = (a: Op) => {

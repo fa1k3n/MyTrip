@@ -1,5 +1,5 @@
 import type { BookingReading, Op, Settings, TicketFile, Trip } from "@trip/schema";
-import type { TransitStep, Traffic } from "./transport.ts";
+import type { TransitAnswer, Traffic } from "./transport.ts";
 
 import { accountSlot, dropAllCopies, dropCopy, flush, forgetAccount, keepAccount, loadCopy, loadQueue, saveCopy, saveQueue, sendError, serial, storedAccount, useCopy, loadVerdicts, saveVerdicts, verdictOps, type WaitingVerdict, timeoutSignal, triedAt, unrated, withRate, type Copy, type Expense, type Sent, type Waiting } from "./offline.ts";
 import { sv } from "./sv.ts";
@@ -228,7 +228,8 @@ async function aiCall<T>(path: string, body: BodyInit, type: string): Promise<Ai
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
   login: (password: string, email = "") => call<void>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
-  authConfig: () => call<{ google: boolean }>("/api/auth/config"), // US-10
+  authConfig: () => call<{ google: boolean; reset?: boolean }>("/api/auth/config"), // US-10, US-35
+  reset: (email: string) => call<{ sent: true }>("/api/reset", { method: "POST", body: JSON.stringify({ email }) }), // US-35
   setupInfo: (user: string, secret: string) => call<{ name: string; email: string }>("/api/setup/info", { method: "POST", body: JSON.stringify({ user, secret }) }), // US-05
   setup: (user: string, secret: string, password: string, consent = false) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password, consent }) }),
   consent: () => call<void>("/api/consent", { method: "POST" }), // US-26
@@ -262,8 +263,8 @@ export const api = {
   people: (id: string) => call<PersonLinkInfo[]>(`${trip(id)}/people`),
   setPerson: (id: string, travelerId: string, role: PersonLinkInfo["role"], account?: string | null) => // account left out: kept (US-21)
     call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "PUT", body: JSON.stringify(account === undefined ? { role } : { role, account }) }),
-  invite: (id: string, travelerId: string, renew = false) => // US-30, US-32
-    call<{ user: string; setup: SetupLink } | { exists: true; mayRenew: boolean }>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/invite`, { method: "POST", body: JSON.stringify(renew ? { renew: true } : {}) }),
+  invite: (id: string, travelerId: string) => // US-30
+    call<{ user: string; setup: SetupLink } | { exists: true }>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/invite`, { method: "POST" }),
   renewPerson: (id: string, travelerId: string) => call<PersonLinkInfo>(`${trip(id)}/people/${encodeURIComponent(travelerId)}/renew`, { method: "POST" }),
   removePerson: (id: string, travelerId: string) => call<void>(`${trip(id)}/people/${encodeURIComponent(travelerId)}`, { method: "DELETE" }),
   trips: () => kept<Trip[]>("trips", "/api/trips"),
@@ -277,7 +278,7 @@ export const api = {
   unsubscribe: (tripId: string, endpoint: string, key = link) => call<void>(`${trip(tripId)}/push`, { method: "DELETE", body: JSON.stringify({ endpoint }) }, key),
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   transit: (tripId: string, dayId: string, aid: string, from?: { lat: number; lng: number }) => // TR-23; from: the phone's position
-    call<{ status: "off" | "none" | "error" | "nofrom" } | { status: "ok"; steps: TransitStep[] }>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(aid)}/transit${from ? `?from=${from.lat.toFixed(5)},${from.lng.toFixed(5)}` : ""}`),
+    call<TransitAnswer>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(aid)}/transit${from ? `?from=${from.lat.toFixed(5)},${from.lng.toFixed(5)}` : ""}`),
   settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
   // BK-09, BK-10: ticket files go up and come down as they are, with the link's credentials.

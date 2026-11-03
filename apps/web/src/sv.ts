@@ -79,7 +79,9 @@ export const sv = {
   showWay: "Visa resvägen", // TR-21
   transit: { // TR-23
     show: "Visa linjer", hide: "Dölj linjer", asking: "Söker resa…", locating: "Söker var du är…",
-    noPosition: "Ingen plats före den här på dagen, och telefonen gav inte sin position. Tillåt platsen, eller använd Visa resvägen.", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.", failed: "Kunde inte hämta linjerna just nu.",
+    noPosition: "Ingen plats före den här på dagen, och telefonen gav inte sin position. Tillåt platsen, eller använd Visa resvägen.", none: "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.",
+    far: "Google har ingen tidtabell så långt fram än. Försök igen närmare resan, eller använd Visa resvägen.", // TR-24
+    example: (day: string) => `Google har ingen tidtabell för resdagen än. Så här går det samma tid ${day}:`, failed: "Kunde inte hämta linjerna just nu.",
     walk: (min: number) => `Gå ${min} min`, toward: (h: string) => `mot ${h}`, stops: (n: number) => (n === 1 ? "1 hållplats" : `${n} hållplatser`),
     kinds: { bus: "Buss", tram: "Spårvagn", metro: "Tunnelbana", train: "Tåg", ferry: "Färja", other: "Linje" } as Record<string, string>,
     label: "Resan med kollektivtrafik",
@@ -270,9 +272,19 @@ export const sv = {
     setSave: "Spara och logga in", setGone: "Länken gäller inte längre. Be den som skapade kontot om en ny.", setShort: "Lösenordet behöver minst 10 tecken.",
     pasteLink: "Klistra in länken du fått", openLink: "Öppna resan", badLink: "Det där är ingen länk till en resa.", // PW-02
     wrong: "Fel mejladress eller lösenord.", tooMany: "För många försök. Vänta en kvart och försök igen.", off: "Inloggningen är inte påslagen på servern.",
-    forgot: "Glömt lösenordet?", // US-33
-    forgotHelp: "Be den som bjöd in dig om en ny lösenordslänk. Hen gör den under resans inställningar, Resenärer.",
+    forgot: "Glömt lösenordet?", // US-35
+    forgotAsk: "Skriv din mejladress, så skickar vi en länk där du väljer ett nytt lösenord.", forgotSend: "Skicka länk",
+    forgotSent: (email: string) => `Finns det ett konto för ${email} kommer ett mejl med en länk om en liten stund. Länken gäller en timme. Titta i skräpposten om det dröjer.`,
+    forgotFailed: "Det gick inte att skicka. Försök igen om en stund.",
+    forgotHelp: "Be den som sköter Basläger om en ny lösenordslänk. Har du fått en inbjudan men aldrig loggat in kan den som bjöd in dig göra en ny under resans inställningar, Resenärer.",
     forgotGoogle: "Har du ett Google-konto med samma mejladress kan du också logga in med Google.",
+  },
+  resetMail: { // US-35: the mail the server sends for a forgotten password; the name in html is already escaped
+    subject: "Nytt lösenord till Basläger",
+    text: (name: string, url: string) =>
+      `Hej ${name}!\n\nDu har bett om ett nytt lösenord till Basläger. Öppna länken inom en timme och välj ett nytt lösenord:\n\n${url}\n\nHar du inte bett om det kan du strunta i det här mejlet. Ditt lösenord är kvar som förut.`,
+    html: (name: string, url: string) =>
+      `<p>Hej ${name}!</p><p>Du har bett om ett nytt lösenord till Basläger. Öppna länken inom en timme och välj ett nytt lösenord:</p><p><a href="${url}">${url}</a></p><p>Har du inte bett om det kan du strunta i det här mejlet. Ditt lösenord är kvar som förut.</p>`,
   },
   invite: { // US-31: the mail the phone's own mail app sends
     subject: (trip: string) => `Inbjudan till ${trip} i Basläger`,

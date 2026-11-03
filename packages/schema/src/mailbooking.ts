@@ -94,15 +94,20 @@ export const FORWARD_PREFIX = /^\s*((fwd?|fw|vb|vs|sv|re|tr|aw|wg)\s*:\s*)+/i;
 export const KIND_PREFIX = /^\s*(bokning|önskan)\s*:\s*/i;
 /** A subject without forwarding prefixes and the sorting prefix. */
 export const bareSubject = (s: string) => s.replace(FORWARD_PREFIX, "").replace(KIND_PREFIX, "").trim();
-const GENERIC = new RegExp("^(bokningsbekräftelse|orderbekräftelse|bekräftelse på din (bokning|beställning)|bekräftelse|din bokning|din beställning"
-  + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?)"
-  + "\\s*(?:[-–—:|,]\\s*|\\s+(?:hos|till|på|från)\\s+)", "i");
-/** The subject without forwarding prefixes and words that only say it is a confirmation. */
+const GENERIC_WORDS = "bokningsbekräftelse|orderbekräftelse|bekräftelse på din (bokning|beställning)|bekräftelse|din bokning|din beställning"
+  + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?";
+const GENERIC = new RegExp(`^(${GENERIC_WORDS})\\s*(?:[-–—:|,]\\s*|\\s+(?:hos|till|på|från)\\s+)`, "i");
+/** What is left of a subject that only says it is a confirmation: punctuation and at most a number such as #A55120. */
+const NO_NAME = /^[\s#:.,!|–—-]*(?:[\p{L}\d-]*\d[\p{L}\d-]*)?[\s.!]*$/u;
+/** The subject without forwarding prefixes and words that only say it is a confirmation; none when nothing else is left (BK-16). */
 function subjectName(subject: string): string | undefined {
   let s = bareSubject(subject);
   for (let g = GENERIC.exec(s); g && s.length > g[0].length; g = GENERIC.exec(s)) s = s.slice(g[0].length).trim();
-  return s || undefined;
+  return NO_NAME.test(s.replace(new RegExp(`^(${GENERIC_WORDS})`, "i"), "")) ? undefined : s;
 }
+/** A name after "bokning hos", "köp på", "reservation at" and the like in the text, starting with a capital letter (BK-16). */
+const TEXT_NAME = /\b(?:bokning|vistelse|reservation|beställning|köp|booking|stay|order|purchase)\s+(?:hos|på|at|with)\s+(\p{Lu}[^\n.!,;:()]{1,58})/u;
+const textName = (text: string) => TEXT_NAME.exec(text)?.[1]?.trim();
 
 type Ld = Record<string, unknown>;
 /** Every object with a schema.org type in the mail's JSON-LD, also inside lists and @graph. */
@@ -158,7 +163,7 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
   const k = kind(`${mail.subject ?? ""}\n${text}`), checkIn = timeAfter(text, CHECK_IN);
   const stay = k === "stay" || (!k && !!checkIn);
   const fromText = clean({
-    kind: stay ? "stay" : k, name: mail.subject ? subjectName(mail.subject) : undefined, reference: reference(text), price: price(text),
+    kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject) : undefined) ?? textName(text), reference: reference(text), price: price(text),
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
   });

@@ -5,7 +5,8 @@ export type User = {
   id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string;
   passwordHash?: string; googleId?: string; lastLogin?: string; setup?: { hash: string; expires: string };
   consentAt?: string; // when the beta notice was accepted (US-26)
-  invitedBy?: string; // the account that invited it from a trip (US-30), which may renew its password link (US-32)
+  invitedBy?: string; // the account that invited it from a trip (US-30)
+  resets?: string[]; // when password links were mailed for a forgotten password, the last day kept (US-35)
 };
 /** The Google OAuth client of the instance (US-10). */
 export type Google = { clientId: string; clientSecret: string };
@@ -13,6 +14,8 @@ export type Google = { clientId: string; clientSecret: string };
 export const googleOf = (clientId?: string, clientSecret?: string): Google | undefined => (clientId && clientSecret ? { clientId, clientSecret } : undefined);
 
 export const PASSWORD_MIN = 10, SETUP_DAYS = 7, ITERATIONS = 100_000; // 100 000 is the most the Worker's PBKDF2 allows (US-06)
+/** US-35: a mailed link lasts an hour; an account gets one mail per 15 minutes and three a day, the instance 50 a day. */
+export const RESET_MS = 3_600_000, RESET_GAP_MS = 15 * 60_000, RESET_ACCOUNT_MAX = 3, RESET_DAY_MAX = 50;
 const enc = new TextEncoder();
 const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
 const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));

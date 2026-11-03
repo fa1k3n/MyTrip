@@ -94,3 +94,34 @@ test("TR-23 a Routes error is logged", async () => {
   } finally { console.error = was; }
   assert.ok(logged.some((l) => l.includes("403") && l.includes("API key not valid")), logged.join("\n"));
 });
+
+// REQ: TR-24 far ahead without a timetable: the same time on the nearest same weekday from today, marked as an example
+test("TR-24 far ahead, the nearest same weekday is shown as an example", async () => {
+  const asked: Record<string, unknown>[] = [];
+  const fetch = (async (_u: string, init: RequestInit) => {
+    const b = JSON.parse(String(init.body)); asked.push(b);
+    return new Response(JSON.stringify(b.arrivalTime < "2026-11-01" ? answer : { routes: [] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+  // a Wednesday: today is Wednesday 2026-10-14, the activity on Friday 2026-11-20
+  const app = createApp(memoryStore([trip()]), tokens, { routesKey: "k", fetch, now: () => new Date("2026-10-14T08:00:00Z") });
+  const b = await (await app.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json();
+  assert.equal(asked.length, 2);
+  assert.equal(asked[0]!.arrivalTime, "2026-11-20T09:30:00.000Z");
+  assert.equal(asked[1]!.arrivalTime, "2026-10-16T08:30:00.000Z"); // Friday 16 October, 10.30 in Berlin (summer time)
+  assert.equal(b.status, "ok");
+  assert.equal(b.example, "2026-10-16");
+  assert.equal(b.steps[1].line, "U2");
+});
+
+// REQ: TR-24 far ahead and no example either: "none" says the date is far ahead; near, or with a route, nothing more is asked
+test("TR-24 far ahead without any trip, and near dates ask once", async () => {
+  let n = 0;
+  const none = (async () => { n++; return new Response(JSON.stringify({ routes: [] }), { status: 200 }); }) as unknown as typeof globalThis.fetch;
+  const far = createApp(memoryStore([trip()]), tokens, { routesKey: "k", fetch: none, now: () => new Date("2026-10-14T08:00:00Z") });
+  assert.deepEqual(await (await far.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json(), { status: "none", far: true });
+  assert.equal(n, 2);
+  n = 0;
+  const near = createApp(memoryStore([trip()]), tokens, { routesKey: "k", fetch: none, now: () => new Date("2026-11-10T08:00:00Z") }); // ten days before
+  assert.deepEqual(await (await near.request("/api/trips/berlin/days/d1/activities/a2/transit", { headers: { authorization: "Bearer a" } })).json(), { status: "none" });
+  assert.equal(n, 1);
+});

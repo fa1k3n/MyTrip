@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.ts";
 import { fileStore } from "./file-store.ts";
 import { googleOf } from "./users.ts";
+import { brevoMailer } from "./mailer.ts";
 import { anthropicCall, CLOCK_DELAY_MS } from "./ai.ts";
 
 // One file per trip: <dir>/<id>.trip.json. Cover images live in <dir>/img/.
@@ -27,6 +28,7 @@ const onChange = async (id: string) => {
   clearTimeout(timers.get(id));
   timers.set(id, setTimeout(() => { timers.delete(id); void app.aiTick(id).catch(() => {}); }, CLOCK_DELAY_MS).unref());
 };
-const app = createApp(store, tokens, { aiService: !!ai, ...(ai ? { ai: { call: ai } } : {}), onChange, routesKey: process.env.ROUTES_API_KEY, trafficThresholdMin, auth, vapidKey: process.env.VAPID_KEY, inboxDomain: process.env.INBOX_DOMAIN });
+const env = process.env, mail = env.BREVO_API_KEY && env.MAIL_FROM && env.APP_URL ? { ...brevoMailer({ apiKey: env.BREVO_API_KEY, from: env.MAIL_FROM }), appUrl: env.APP_URL } : undefined; // US-35
+const app = createApp(store, tokens, { mail, aiService: !!ai, ...(ai ? { ai: { call: ai } } : {}), onChange, routesKey: process.env.ROUTES_API_KEY, trafficThresholdMin, auth, vapidKey: process.env.VAPID_KEY, inboxDomain: process.env.INBOX_DOMAIN });
 serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 8787) });
 console.log(`API on http://localhost:${process.env.PORT ?? 8787}, trips in ${dir}`);

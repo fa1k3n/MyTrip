@@ -5,7 +5,9 @@ import { zoned, type TrafficOpts } from "./traffic.ts";
 export type Step =
   | { kind: "walk"; min: number }
   | { kind: "ride"; line: string; vehicle: string; headsign?: string; from: string; to: string; dep?: string; arr?: string; stops?: number };
-export type Transit = { status: "off" | "none" | "error" | "nofrom" } | { status: "ok"; steps: Step[] }; // nofrom: no place before, the phone's position is needed
+// nofrom: no place before, the phone's position is needed; far: no trip on a date so far ahead that Google may have no timetable yet;
+// example: the date of the nearest same weekday whose trip is shown instead (TR-24)
+export type Transit = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: Step[]; example?: string };
 
 /** Google's kinds of vehicle as the app's: bus, tram, metro, train, ferry, or other. */
 const KIND: Record<string, string> = {
@@ -42,7 +44,18 @@ export function transitSteps(answer: unknown): Step[] | null {
 }
 
 const MASK = "routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.transitDetails";
-/** Asks Routes for public transport to the activity, arriving by its start, or leaving now when that has passed (TR-23). */
+/** Google often has no timetable more than about two weeks ahead (TR-24). */
+const FAR_MS = 14 * 86_400_000;
+/** The first date after today, in the trip's time zone, on the same weekday as `date`. */
+export function nearestWeekday(date: string, now: number, timeZone: string) {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const day = (d: string) => new Date(`${d}T12:00:00Z`);
+  const ahead = (day(date).getUTCDay() - day(today).getUTCDay() + 7) % 7 || 7;
+  return new Date(day(today).getTime() + ahead * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Asks Routes for public transport to the activity, arriving by its start, or leaving now when that has passed (TR-23). Far ahead
+ * without a trip, the same time on the nearest same weekday is asked for and shown as an example (TR-24). */
 export async function checkTransit(t: Trip, dayId: string, activityId: string, o: TrafficOpts, here?: { lat: number; lng: number }): Promise<Transit> {
   const w = wayEnds(t, dayId, activityId);
   if (!w || (w.vehicle !== "transit" && w.vehicle !== "train")) return { status: "none" };
@@ -50,11 +63,18 @@ export async function checkTransit(t: Trip, dayId: string, activityId: string, o
   const origin = w.from ? { address: w.from } : here ? { location: { latLng: { latitude: here.lat, longitude: here.lng } } } : undefined;
   if (!origin) return { status: "nofrom" }; // no place before: from where the phone is, as the link does (TR-21)
   const now = (o.now ?? (() => new Date()))().getTime(), at = w.start ? zoned(w.date, w.start, t.timezone) : 0;
-  const when = at > now + 60_000 ? { arrivalTime: new Date(at).toISOString() } : { departureTime: new Date(now + 60_000).toISOString() };
+  const ask = (when: { arrivalTime: string } | { departureTime: string }) => routes(o, { origin, destination: { address: w.to }, travelMode: "TRANSIT", ...when, languageCode: "sv-SE" });
+  const first = await ask(at > now + 60_000 ? { arrivalTime: new Date(at).toISOString() } : { departureTime: new Date(now + 60_000).toISOString() });
+  if (first.status !== "none" || !w.start || at <= now + FAR_MS) return first;
+  const example = nearestWeekday(w.date, now, t.timezone), again = await ask({ arrivalTime: new Date(zoned(example, w.start, t.timezone)).toISOString() });
+  return again.status === "ok" ? { ...again, example } : { status: "none", far: true };
+}
+
+async function routes(o: TrafficOpts, body: Record<string, unknown>): Promise<Transit> {
   try {
     const res = await (o.fetch ?? fetch)("https://routes.googleapis.com/directions/v2:computeRoutes", {
-      method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": o.routesKey, "X-Goog-FieldMask": MASK },
-      body: JSON.stringify({ origin, destination: { address: w.to }, travelMode: "TRANSIT", ...when, languageCode: "sv-SE" }),
+      method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": o.routesKey!, "X-Goog-FieldMask": MASK },
+      body: JSON.stringify(body),
     });
     if (!res.ok) { console.error(`Routes transit ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`); return { status: "error" }; } // shows in the Worker's logs
     const steps = transitSteps(await res.json());

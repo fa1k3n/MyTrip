@@ -11,7 +11,8 @@ import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
 import { addWish, MIN_PHOTO, sortMail } from "./mail.ts";
-import { checkPassword, firstSuper, googleAuthUrl, googleIdentity, hashPassword, memberships, normEmail, PASSWORD_MIN, pkce, publicUser, SETUP_DAYS, sha256, validEmail, type Google, type User } from "./users.ts";
+import { checkPassword, firstSuper, googleAuthUrl, googleIdentity, hashPassword, memberships, normEmail, PASSWORD_MIN, pkce, publicUser, RESET_ACCOUNT_MAX, RESET_DAY_MAX, RESET_GAP_MS, RESET_MS, SETUP_DAYS, sha256, validEmail, type Google, type User } from "./users.ts";
+import { escapeHtml, type Mailer } from "./mailer.ts";
 export type { User } from "./users.ts";
 
 export type Proposal = {
@@ -311,7 +312,9 @@ export const pushMatch = (x: PushSub, m: { endpoint?: string; who?: string }) =>
 export type AiOpts = { call: AiCall; features?: Record<string, AiFeature> };
 
 /** onChange: told after every saved change of a trip, to start its AI timer (AI-69). */
-export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; ai?: AiOpts; onChange?: (tripId: string) => Promise<void>; auth?: Auth; vapidKey?: string; inboxDomain?: string } & TrafficOpts = {}) {
+/** mail: the mail service and the app's own address, for the links it sends (US-35). */
+export function createApp(store: Store, tokens: Tokens, opts: { aiService?: boolean; ai?: AiOpts; onChange?: (tripId: string) => Promise<void>; auth?: Auth; vapidKey?: string; inboxDomain?: string;
+  mail?: Mailer & { appUrl: string } } & TrafficOpts = {}) {
   const app = new Hono<Env>();
   const { adminPassword, sessionKey, google } = opts.auth ?? {};
   const fails = new Map<string, { n: number; since: number }>(); // per address and per account, in memory (AU-05, US-08)
@@ -380,8 +383,34 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return c.body(null, 204);
   });
 
+  // US-35: a forgotten password: a mail with a password link for one hour. The answer is the same whatever the address, and the
+  // work is done after it, so neither the answer nor its time tells whether there is an account.
+  const resetting = new Set<string>(), DAY_MS = 86_400_000;
+  async function sendReset(email: string, mail: Mailer & { appUrl: string }) {
+    if (resetting.has(email)) return; // one at a time per address
+    resetting.add(email);
+    try {
+      const now = clock().getTime(), users = await store.users(), u = users.find((x) => x.email === email && !x.disabled);
+      const recent = (x: User) => (x.resets ?? []).filter((at) => now - Date.parse(at) < DAY_MS);
+      if (!u || users.reduce((n, x) => n + recent(x).length, 0) >= RESET_DAY_MAX) return;
+      const mine = recent(u);
+      if (mine.length >= RESET_ACCOUNT_MAX || mine.some((at) => now - Date.parse(at) < RESET_GAP_MS)) return;
+      const secret = newSecret(), url = `${mail.appUrl.replace(/\/+$/, "")}/#u=${u.id}.${secret}`;
+      await store.saveUser({ ...u, setup: { hash: await sha256(secret), expires: new Date(now + RESET_MS).toISOString() }, resets: [...mine, new Date(now).toISOString()] });
+      await mail.send({ to: u.email, name: u.name, subject: sv.resetMail.subject, text: sv.resetMail.text(u.name, url), html: sv.resetMail.html(escapeHtml(u.name), url) });
+    } finally { resetting.delete(email); }
+  }
+  app.post("/api/reset", async (c) => {
+    if (!opts.mail || !sessionKey) return c.json({ error: "off" }, 404);
+    const b = await c.req.json<{ email?: unknown }>().catch(() => ({} as { email?: unknown }));
+    const email = typeof b.email === "string" ? normEmail(b.email) : "";
+    if (!validEmail(email)) return c.json({ error: "a valid address needed" }, 400);
+    later(c, sendReset(email, opts.mail));
+    return c.json({ sent: true }, 202);
+  });
+
   // US-09, US-10: Google login, only for an existing account with Google's verified address.
-  app.get("/api/auth/config", (c) => c.json({ google: !!google && !!sessionKey }));
+  app.get("/api/auth/config", (c) => c.json({ google: !!google && !!sessionKey, ...(opts.mail && sessionKey ? { reset: true } : {}) }));
   const redirectUri = (c: Context<Env>) => `${new URL(c.req.url).origin}/api/auth/google/callback`;
   app.get("/api/auth/google", async (c) => {
     if (!google || !sessionKey) return c.json({ error: "off" }, 404);
@@ -1167,14 +1196,13 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return { secret, expires };
   };
   app.get("/api/users", async (c) => c.json((await store.users()).map(publicUser)));
-  // US-30, US-32: whoever manages a trip invites a traveler with an address: an account and a password link, or a new link for an
-  // account they invited; an account that can log in already gets none.
+  // US-30: whoever manages a trip invites a traveler with an address: an account and a password link, or a new link for an account
+  // that never logged in; an account that can log in already gets none.
   app.post("/api/trips/:id/people/:tid/invite", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
     const t = await load(c.req.param("id")), x = t.travelers.find((y) => y.id === c.req.param("tid"));
     const address = (await people(t.id)).find((l) => l.travelerId === x?.id)?.account;
     if (!x || !address) return c.json({ error: "no address" }, 409);
-    const { renew } = await c.req.json<{ renew?: unknown }>().catch(() => ({ renew: undefined }));
     const users = await store.users(), me = await selfOf(c), u = users.find((y) => y.email === address);
     if (!u) {
       let id = slug(x.name);
@@ -1183,8 +1211,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return c.json({ user: id, setup: await newSetup(made) }, 201);
     }
     if (!u.superuser && !u.disabled && !u.passwordHash && !u.googleId) return c.json({ user: u.id, setup: await newSetup(u) });
-    const mayRenew = !!me && u.invitedBy === me && !u.superuser && !u.disabled;
-    return renew === true && mayRenew ? c.json({ user: u.id, setup: await newSetup(u) }) : c.json({ exists: true, mayRenew });
+    return c.json({ exists: true }); // a forgotten password is mailed (US-35)
   });
   app.post("/api/users", async (c) => {
     const b = await c.req.json<{ name?: unknown; email?: unknown }>().catch(() => ({} as { name?: unknown; email?: unknown }));

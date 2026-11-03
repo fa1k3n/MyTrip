@@ -22,12 +22,11 @@ export const svAdmin = {
     account: "Konto (mejladress)", accountPlaceholder: "namn@exempel.se", // US-21
     accountHint: "Med en mejladress ser resenären resan när hen loggar in. Saknar adressen konto kopplas det när kontot skapas.",
     accountTaken: "Adressen används redan av en annan resenär i resan.", accountBad: "Det där är ingen mejladress.",
-    invite: (n: string) => `Bjud in ${n}`, // US-30..US-32
+    invite: (n: string) => `Bjud in ${n}`, // US-30, US-31
     inviteHint: "Skriv mejladressen ovan och tryck här. Det ger ett konto och en lösenordslänk som du skickar med din mejlapp, kopierar eller visar som QR-kod.",
     invited: (n: string, d: string) => `Inbjudan för ${n} är klar. Länken gäller till ${d}.`,
     mail: (n: string) => `Mejla inbjudan till ${n}`, copyInvite: (n: string) => `Kopiera inbjudningslänken för ${n}`, copied2: "Kopierad.",
-    hasAccount: (n: string) => `${n} har redan ett konto och ser resan när hen loggar in.`,
-    askRenew: (n: string) => `${n} har redan ett konto. Göra en ny lösenordslänk, till exempel om hen har glömt lösenordet? Lösenordet byts när länken används.`,
+    hasAccount: (n: string) => `${n} har redan ett konto och ser resan när hen loggar in. Har hen glömt lösenordet finns "Glömt lösenordet?" på inloggningen.`,
     inviteFailed: "Inbjudan gick inte att göra. Försök igen.",
   },
   inbox: { // BK-26

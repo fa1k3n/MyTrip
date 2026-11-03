@@ -30,8 +30,8 @@ const googleAnswer = (() => {
  * valid. Without an address, the password is the admin password (US-18). */
 export function Login({ expired, onDone }: { expired: boolean; onDone: () => void }) {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(googleAnswer), [busy, setBusy] = useState(false);
-  const [google, setGoogle] = useState(false);
-  useEffect(() => { api.authConfig().then((c) => setGoogle(c.google), () => {}); }, []);
+  const [google, setGoogle] = useState(false), [reset, setReset] = useState(false);
+  useEffect(() => { api.authConfig().then((c) => { setGoogle(c.google); setReset(!!c.reset); }, () => {}); }, []);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -56,18 +56,33 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
       {google && !installed && <a className="btn ghost google" href="/api/auth/google">{sv.login.google}</a>}
       {google && installed && <p className="ro note">{sv.login.googleInstalled}</p>}
     </form>
-    <Forgot google={google} /> {/* US-33 */}
+    <Forgot google={google} reset={reset} email={email} /> {/* US-35 */}
     {installed && <PasteLink />}
     <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a></p> {/* UI-13 */}
   </>;
 }
 
-/** US-33: how to get in again without a password: the inviter makes a new link, or Google with the same address. */
-function Forgot({ google }: { google: boolean }) {
-  const [open, setOpen] = useState(false);
+/** US-35: a forgotten password: a mailed password link when the server has a mail service, else how to get in again: a new link from
+ * the one who runs the instance, or Google with the same address. The answer is the same whatever the address. */
+function Forgot({ google, reset, email }: { google: boolean; reset: boolean; email: string }) {
+  const [open, setOpen] = useState(false), [to, setTo] = useState(""), [note, setNote] = useState(""), [busy, setBusy] = useState(false);
+  const toggle = () => { if (!open) { setTo(email.trim()); setNote(""); } setOpen(!open); };
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try { await api.reset(to); setNote(sv.login.forgotSent(to.trim())); } catch { setNote(sv.login.forgotFailed); }
+    setBusy(false);
+  };
+  const orGoogle = google ? ` ${sv.login.forgotGoogle}` : "";
   return <div className="forgot">
-    <button type="button" className="place" aria-expanded={open} onClick={() => setOpen(!open)}>{sv.login.forgot}</button>
-    {open && <p className="ro note" role="status">{sv.login.forgotHelp}{google ? ` ${sv.login.forgotGoogle}` : ""}</p>}
+    <button type="button" className="place" aria-expanded={open} onClick={toggle}>{sv.login.forgot}</button>
+    {open && !reset && <p className="ro note" role="status">{sv.login.forgotHelp}{orGoogle}</p>}
+    {open && reset && <form className="card" onSubmit={send}>
+      <p className="ro note">{sv.login.forgotAsk}{orGoogle}</p>
+      <label>{sv.login.email}<input type="email" inputMode="email" autoComplete="username" value={to} onChange={(e) => setTo(e.target.value)} autoFocus /></label>
+      <button className="btn" type="submit" disabled={busy || !validAddress(to.trim())}>{sv.login.forgotSend}</button>
+      {note && <p className="ro note" role="status">{note}</p>}
+    </form>}
   </div>;
 }
 
@@ -326,17 +341,16 @@ function TravelerDialog({ t, x, link, put, run, invite, close }: { t: Trip; x: T
 }
 
 const until = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
-/** US-30..US-32: the invitation of a traveler with an address: an account and a password link to mail, copy or show, or a new
- * link for an account one invited, after asking. */
+/** US-30, US-31: the invitation of a traveler with an address: an account and a password link to mail, copy or show, also anew for
+ * an account that never logged in. */
 const validAddress = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 function Invite({ t, x, to, ready }: { t: Trip; x: Trip["travelers"][number]; to: string; ready: () => Promise<boolean> }) {
   const [got, setGot] = useState<{ user: string; setup: SetupLink } | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
-  const go = async (renew = false) => {
-    if (!renew && !(await ready())) return;
+  const go = async () => {
+    if (!(await ready())) return;
     try {
-      const r = await api.invite(t.id, x.id, renew);
+      const r = await api.invite(t.id, x.id);
       if ("setup" in r) { setGot(r); setNote(""); setCopied(false); return; }
-      if (r.mayRenew && await ask(svAdmin.people.askRenew(x.name), { ok: sv.askOk.replace })) return go(true);
       setNote(svAdmin.people.hasAccount(x.name));
     } catch { setNote(svAdmin.people.inviteFailed); }
   };

@@ -67,7 +67,7 @@ test("US-30 a new link only for an account without a login; otherwise it says to
   await tie("anna", "eva@example.org"); // a superuser who can log in
   const r = await invite("anna");
   assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), { exists: true, mayRenew: false });
+  assert.deepEqual(await r.json(), { exists: true });
 });
 
 // REQ: US-30 only those who manage the trip may invite
@@ -83,25 +83,11 @@ test("US-30 a traveler or a stranger cannot invite", async () => {
   assert.equal((await invite("anna", ada)).status, 403);
 });
 
-// REQ: US-32 the inviter makes a new password link for the account they invited, after asking
-test("US-32 the inviter can renew the link of their own invitation, not of others", async () => {
-  const { app, store, admin, tie, invite } = await setup();
+// REQ: US-30 an account that can log in gets no new link, also not from the one who invited it (US-32 replaced by US-35)
+test("US-30 the inviter cannot replace the password of an account in use", async () => {
+  const { app, invite, tie } = await setup();
   await tie("anna", "anna@example.org");
   const first = await (await invite("anna")).json();
   await call(app, "/api/setup", { method: "POST", body: { user: first.user, secret: first.setup.secret, password: PW } });
-  const asked = await (await invite("anna")).json();
-  assert.deepEqual(asked, { exists: true, mayRenew: true }); // the question first
-  const renewed = await invite("anna", undefined, { renew: true });
-  assert.equal(renewed.status, 200);
-  const { setup: s } = await renewed.json();
-  assert.ok(s.secret && s.secret !== first.setup.secret);
-  // an account invited by someone else (here: the admin) is not the inviter's to renew
-  await call(app, "/api/users", { method: "POST", cookie: admin, body: { name: "Bo", email: "bo@example.org" } });
-  const bo = (await store.users()).find((u) => u.email === "bo@example.org")!;
-  await store.saveUser({ ...bo, passwordHash: "x" });
-  await tie("bo", "bo@example.org");
-  assert.deepEqual(await (await invite("bo", undefined, { renew: true })).json(), { exists: true, mayRenew: false });
-  // untied from the trip: no longer the inviter's to renew
-  await tie("anna", null);
-  assert.equal((await invite("anna", undefined, { renew: true })).status, 409);
+  assert.deepEqual(await (await invite("anna", undefined, { renew: true })).json(), { exists: true });
 });

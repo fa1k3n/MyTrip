@@ -1,6 +1,7 @@
 // The transport panel behind the clock (TR-01..TR-08).
 import type { Trip } from "@trip/schema";
 import { sv } from "./sv.ts";
+import { dayLabel } from "./format.ts";
 
 import { routeOf, wayEnds, type Route } from "@trip/schema/src/route.ts";
 export { routeOf, type Route };
@@ -65,6 +66,13 @@ export function stepText(s: TransitStep) {
   if (s.kind === "walk") return sv.transit.walk(s.min);
   const head = [sv.transit.kinds[s.vehicle] ?? sv.transit.kinds.other, s.line, s.headsign && sv.transit.toward(s.headsign)].filter(Boolean).join(" ");
   return `${head}: ${clock(s.dep)}${s.from} – ${clock(s.arr)}${s.to}${s.stops ? `, ${sv.transit.stops(s.stops)}` : ""}`;
+}
+/** The server's answer for "Visa linjer" (TR-23, TR-24). */
+export type TransitAnswer = { status: "off" | "error" | "nofrom" } | { status: "none"; far?: true } | { status: "ok"; steps: TransitStep[]; example?: string };
+/** What is said with or instead of the steps: none found, none so far ahead, or the trip of the nearest same weekday (TR-24). */
+export function transitNote(r: TransitAnswer) {
+  if (r.status === "ok") return r.example ? sv.transit.example(dayLabel(r.example)) : undefined;
+  return r.status === "none" && r.far ? sv.transit.far : sv.transit.none;
 }
 /** The icon of a step, among the means of transport the app draws. */
 export const stepIcon = (s: TransitStep) => (s.kind === "walk" ? "walk" : s.vehicle === "train" || s.vehicle === "ferry" ? s.vehicle : "transit");

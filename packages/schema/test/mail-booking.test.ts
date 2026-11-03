@@ -65,6 +65,17 @@ test("BK-16 nothing to read", () => {
   assert.deepEqual(readBooking({}), {});
 });
 
+// REQ: BK-16 a subject that only says it is a confirmation is no name: the name is read from the text, else left empty for AI-60
+test("BK-16 a generic subject is no name", () => {
+  for (const subject of ["Bokningsbekräftelse", "VB: Bokningsbekräftelse", "Din bokning #A55120", "Booking confirmation - 4471", "Kvitto.", "Tack för din bokning!", "Bekräftelse på din bokning: 12345"])
+    assert.equal(readBooking({ subject, text: "Datum 2026-10-25" }, trip).name, undefined, subject);
+  assert.equal(readBooking({ subject: "Bokningsbekräftelse", text: "Hej!\nTack för din bokning hos Hotell Kusten.\nVälkommen" }, trip).name, "Hotell Kusten");
+  assert.equal(readBooking({ subject: "Your booking", text: "Thank you for your reservation at Seaside Inn Göteborg, see you soon" }, trip).name, "Seaside Inn Göteborg");
+  assert.equal(readBooking({ subject: "Kvitto", text: "Ditt köp på Universeum\nSumma 250 kr" }, trip).name, "Universeum");
+  assert.equal(readBooking({ subject: "Bokningsbekräftelse", text: "Din bokning hos oss är klar" }, trip).name, undefined, "a lowercase word is no name");
+  assert.equal(readBooking({ subject: "Bokningsbekräftelse Hotell Kusten", text: "Tack för din bokning hos Annat" }, trip).name, "Bokningsbekräftelse Hotell Kusten", "a real subject wins");
+});
+
 // REQ: BK-16 a mail with only HTML is read through its text
 test("BK-16 htmlText", () => {
   assert.equal(htmlText("<style>p{}</style><p>Bokningsnummer:&nbsp;<b>AB12</b></p><p>R&auml;ksm&ouml;rg&#229;s &amp; mer</p>"), "Bokningsnummer: AB12\nRäksmörgås & mer");

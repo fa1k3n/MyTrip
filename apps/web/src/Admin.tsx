@@ -241,7 +241,7 @@ function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: 
           </div>
         );
       })}
-      <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={add} tip="right" /></div> {/* AU-26, UI-09 */}
+      <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={() => add()} tip="right" /> {/* never the click as an id */}</div> {/* AU-26, UI-09 */}
       {shared && linkOf(shared.id) && <ShareDialog t={t} name={shared.name} link={linkOf(shared.id)!} put={put} close={() => setSharing(null)} />}
       {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} run={run} close={() => setOpen(null)} />}
     </div>
@@ -307,7 +307,13 @@ function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["tra
         <p className="ro note">{svAdmin.people.sharesHint}</p>
         <label>{svAdmin.people.account}<input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
         <p className="ro note">{svAdmin.people.accountHint}</p>
-        {link.account && account.trim().toLowerCase() === link.account && <Invite t={t} x={x} to={link.account} />}
+        <Invite t={t} x={x} to={account.trim().toLowerCase()} ready={async () => { // US-30: a typed address is saved first
+          const to = account.trim().toLowerCase();
+          if (!validAddress(to)) { setErr(svAdmin.people.accountBad); return false; }
+          if (to === link.account) return true;
+          try { put(await api.setPerson(t.id, x.id, role, to)); setErr(""); return true; }
+          catch (y) { setErr(y instanceof ApiError && y.status === 409 ? svAdmin.people.accountTaken : svAdmin.people.accountBad); return false; }
+        }} />
         {err && <p className="err" role="alert">{err}</p>}
         <div className="dlgbar"><button className="btn" type="submit" disabled={busy}>{sv.save}</button></div>
       </form>
@@ -318,9 +324,11 @@ function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["tra
 const until = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
 /** US-30..US-32: the invitation of a traveler with an address: an account and a password link to mail, copy or show, or a new
  * link for an account one invited, after asking. */
-function Invite({ t, x, to }: { t: Trip; x: Trip["travelers"][number]; to: string }) {
+const validAddress = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+function Invite({ t, x, to, ready }: { t: Trip; x: Trip["travelers"][number]; to: string; ready: () => Promise<boolean> }) {
   const [got, setGot] = useState<{ user: string; setup: SetupLink } | null>(null), [note, setNote] = useState(""), [qr, setQr] = useState(false), [copied, setCopied] = useState(false);
   const go = async (renew = false) => {
+    if (!renew && !(await ready())) return;
     try {
       const r = await api.invite(t.id, x.id, renew);
       if ("setup" in r) { setGot(r); setNote(""); setCopied(false); return; }
@@ -331,7 +339,7 @@ function Invite({ t, x, to }: { t: Trip; x: Trip["travelers"][number]; to: strin
   const url = got && setupUrl(location.origin, got.user, got.setup.secret);
   const copy = async () => { try { await navigator.clipboard.writeText(url!); setCopied(true); } catch { /* no clipboard */ } };
   return <div className="invite">
-    <div className="row mid"><IconButton icon="mail" tip="right" label={svAdmin.people.invite(x.name)} onClick={() => go()} /><small className="ro">{svAdmin.people.inviteHint}</small></div>
+    <div className="row mid"><IconButton icon="mail" tip="right" label={svAdmin.people.invite(x.name)} disabled={!to} onClick={() => go()} /><small className="ro">{svAdmin.people.inviteHint}</small></div>
     {got && url && <div className="setuplink" role="status">
       <p>{svAdmin.people.invited(x.name, until(got.setup.expires))}</p>
       <span className="end">

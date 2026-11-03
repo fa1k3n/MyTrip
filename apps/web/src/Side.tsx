@@ -2,7 +2,7 @@
 // Loaded on demand with the Nåla tab to keep the page under 200 KB (PF-01).
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { Trip } from "@trip/schema";
-import { bookingDates, bookingTimes, kr, shortDate, statusBadge, toBook } from "./format.ts";
+import { bookingDates, bookingTimes, bookingsTint, kr, shortDate, statusBadge, toBook } from "./format.ts";
 import { api, type MailProposal } from "./api.ts";
 import { BudgetPlanView, LimitIcon, limitClass } from "./Donut.tsx";
 import { amountText } from "./budget.ts";
@@ -25,8 +25,8 @@ import { WISH_DRAG } from "./schedule.ts";
 
 type MayOf = (id: string) => boolean; // whether the role may change that section (AU-21)
 
-/** A calm count in a section's heading, seen also when it is closed: AI suggestions waiting, bookings to book (UI-22). Not a warning. */
-const CountMark = ({ icon, n, label }: { icon: "sparkle" | "ticket"; n: number; label: string }) =>
+/** A calm count in a section's heading, seen also when it is closed: AI suggestions waiting (UI-22). Not a warning. */
+const CountMark = ({ icon, n, label }: { icon: "sparkle"; n: number; label: string }) =>
   n > 0 ? <span className="secmark" role="img" aria-label={label} title={label}><Icon name={icon} />{n}</span> : null;
 
 /** A collapsible section of the side column, closed by default (BG-01, PK-02). It has no lock: its editing controls show
@@ -99,10 +99,11 @@ function Bookings({ t, edit, onPlace, part, review, run }: { part: MayOf; t: Tri
   const mails = useMailProposals(t, part("bookings")), twins = mailTwins(t, mails);
   const suggested = useAiSuggestions(t, !!review && part("bookings"), "prep", "bookings/-"); // BK-21
   const [err, setErr] = useState<string | null>(null);
-  const flag = <>{mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>}
-    <CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} /><CountMark icon="ticket" n={toBook(t)} label={sv.marks.toBook(toBook(t))} /></>;
+  const flag = <>{toBook(t) > 0 && <span className="limiticon near inline" role="img" aria-label={sv.marks.toBook(toBook(t))} title={sv.marks.toBook(toBook(t))}><Icon name="alert" /></span> /* BK-34 */}
+    {mails.length > 0 && <span className="mailflag" role="img" aria-label={sv.mail.waiting(mails.length)} title={sv.mail.waiting(mails.length)}><Icon name="mail" />{mails.length}</span>}
+    <CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} /></>;
   return (
-    <Section title={sv.bookings} may={part("bookings")} flag={flag} id="sec-bookings">
+    <Section title={sv.bookings} may={part("bookings")} flag={flag} tint={bookingsTint(t)} id="sec-bookings">
       {mails.length > 0 && <div className="mails">{/* not an editing control: reviewing is the point (BK-17) */}
         <p className="ro note">{sv.mail.waiting(mails.length)}</p>
         {mails.map((m) => {

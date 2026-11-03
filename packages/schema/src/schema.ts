@@ -106,6 +106,7 @@ export const BudgetItem = z.object({
   amount: z.number().nonnegative().optional(), // missing: not checked yet (BG-06)
   amountMax: z.number().nonnegative().optional(), // upper end of a range, e.g. 75–100 (BG-03)
   estimate: z.boolean().optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), // default: the trip's currency (BG-07)
+  rate: z.number().positive().optional(), rateDate: Date_.optional(), // another currency: the trip's currency per unit, and its date (BG-07, BK-25)
   note: z.string().optional(),
   bookingId: Id.optional(), // the booking whose price it is; not counted while that booking is cancelled (BK-25, BK-05)
   hidden: z.boolean().optional(), // only in what a Resenär or Följare receives: its texts give away a hidden activity (AU-30)

@@ -257,7 +257,14 @@ export type BookingInput = {
   kind?: "stay" | "ticket" | "other" | "transport"; checkIn?: string; checkOut?: string; start?: string; activityId?: string; // undefined: keep (BK-07, BK-08)
   files?: TicketFile[]; // undefined: keep (BK-09)
   price?: string; currency?: string; // the booking's own budget item; undefined: keep, "": remove (BK-25)
+  rate?: Rate; // fetched when saved, for a price in another currency (BK-25, BG-07)
 };
+/** The trip's currency per unit of another, and the date of the rate (BG-07). */
+export type Rate = { rate: number; date: string };
+/** The rate fields of a budget item in `currency`: the new rate, else the old one of the same currency; none in the trip's currency (BG-07). */
+const rateOf = (t: Trip, currency: string | undefined, rate: Rate | undefined, old?: { currency?: string; rate?: number; rateDate?: string }) =>
+  !currency || currency === t.currency ? {} : rate ? { rate: rate.rate, rateDate: rate.date }
+    : old?.currency === currency ? { rate: old.rate, rateDate: old.rateDate } : {};
 
 /** The activities a Biljett can be linked to: those on its first date (BK-08). */
 export const ticketActivities = (t: Trip, date: string) => t.days.filter((d) => d.date === date).flatMap((d) => d.activities);
@@ -288,17 +295,18 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
     kind, ...times, files,
   });
   return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking },
-    ...(input.price === undefined ? [] : priceOps(t, booking as Booking, price, input.currency))]);
+    ...(input.price === undefined ? [] : priceOps(t, booking as Booking, price, input.currency, input.rate))]);
 }
 
 const PRICE_CATEGORY: Record<string, string> = { stay: "Boende", ticket: "Upplevelse", transport: "Transport" };
 /** The booking's own budget item: added, updated (keeping its category) or, without a price, removed (BK-25). */
-function priceOps(t: Trip, b: Booking, price: number | undefined, currency?: string): Op[] {
+function priceOps(t: Trip, b: Booking, price: number | undefined, currency?: string, rate?: Rate): Op[] {
   const i = t.budget.findIndex((x) => x.bookingId === b.id), old = t.budget[i];
   if (price === undefined) return old ? removeAt("budget", [i]) : [];
   const item = clean({
     ...old, id: old?.id ?? uniqueId(`${b.id}-pris`, allIds(t)), bookingId: b.id, category: old?.category ?? PRICE_CATEGORY[b.kind ?? ""] ?? "Övrigt",
     note: b.name, amount: price, currency: currency || t.currency, paid: b.status === "paid", amountMax: undefined, estimate: undefined,
+    rate: undefined, rateDate: undefined, ...rateOf(t, currency || t.currency, rate, old),
   });
   return [old ? { op: "set", path: `budget/${i}`, value: item } : { op: "add", path: "budget/-", value: item }];
 }
@@ -368,6 +376,7 @@ export const removeBooking = (t: Trip, id: string): Op[] => [ // with its own bu
 export type BudgetInput = {
   category: string; amount: string; paid: boolean; owner: string;
   estimate?: boolean; amountMax?: string; currency?: string; note?: string; // BG-03, BG-06, BG-07
+  rate?: Rate; // fetched when saved, for another currency (BG-07)
 };
 
 export function saveBudgetItem(t: Trip, input: BudgetInput, id?: string): Result {
@@ -384,6 +393,7 @@ export function saveBudgetItem(t: Trip, input: BudgetInput, id?: string): Result
   const item = clean({
     id: old?.id ?? uniqueId(category, allIds(t)), category, amount, amountMax, paid: input.paid,
     estimate: estimate || undefined, currency, owner: input.owner.trim() || undefined, note: input.note?.trim() || undefined,
+    ...rateOf(t, currency, input.rate, old),
   });
   return ok([old ? { op: "set", path: `budget/${i}`, value: item } : { op: "add", path: "budget/-", value: item }]);
 }

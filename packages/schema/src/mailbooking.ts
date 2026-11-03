@@ -92,18 +92,29 @@ function kind(text: string): BookingReading["kind"] {
 export const FORWARD_PREFIX = /^\s*((fwd?|fw|vb|vs|sv|re|tr|aw|wg)\s*:\s*)+/i;
 /** "Bokning:" or "Önskan:" first in a subject, after forwarding prefixes: the sender's own sorting (BK-28). */
 export const KIND_PREFIX = /^\s*(bokning|önskan)\s*:\s*/i;
-/** A subject without forwarding prefixes and the sorting prefix. */
-export const bareSubject = (s: string) => s.replace(FORWARD_PREFIX, "").replace(KIND_PREFIX, "").trim();
+/** A forwarded subject in brackets, as "[Fwd: …]": the subject inside them. */
+const BRACKETED = /^\s*\[\s*(?:fwd?|fw|vb|vs|tr|wg)\s*:\s*([\s\S]*?)\s*\]\s*$/i;
+const unbracket = (s: string): string => { const x = s.replace(FORWARD_PREFIX, ""), m = BRACKETED.exec(x); return m ? unbracket(m[1]!) : x; };
+/** A subject without forwarding prefixes, also in brackets, and the sorting prefix. */
+export const bareSubject = (s: string) => unbracket(s).replace(FORWARD_PREFIX, "").replace(KIND_PREFIX, "").trim();
 const GENERIC_WORDS = "bokningsbekräftelse|orderbekräftelse|bekräftelse på din (bokning|beställning)|bekräftelse|din bokning|din beställning"
-  + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?";
+  + "|tack för (din bokning|ditt köp|din beställning)|booking confirmation|order confirmation|your booking|your order|kvitto|e-biljett|biljetter?|tickets?"
+  + "|(ihre )?(buchungs|reservierungs|bestell)?bestätigung|ihre (buchung|reservierung|bestellung)|confirmation de (réservation|commande)|votre réservation"
+  + "|(bestillings|booking)?bekreftelse|(bestillings|booking)?bekræftelse|confirmación de reserva|conferma (di )?prenotazione|(reserverings|boekings)?bevestiging";
 const GENERIC = new RegExp(`^(${GENERIC_WORDS})\\s*(?:[-–—:|,]\\s*|\\s+(?:hos|till|på|från)\\s+)`, "i");
 /** What is left of a subject that only says it is a confirmation: punctuation and at most a number such as #A55120. */
 const NO_NAME = /^[\s#:.,!|–—-]*(?:[\p{L}\d-]*\d[\p{L}\d-]*)?[\s.!]*$/u;
+/** A subject in parts, as "Rezervace potvrzena – Penzion Příklad": the one part the text also names, in any language (BK-16). */
+function namedPart(subject: string, text: string): string {
+  const parts = subject.split(/\s+[-–—|]\s+/), low = text.toLowerCase();
+  const named = parts.filter((p) => p.trim().length >= 3 && low.includes(p.trim().toLowerCase()));
+  return parts.length > 1 && named.length === 1 ? named[0]!.trim() : subject;
+}
 /** The subject without forwarding prefixes and words that only say it is a confirmation; none when nothing else is left (BK-16). */
-function subjectName(subject: string): string | undefined {
+function subjectName(subject: string, text: string): string | undefined {
   let s = bareSubject(subject);
   for (let g = GENERIC.exec(s); g && s.length > g[0].length; g = GENERIC.exec(s)) s = s.slice(g[0].length).trim();
-  return NO_NAME.test(s.replace(new RegExp(`^(${GENERIC_WORDS})`, "i"), "")) ? undefined : s;
+  return NO_NAME.test(s.replace(new RegExp(`^(${GENERIC_WORDS})`, "i"), "")) ? undefined : namedPart(s, text);
 }
 /** A name after "bokning hos", "köp på", "reservation at" and the like in the text, starting with a capital letter (BK-16). */
 const TEXT_NAME = /\b(?:bokning|vistelse|reservation|beställning|köp|booking|stay|order|purchase)\s+(?:hos|på|at|with)\s+(\p{Lu}[^\n.!,;:()]{1,58})/u;
@@ -163,7 +174,7 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
   const k = kind(`${mail.subject ?? ""}\n${text}`), checkIn = timeAfter(text, CHECK_IN);
   const stay = k === "stay" || (!k && !!checkIn);
   const fromText = clean({
-    kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject) : undefined) ?? textName(text), reference: reference(text), price: price(text),
+    kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject, text) : undefined) ?? textName(text), reference: reference(text), price: price(text),
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
   });

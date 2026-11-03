@@ -519,3 +519,10 @@ a.btn.google{display:flex;justify-content:center;margin-top:8px;text-decoration:
 .usage{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}.usage p{margin:0 0 6px}
 .tablewrap{overflow-x:auto}.usage table{border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
 .usage th,.usage td{padding:4px 10px 4px 0;text-align:left;white-space:nowrap}.usage thead th{color:var(--mute);font-weight:600}
+/* BK-34: bookings to book are a less serious warning, the triangle by the heading so the other marks stay to the right. */
+.limiticon.inline{margin:0 0 0 8px}
+/* LC-05: a date field as dd/mm/åååå, with the device's calendar under a transparent date input on the icon. */
+.datefield{display:flex;align-items:center;gap:6px;margin:4px 0 10px}.datefield>input{flex:1;min-width:0;margin:0}
+.datepick{position:relative;flex:0 0 44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:var(--sageT);cursor:pointer}
+.datepick svg{width:20px;height:20px}
+.datepick input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}

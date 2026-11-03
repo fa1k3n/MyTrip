@@ -1,7 +1,7 @@
 // Budget display: amounts in their own currency (BG-06, BG-07), and plan, utfall and prognos per category (BG-15..BG-19).
 import { sv } from "./sv.ts";
 
-type Item = { amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean };
+type Item = { amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean; rate?: number };
 const symbols: Record<string, string> = { SEK: "kr", EUR: "€", USD: "$", GBP: "£" };
 
 const num = (n: number) => n.toLocaleString("sv-SE", Number.isInteger(n) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10,15 +10,17 @@ export const money = (n: number, currency: string) => `${num(n)} ${symbols[curre
 export function amountText(i: Item, tripCurrency: string) {
   if (i.amount === undefined) return sv.notChecked;
   const cur = i.currency ?? tripCurrency;
-  const text = i.amountMax !== undefined ? `${num(i.amount)}–${money(i.amountMax, cur)}` : money(i.amount, cur);
-  return i.estimate ? `ca ${text}` : text;
+  const range = (a: number, b: number | undefined, c: string) => (b !== undefined ? `${num(a)}–${money(b, c)}` : money(a, c));
+  const text = range(i.amount, i.amountMax, cur), r = cur !== tripCurrency ? i.rate : undefined;
+  const home = r ? ` (ca ${range(Math.round(i.amount * r), i.amountMax !== undefined ? Math.round(i.amountMax * r) : undefined, tripCurrency)})` : ""; // BG-07
+  return (i.estimate ? `ca ${text}` : text) + home;
 }
 
 type Slice = { label: string; value: number; kind: "cat" | "unused" };
 
 type PlanTrip = {
   currency: string; budgetMax?: number;
-  budget: { category: string; amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean; bookingId?: string }[];
+  budget: { category: string; amount?: number; amountMax?: number; estimate?: boolean; currency?: string; paid: boolean; bookingId?: string; rate?: number }[];
   bookings?: { id: string; status: string }[];
   expenses: { category: string; amount: number }[];
 };
@@ -36,9 +38,10 @@ export function budgetPlan(t: PlanTrip, used = false) {
   for (const i of t.budget) {
     const r = row(i.category || sv.hiddenText); // a hidden budget item reaches the viewer without its category (AU-30)
     if (i.bookingId && cancelled.has(i.bookingId)) continue; // listed, not counted (BK-05)
-    if (i.currency && i.currency !== t.currency) continue; // listed, not counted (BG-07)
-    r.planned += cents(i.amountMax ?? i.amount ?? 0);
-    if (i.paid && !i.estimate && i.amount !== undefined) r.actual += cents(i.amount);
+    const rate = i.currency && i.currency !== t.currency ? i.rate : 1;
+    if (!rate) continue; // another currency without a rate: listed, not counted (BG-07)
+    r.planned += cents((i.amountMax ?? i.amount ?? 0) * rate);
+    if (i.paid && !i.estimate && i.amount !== undefined) r.actual += cents(i.amount * rate);
   }
   for (const e of t.expenses) {
     const r = row(e.category || sv.hiddenText);

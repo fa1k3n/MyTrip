@@ -29,6 +29,22 @@ const dayMonth = (iso: string) => { const p = parts(iso); return `${p.d} ${sv.mo
 export const shortDate = (iso: string) => `${dayMonth(iso)} ${parts(iso).y}`;
 export const dayLabel = (iso: string) => `${sv.weekdays[parts(iso).wd]} ${dayMonth(iso)}`; // BG-21
 
+/** A date field's text: dd/mm/åååå, whatever the browser's language (LC-05). */
+export const dateText = (iso: string) => (/^\d{4}-\d\d-\d\d$/.test(iso) ? iso.split("-").reverse().join("/") : "");
+/** A date typed in a date field as an ISO date: d/m/åååå with /, . or -, the eight digits, or 2027-11-01; undefined when it is no date (LC-05). */
+export function parseDate(text: string): string | undefined {
+  const s = text.trim(), m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s) ?? /^(\d\d)(\d\d)(\d{4})$/.exec(s), iso = /^(\d{4})-(\d\d)-(\d\d)$/.exec(s);
+  const [y, mo, d] = iso ? [+iso[1]!, +iso[2]!, +iso[3]!] : m ? [+m[3]!, +m[2]!, +m[1]!] : [0, 0, 0];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? date.toISOString().slice(0, 10) : undefined;
+}
+/** Digits typed in a date field with the slashes put in: "011" is "01/1" (LC-05); other separators are left as typed. */
+export function typedDate(text: string): string {
+  if (!/^[\d/]*$/.test(text) || text.endsWith("/")) return text;
+  const d = text.replace(/\D/g, "").slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join("/");
+}
+
 export function tripDates(t: { days: { date: string }[]; dateLabel?: string }) {
   if (t.dateLabel) return t.dateLabel;
   if (!t.days.length) return sv.noDates;
@@ -109,6 +125,8 @@ export const scrollBehavior = (reducedMotion: boolean): ScrollBehavior => (reduc
 /** The class of a booking's status badge: green when paid or ready (BK-19). */
 /** How many bookings are still to book (BK-20, UI-22). */
 export const toBook = (t: { bookings: { status: string }[] }) => t.bookings.filter((b) => b.status === "tobook").length;
+/** The bookings card's tint: light yellow while something is left to book (BK-34). */
+export const bookingsTint = (t: { bookings: { status: string }[] }) => (toBook(t) > 0 ? "caution" : "");
 export const statusBadge = (status: string) => (status === "paid" || status === "ready" ? "badge ok" : status === "tobook" ? "badge tobook" : "badge"); // BK-19, BK-20
 
 /** What the app says when an AI feature could not run (AI-03, AI-65). */

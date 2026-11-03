@@ -1,5 +1,5 @@
 // Dialog forms for editing the plan (ED-01..ED-11). The changes themselves are built in edit.ts.
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
@@ -10,7 +10,7 @@ import { lookupPlace } from "./weather.ts";
 import { AiMark, Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { replaceNeedsAsk, suggestPurpose } from "./purpose.ts";
-import { aiErrorText, dayLabel, dayTitle, shortDate } from "./format.ts";
+import { aiErrorText, dateText, dayLabel, dayTitle, parseDate, shortDate, typedDate } from "./format.ts";
 import { activityMissing, defaultDuration, planWish, suggestStart } from "./schedule.ts";
 import { CatIcon } from "./CatIcon.tsx";
 import { pickedLabel } from "./hiddenView.ts";
@@ -19,6 +19,7 @@ import { fmtDuration } from "./transport.ts";
 import { readBooking } from "@trip/schema/src/mailbooking.ts";
 import { api, type MailProposal } from "./api.ts";
 import { checkPick } from "./tickets.ts";
+import { todayIn } from "./today.ts";
 import { MAX_NOTE, memoryOps, mineOf, saveAlbum } from "./memories.ts";
 import { defaultSharers, rewishOps, splitOps, wishOf } from "./money.ts";
 import { ActivityAndCategory } from "./ExpenseFields.tsx";
@@ -41,6 +42,25 @@ type Props = {
 };
 
 type Change = ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
+
+/** Today's rate for an amount in another currency than the trip's; none in its own currency or without a rate (BG-07, BK-25). */
+const rateToday = async (t: Trip, currency: string | undefined) =>
+  !currency || currency === t.currency ? undefined : (await (await import("./currency.ts")).rateFor(currency, t.currency, todayIn(t.timezone))) ?? undefined;
+
+/** A date as dd/mm/åååå whatever the browser's language, typed or picked in the device's calendar behind the icon (LC-05).
+ * The form gets the ISO date, or "" while the text is no date. */
+function DateField({ label, value, onChange, autoFocus }: { label: string; value: string; onChange: (e: Change) => void; autoFocus?: boolean }) {
+  const [typed, setTyped] = useState(() => dateText(value));
+  useEffect(() => { if (value && parseDate(typed) !== value) setTyped(dateText(value)); }, [value]); // filled in from elsewhere
+  const set = (iso: string) => onChange({ target: { value: iso } } as Change);
+  return <label>{label}<span className="datefield">
+    <input value={typed} inputMode="numeric" placeholder={sv.datePlaceholder} autoFocus={autoFocus}
+      onChange={(e) => { const s = typedDate(e.target.value); setTyped(s); set(parseDate(s) ?? ""); }} />
+    <span className="datepick" title={sv.pickDate}><Icon name="calendar" />
+      <input type="date" tabIndex={-1} aria-label={sv.pickDate} value={value} onChange={(e) => set(e.target.value)}
+        onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* opened by the tap itself, or not supported */ } }} /></span>
+  </span></label>;
+}
 function useFields<T extends Record<string, string | boolean>>(init: T) {
   const [f, set] = useState(init);
   const text = (k: keyof T) => ({ value: f[k] as string, onChange: (e: Change) => set((o) => ({ ...o, [k]: e.target.value })) });
@@ -193,8 +213,8 @@ function DatesForm(p: Props) {
   return (
     <Form title={sv.editDates} {...s} close={p.close} onSubmit={submit}>
       <div className="two">
-        <label>{sv.firstDay}<input type="date" {...text("from")} autoFocus /></label>
-        <label>{sv.lastDay}<input type="date" {...text("to")} /></label>
+        <DateField label={sv.firstDay} {...text("from")} autoFocus />
+        <DateField label={sv.lastDay} {...text("to")} />
       </div>
       <p className="ro note">{sv.datesHint}</p>
     </Form>
@@ -368,8 +388,9 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   };
   const kinds: NonNullable<BookingInput["kind"]>[] = ["stay", "ticket", "other", ...(b?.kind === "transport" ? ["transport" as const] : [])];
   const acts = ticketActivities(p.t, f.from);
-  const submit = () => {
-    const r = saveBooking(p.t, f, p.id ?? (target || undefined)); // BK-22: a chosen "Att boka" booking is updated
+  const submit = async () => {
+    const rate = f.price?.trim() ? await rateToday(p.t, f.currency) : undefined; // counted in the budget in the trip's currency (BK-25)
+    const r = saveBooking(p.t, { ...f, rate }, p.id ?? (target || undefined)); // BK-22: a chosen "Att boka" booking is updated
     if (mail && p.approveMail) s.submit(r, "", (ops) => p.approveMail!(mail.id, ops)); // BK-17: saving approves the mail
     else s.submit(r, p.id || target ? "edit booking" : "add booking");
   };
@@ -397,8 +418,8 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
       <input id="bname" {...text("name")} autoFocus={paste === null} />
       <label>{sv.bookingKinds.label}<select {...text("kind")}>{kinds.map((k) => <option key={k} value={k}>{sv.bookingKinds[k]}</option>)}</select></label>
       <div className="two">
-        <label>{sv.firstDate}<input type="date" {...text("from")} /></label>
-        <label>{sv.lastDate}<input type="date" {...text("to")} /></label>
+        <DateField label={sv.firstDate} {...text("from")} />
+        <DateField label={sv.lastDate} {...text("to")} />
       </div>
       {f.kind === "stay" && <div className="two">
         <label>{sv.bookingKinds.checkIn}<input type="time" {...text("checkIn")} /></label>
@@ -448,7 +469,7 @@ function BudgetForm(p: Props & { id?: string }) {
   const categories = [...new Set([...sv.budgetCategories, ...p.t.budget.map((x) => x.category)])];
   return (
     <Form title={p.id ? sv.editCost : sv.newCost} {...s} close={p.close}
-      onSubmit={() => s.submit(saveBudgetItem(p.t, f, p.id), p.id ? "edit budget" : "add budget")}
+      onSubmit={async () => s.submit(saveBudgetItem(p.t, { ...f, rate: await rateToday(p.t, f.currency) }, p.id), p.id ? "edit budget" : "add budget")}
       onRemove={p.id ? () => s.remove(removeBudgetItem(p.t, p.id!), "remove budget") : undefined}>
       <label>{sv.category}<select {...text("category")} autoFocus>{categories.map((c) => <option key={c}>{c}</option>)}</select></label>
       <label>{sv.description}<input {...text("note")} /></label>
@@ -481,7 +502,7 @@ function TaskForm(p: Props & { id?: string }) {
       onSubmit={() => s.submit(saveTask(p.t, f, p.id), p.id ? "edit task" : "add task")}
       onRemove={p.id ? () => s.remove(removeTask(p.t, p.id!), "remove task") : undefined}>
       <label>{sv.what}<input {...text("text")} autoFocus /></label>
-      <label>{sv.due}<input type="date" {...text("due")} /></label>
+      <DateField label={sv.due} {...text("due")} />
       <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
     </Form>
   );

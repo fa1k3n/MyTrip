@@ -307,10 +307,11 @@ export const sv = {
   date: "Datum", summaryLabel: "Sammanfattning (en mening, utan klockslag)", icons: "Egna ikoner, en eller två (visas när aktiviteterna saknar kategori)",
   start: "Start", end: "Slut", estimate: "ca", location: "Ort (för vädret)", time: "Tid", what: "Vad",
   placeLabel: "Plats", noPlace: "Ingen plats", newPlace: "Ny plats…", placeName: "Platsens namn", address: "Adress",
+  datePlaceholder: "dd/mm/åååå", pickDate: "Välj i kalendern", // LC-05
   firstDate: "Första datum", lastDate: "Sista datum", status: "Status", reference: "Bokningsnummer",
   statuses: { tobook: "Att boka", paid: "Betald", ready: "Klar", cancelled: "Avbokad" }, paidMark: "Betald", owner: "Ansvarig",
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
-  marks: { suggestions: (n: number) => `${n} AI-förslag väntar`, toBook: (n: number) => `${n} ${n === 1 ? "bokning" : "bokningar"} att boka` }, // UI-22
+  marks: { suggestions: (n: number) => `${n} AI-förslag väntar`, toBook: (n: number) => `${n} ${n === 1 ? "bokning" : "bokningar"} att boka` }, // UI-22, BK-34
   badge: { tobook: "att boka", paid: "betald", ready: "klar", cancelled: "avbokad" }, bookIt: "Boka", // BK-20
   tickets: { // BK-09, BK-10
     title: "Biljetter", show: "Visa biljett", add: "Lägg till biljett", remove: (n: string) => `Ta bort ${n}`, confirmRemove: "Ta bort biljetten?",
@@ -336,7 +337,7 @@ export const sv = {
     movedToBooking: "Mejlet ligger nu under Bokningar i Nåla, att granska.", noMailKept: "Mejlet finns inte kvar, så önskan kan inte bli en bokning.",
     wishInUse: "Önskan är med i planen eller har omdömen, så den ligger kvar. Lägg in bokningen för hand under Bokningar.",
     toWish: "Gör till önskan", confirmToWish: "Göra mejlet till en önskan i Önska i stället för en bokning? Bifogade filer utom en bild tas bort.", // BK-29
-    price: "Pris", priceHint: "Priset läggs i budgeten som en egen post.", // BK-25
+    price: "Pris", priceHint: "Priset läggs i budgeten som en egen post, i annan valuta omräknat med dagens kurs.", // BK-25
     target: "Gäller", newBooking: "Ny bokning", targetHint: "Bokningen som stod som Att boka fylls i och blir klar.", // BK-22
   },
   bookingKinds: { // BK-07, BK-08

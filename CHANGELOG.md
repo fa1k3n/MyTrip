@@ -2,6 +2,11 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.2.2 – 2026-11-03
+
+### Fixed
+- An empty day added from the trip's dates shows a calendar line icon like the other days, not the system's coloured emoji (UI-08).
+
 ## 0.2.1 – 2026-11-03
 
 Fixes from the first beta trips, and "Kör nu" for wish suggestions in Önska.

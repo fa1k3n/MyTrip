@@ -3,6 +3,7 @@
 import { ROSE, SAGE, SAND, TAUPE, TERRACOTTA } from "./palette.ts";
 
 const SHAPES: Record<string, string> = {
+  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>', // an empty day (UI-08)
   bed: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>', // UP-42
   ellipsis: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>', // UP-42
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
@@ -51,6 +52,7 @@ export const ICONS: Record<string, { shape: string; color: string; label: string
   train: { shape: "train", color: TAUPE, label: "Tåg" },
   transit: { shape: "tram", color: TAUPE, label: "Kollektivtrafik" },
   walk: { shape: "walk", color: TAUPE, label: "Promenad" },
+  "📅": { shape: "calendar", color: TAUPE, label: "Dag" }, // the icon of a day added from the trip's dates (ED-14), drawn as a line (UI-08)
 };
 
 /** A known id as a tinted badge; anything else (a day's own emoji) as plain text. */

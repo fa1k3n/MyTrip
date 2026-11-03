@@ -28,7 +28,16 @@ const pathOf = (t: Trip, x: AiItem): string | undefined => {
   const list = { task: "tasks", booking: "bookings", wish: "dreams", info: "info" }[x.kind], i = (t[list as "tasks"] as { id: string }[]).findIndex((y) => y.id === x.id);
   return i < 0 ? undefined : `${list}/${i}`;
 };
-/** Keeps one item: its AI mark goes, and that of its AI wish or of the wish's AI activities, which belong together (AI-83). */
+/** The AI places the given activities use, as changes that confirm them (DQ-01). */
+const placeMarks = (t: Trip, acts: string[]): Op[] => {
+  const used = new Set(t.days.flatMap((d) => d.activities.filter((a) => acts.includes(a.id)).flatMap((a) => a.placeIds)));
+  return t.places.flatMap((p, i) => (p.ai && used.has(p.id) ? [{ op: "remove" as const, path: `places/${i}/ai` }] : []));
+};
+/** Each change once, so the same mark is not removed twice. */
+export const once = (ops: Op[]) => ops.filter((o, i) => ops.findIndex((x) => x.op === o.op && x.path === o.path) === i);
+
+/** Keeps one item: its AI mark goes, and that of its AI wish or of the wish's AI activities and the AI places they use, which belong
+ * together (AI-83, DQ-01). */
 export function keepAi(t: Trip, x: AiItem): Op[] {
   if (x.kind === "packing") { // AI-89: the item stays, its mark goes
     const p = packLists(t).find((y) => y.id === x.list);
@@ -39,13 +48,14 @@ export function keepAi(t: Trip, x: AiItem): Op[] {
     ...(x.kind !== "wish" && t.dreams.find((w) => w.id === wish)?.ai ? [{ kind: "wish" as const, id: wish }] : []),
     ...t.days.flatMap((d) => d.activities.filter((a) => a.ai && a.dreamId === wish && a.id !== x.id).map((a) => ({ kind: "activity" as const, dayId: d.id, id: a.id }))),
   ] : [])];
-  return items.flatMap((y) => { const p = pathOf(t, y); return p ? [{ op: "remove" as const, path: `${p}/ai` }] : []; });
+  const acts = [...(x.kind === "activity" ? [x.id] : []), ...t.days.flatMap((d) => d.activities.filter((a) => wish && a.dreamId === wish).map((a) => a.id))];
+  return once([...items.flatMap((y) => { const p = pathOf(t, y); return p ? [{ op: "remove" as const, path: `${p}/ai` }] : []; }), ...placeMarks(t, acts)]);
 }
 /** Behåll allt: every AI mark in the trip goes (AI-84). */
 export const keepAllAi = (t: Trip): Op[] => [
   ...[
     ...t.days.flatMap((d, di) => d.activities.flatMap((a, ai) => (a.ai ? [`days/${di}/activities/${ai}`] : []))),
-    ...(["tasks", "bookings", "dreams", "info"] as const).flatMap((k) => (t[k] as { ai?: boolean }[]).flatMap((x, i) => (x.ai ? [`${k}/${i}`] : []))),
+    ...(["tasks", "bookings", "dreams", "info", "places"] as const).flatMap((k) => (t[k] as { ai?: boolean }[]).flatMap((x, i) => (x.ai ? [`${k}/${i}`] : []))), // places: DQ-01
   ].map((p): Op => ({ op: "remove", path: `${p}/ai` })),
   ...packLists(t).filter((x) => x.l.packingAi?.length).map((x): Op => ({ op: "set", path: `${x.base}packingAi`, value: [] })), // AI-89
 ];

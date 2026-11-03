@@ -311,6 +311,12 @@ export const sv = {
   firstDate: "Första datum", lastDate: "Sista datum", status: "Status", reference: "Bokningsnummer",
   statuses: { tobook: "Att boka", paid: "Betald", ready: "Klar", cancelled: "Avbokad" }, paidMark: "Betald", owner: "Ansvarig",
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
+  check: { // DQ-08: "Kontrollera resan"
+    title: "Kontrollera resan", ok: "Inga problem hittade.", warn: "Resan har allvarliga problem", caution: "Resan har något att se över", allOk: "Resan ser bra ut",
+    what: "Kontrollerar nu: boende varje natt.",
+    noStay: (nights: string, n: number) => `${n === 1 ? "Natten" : "Nätterna"} ${nights} saknar boende.`,
+    toBook: (nights: string, n: number) => `${n === 1 ? "Natten" : "Nätterna"} ${nights}: boendet är inte bokat än.`,
+  },
   marks: { suggestions: (n: number) => `${n} AI-förslag väntar`, toBook: (n: number) => `${n} ${n === 1 ? "bokning" : "bokningar"} att boka` }, // UI-22, BK-34
   badge: { tobook: "att boka", paid: "betald", ready: "klar", cancelled: "avbokad" }, bookIt: "Boka", // BK-20
   tickets: { // BK-09, BK-10

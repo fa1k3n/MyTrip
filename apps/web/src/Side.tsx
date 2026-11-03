@@ -9,6 +9,7 @@ import { amountText } from "./budget.ts";
 import { MailInButton } from "./MailIn.tsx";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
+import { checkLevel, tripFindings } from "./tripCheck.ts";
 import { sv } from "./sv.ts";
 import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
@@ -268,6 +269,18 @@ function Packing({ t, run, part, tick, review }: { part: MayOf; t: Trip; run: Ru
 }
 
 /** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
+/** "Kontrollera resan": what the rules find in the plan, with a red or yellow triangle or a green check in the heading (DQ-08). */
+function TripCheck({ t }: { t: Trip }) {
+  const found = tripFindings(t), level = checkLevel(found), label = level === "ok" ? sv.check.allOk : sv.check[level];
+  const mark = <span className={`limiticon inline ${level === "caution" ? "near" : level === "ok" ? "allok" : level}`} role="img" aria-label={label} title={label}><Icon name={level === "ok" ? "allok" : "alert"} /></span>;
+  return (
+    <Section title={sv.check.title} may flag={mark} tint={level === "ok" ? "" : level} id="sec-check">
+      {found.length ? <ul className="checks">{found.map((f) => <li key={f.text} className={f.level}><Icon name="alert" /><span>{f.text}</span></li>)}</ul> : <p>{sv.check.ok}</p>}
+      <p className="ro note">{sv.check.what}</p>
+    </Section>
+  );
+}
+
 export default function Side({ t, today, edit, run, onPlace, parts, wishes, review }: {
   review?: Review; // AI-70: for those who review proposals
   parts: Record<string, Level>; // the role's levels on Nåla's components (AU-20)
@@ -276,6 +289,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
 }) {
   const part = (id: string) => parts[id] === "write";
   return <>
+    {parts.bookings !== "hidden" && <TripCheck t={t} />}
     {wishes && parts.plan === "write" && <Wishes t={t} edit={edit} />}
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}

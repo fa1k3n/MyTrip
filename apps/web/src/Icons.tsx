@@ -46,6 +46,7 @@ const paths: Record<string, ReactNode> = {
   never: <><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></>, // Lucide thumbs-down: Inte igen
   comment: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />, // Lucide message-circle (MI-17)
   link: <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>, // Lucide link (MI-32)
+  allok: <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>, // Lucide circle-check: Kontrollera resan finds nothing (DQ-08)
   calendar: <><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /></>, // Lucide calendar (LC-05)
   planned: <><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /><path d="m9 16 2 2 4-4" /></>, // Lucide calendar-check (DB-19)
   calplus: <><path d="M8 2v4" /><path d="M16 2v4" /><path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8" /><path d="M3 10h18" /><path d="M16 19h6" /><path d="M19 16v6" /></>, // Lucide calendar-plus (DB-18)

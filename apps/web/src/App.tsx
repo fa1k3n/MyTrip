@@ -3,7 +3,7 @@ import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, isOffline, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
 import { noAnswer, dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { APP_VERSION, NEWS_KEY, usedBefore, whatsNewFor } from "./version.ts";
-import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
+import { ABOUT_PAGE, isTestInstance, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
 import { tripChanges } from "./changes.ts";
@@ -521,6 +521,7 @@ export function App() {
   );
 
   return <>
+    {isTestInstance(location.hostname) && <div className="testbanner" role="note">{sv.testInstance}</div>} {/* DP-12 */}
     <div className="wrap">{off && <div className="offline" role="status">{offlineText(off.at, new Date(), t?.timezone ?? "Europe/Stockholm")}</div>}
       {hint && view === "trip" && <div className="card hint" role="note"><p>{sv.installHint}</p><IconButton icon="close" look="bare" tip="left" label={sv.close} onClick={closeHint} /></div>}
       {page}</div>

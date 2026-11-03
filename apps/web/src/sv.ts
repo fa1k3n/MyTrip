@@ -103,6 +103,7 @@ export const sv = {
   budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  testInstance: "Testinstans", // DP-12: the banner on the test instance
   whatsNew: { // US-41: the news of a version, shown once per device
     title: (v: string) => `Nytt i Basläger ${v}`, more: "Allt som är nytt", ok: "Okej", open: "Nytt i den här versionen",
     news: {

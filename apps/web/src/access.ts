@@ -59,6 +59,8 @@ export function roleIn(me: Me, tripId: string | undefined): { role: Role; travel
 export const whoChip = (me: Me) => ("user" in me ? me.user.name : sv.admin);
 /** UI-20: a visitor without a session and without a link lands on Om Basläger. Any fragment keeps the login page: #login (the
  * landing page's login icon), a password link (#u=), Google's answer (#login=…), #admin; so does a link that no longer works. */
+/** DP-12: the test instance, told by its address, so the same build runs there and on live. */
+export const isTestInstance = (hostname: string) => hostname.includes("staging");
 export const landsOnAbout = (hash: string, hadLink: boolean, admin: boolean) => !hadLink && !admin && (hash === "" || hash === "#");
 export const ABOUT_PAGE = "/om.html";
 /** The user's roles on a trip, as icons on its card on Drömmar (US-40). */

@@ -4,9 +4,12 @@ import { createApp, memoryStore } from "../src/app.ts";
 
 const tokens = { read: "r", propose: "p", admin: "a" };
 type App = ReturnType<typeof createApp>;
+/** The work the app leaves running after its answer (the notices), as a Worker's waitUntil would keep it. */
+const pending: Promise<unknown>[] = [];
+const ctx = { waitUntil: (p: Promise<unknown>) => { pending.push(p); }, passThroughOnException: () => {}, props: {} };
 const call = async (app: App, path: string, auth: string, method = "GET", body?: unknown) => app.request(path, {
   method, headers: { "content-type": "application/json", authorization: `Bearer ${auth}` }, body: body === undefined ? undefined : JSON.stringify(body),
-});
+}, undefined, ctx as never);
 const json = async (r: Response | Promise<Response>) => (await r).json();
 const trip = () => ({
   id: "berlin", revision: 1, title: "Berlin", timezone: "Europe/Berlin", stops: [], places: [], packing: [], bookings: [], tasks: [],
@@ -28,7 +31,8 @@ async function setup(vapid = true) {
   const anna = await person(app, "anna", "traveler"), bo = await person(app, "bo", "planner"), cy = await person(app, "cy", "traveler");
   return { app, store, anna, bo, cy, sent, setStatus: (s: number) => { status = s; } };
 }
-const settle = () => new Promise((ok) => setTimeout(ok, 50)); // notices go out after the answer
+/** Waits until every notice the app sent after its answers is done, however long that takes. */
+const settle = async () => { while (pending.length) await Promise.all(pending.splice(0)); };
 
 // REQ: NT-03 each person turns notices on and off for the trip on their own phone
 test("NT-03 subscribing and unsubscribing", async () => {

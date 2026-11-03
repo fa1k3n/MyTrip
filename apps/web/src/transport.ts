@@ -72,7 +72,7 @@ export type TransitAnswer = { status: "off" | "error" | "nofrom" } | { status: "
 /** What is said with or instead of the steps: none found, none so far ahead, or the trip of the nearest same weekday (TR-24). */
 export function transitNote(r: TransitAnswer) {
   if (r.status === "ok") return r.example ? sv.transit.example(dayLabel(r.example)) : undefined;
-  return r.status === "none" && r.far ? sv.transit.far : sv.transit.none;
+  return r.status === "off" ? sv.transit.off : r.status === "none" && r.far ? sv.transit.far : sv.transit.none; // TR-25
 }
 /** The icon of a step, among the means of transport the app draws. */
 export const stepIcon = (s: TransitStep) => (s.kind === "walk" ? "walk" : s.vehicle === "train" || s.vehicle === "ferry" ? s.vehicle : "transit");

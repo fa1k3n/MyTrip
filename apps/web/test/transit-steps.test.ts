@@ -20,3 +20,9 @@ test("TR-24 the note of a trip far ahead", () => {
   assert.equal(transitNote({ status: "none", far: true }), "Google har ingen tidtabell så långt fram än. Försök igen närmare resan, eller använd Visa resvägen.");
   assert.equal(transitNote({ status: "none" }), sv.transit.none);
 });
+
+// REQ: TR-25 without a Routes key on the server the steps say that lines are off, not that no trip was found
+test("TR-25 lines turned off", () => {
+  assert.equal(transitNote({ status: "off" }), "Linjer är inte påslagna i det här Basläger än. Använd Visa resvägen.");
+  assert.equal(transitNote({ status: "none" }), "Hittade ingen resa med kollektivtrafik. Använd Visa resvägen.");
+});

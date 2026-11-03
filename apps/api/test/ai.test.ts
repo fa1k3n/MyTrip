@@ -160,9 +160,10 @@ test("AI-03 spending caps", async () => {
   assert.deepEqual(await capped.json(), { error: "cap", scope: "account" });
   assert.equal(ai.seen.length, 2);
   assert.equal((await call(app, "/api/trips/berlin/ai/tasks", "a", "POST")).status, 202, "another account still has room");
+  assert.equal((await call(app, "/api/trips/berlin/ai/tasks", "a", "POST")).status, 202, "AI-92: the superuser has only the instance's cap");
   const month = new Date().toISOString().slice(0, 7);
   const uses = await store.aiUses(month);
-  assert.equal(uses.length, 3);
+  assert.equal(uses.length, 4);
   assert.ok(Math.abs(uses[0]!.usd - 0.08) < 1e-9);
   await store.saveSettings({ ai: { enabled: true, areas: {}, capUsd: 0.2 } } as never);
   assert.deepEqual(await json(call(app, "/api/trips/berlin/ai/tasks", "a", "POST")), { error: "cap", scope: "instance" });

@@ -1030,7 +1030,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   const offered = (s: Settings, f: AiFeature) => aiOn(s, f.area, true) && (!f.web || aiOn(s, "web", true));
   const spent = (xs: AiUse[]) => xs.reduce((n, x) => n + x.usd, 0);
   /** Which cap stops a person this month, if any (AI-03). */
-  const capReached = (s: Settings, uses: AiUse[], who: string) => (spent(uses) >= (s.ai.capUsd ?? CAP_USD) ? "instance"
+  /** AI-03; the superuser (the admin password or a superuser account) has only the instance's cap (AI-92). */
+  const capReached = async (s: Settings, uses: AiUse[], who: string) => (spent(uses) >= (s.ai.capUsd ?? CAP_USD) ? "instance"
+    : who === "admin" || (await store.users()).some((u) => u.id === who && u.superuser) ? undefined
     : spent(uses.filter((x) => x.who === who)) >= (s.ai.capAccountUsd ?? CAP_ACCOUNT_USD) ? "account" : undefined);
   /** About how many more runs of a feature a person has this month (AI-72). */
   const runsLeft = (s: Settings, uses: AiUse[], all: AiUse[], who: string, name: string) => {
@@ -1055,7 +1057,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   async function runFeature(t: Trip, name: string, f: AiFeature, who: string, actor: string) {
     const s = await store.loadSettings(), now = clock(), at = now.toISOString(), month = at.slice(0, 7);
     const h = f.helper, fingerprint = h ? await sha256(h.fingerprint(t)) : undefined;
-    const cap = capReached(s, await store.aiUses(month), who);
+    const cap = await capReached(s, await store.aiUses(month), who);
     if (cap) {
       if (h) await store.saveAiHelper(t.id, name, { at, result: "cap" });
       return { error: "cap" as const, scope: cap };
@@ -1181,7 +1183,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     if (!opts.ai || !aiOnForTrip(s, area, true, t)) return { status: 409 as const, error: "off" };
     if (!t.aiConsent) return { status: 409 as const, error: "consent" }; // AI-64
     const now = clock(), at = now.toISOString(), month = at.slice(0, 7), who = c.get("user")?.id ?? whoOf(c);
-    const cap = capReached(s, await store.aiUses(month), who);
+    const cap = await capReached(s, await store.aiUses(month), who);
     if (cap) return { status: 429 as const, error: "cap", scope: cap };
     const r = await run(opts.ai.call);
     await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who, feature, usd: r.cost.usd, result: "error" in r ? "error" : "proposal" });
@@ -1358,7 +1360,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const s = await store.loadSettings();
     if (!opts.ai || !aiOnForTrip(s, "mail", true, t) || !t.aiConsent) return undefined;
     const at = clock().toISOString(), month = at.slice(0, 7);
-    if (capReached(s, await store.aiUses(month), "mejl")) return undefined;
+    if (await capReached(s, await store.aiUses(month), "mejl")) return undefined;
     const r = await readMailKindAi(opts.ai.call, mailForAi(text, t));
     await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who: "mejl", feature: "mailsort", usd: r.cost.usd, result: "error" in r ? "error" : "proposal" });
     return "reading" in r ? r.reading.kind : undefined;

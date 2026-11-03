@@ -313,7 +313,15 @@ export const sv = {
   noCategory: "Ingen kategori", notChecked: "ej kollat", noTime: "tid ej beräknad",
   check: { // DQ-08: "Kontrollera resan"
     title: "Kontrollera resan", ok: "Inga problem hittade.", warn: "Resan har allvarliga problem", caution: "Resan har något att se över", allOk: "Resan ser bra ut",
-    what: "Kontrollerar nu: boende varje natt, att tiderna hinns med och incheckning.",
+    what: "Kontrollerar nu: boende varje natt, att tiderna hinns med, incheckning, för fulla dagar och körtid.",
+    full: (day: string, need: string, has: string) => `${day}: dagen är för full. Aktiviteter och resor tar ${need}, dagen är ${has}.`, // DQ-06
+    travel: (day: string, min: string, max: string) => `${day}: ${min} restid, mer än ${max} per dag.`, // DQ-07
+    stretch: (day: string, what: string, min: string, max: string) => `${day}: ${what} är ${min} bilkörning i sträck, mer än ${max} utan paus.`,
+    wayTo: (name: string) => `vägen till ${name}`,
+    rules: "Planeringsregler", editRules: "Ändra planeringsregler", noRules: "Marginal 15 min, ingen gräns för restid", // DM-15
+    ruleDay: "Max restid per dag (timmar)", ruleStretch: "Max bilkörning utan paus (timmar)", ruleBuffer: "Marginal mellan fasta tider (minuter)",
+    rulesHint: "Används av Kontrollera resan. Restid är all resa utom promenader. Lämna tomt för ingen gräns; marginalen är 15 minuter om inget anges, 0 stänger av den.", fromAi: "Satt av AI från resans beskrivning", // AI-93
+    rulesText: (parts: string[]) => parts.join(" · "), ruleDayText: (h: string) => `Max ${h} resa per dag`, ruleStretchText: (h: string) => `${h} i sträck`, ruleBufferText: (m: string) => `marginal ${m}`,
     dismiss: "Avfärda varningen", dismissShort: "Avfärda", why: "Varför stämmer den inte?", whyHint: "T.ex. Vi sover hos släkt", undo: "Visa varningen igen", // DQ-11
     dismissed: (n: number) => `Avfärdade (${n})`, because: (reason: string) => `Avfärdad: ${reason}`,
     late: (day: string, name: string, at: string, before: string, end: string, way?: string) => `${day}: ${name} ${at} hinns inte. ${before} slutar ${end}${way ? ` och vägen dit tar ${way}` : ""}.`,

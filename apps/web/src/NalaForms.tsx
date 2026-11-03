@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "r
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
-  saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
+  saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, saveRules, rulesForm, setTripDates, tripRange,
   readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, NEW_PLACE, type BookingInput, type NewPlace, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
@@ -121,6 +121,20 @@ function TripForm(p: Props) {
 }
 
 /** The trip's maximum budget; empty removes it (BG-12). */
+/** The trip's planning rules for Kontrollera resan (DM-15). */
+function RulesForm(p: Props) {
+  const s = useSave(p);
+  const { f, text } = useFields(rulesForm(p.t));
+  return (
+    <Form title={sv.check.editRules} {...s} close={p.close} onSubmit={() => s.submit(saveRules(p.t, f), "planning rules")}>
+      <label>{sv.check.ruleDay}<input {...text("day")} inputMode="decimal" autoFocus /></label>
+      <label>{sv.check.ruleStretch}<input {...text("stretch")} inputMode="decimal" /></label>
+      <label>{sv.check.ruleBuffer}<input {...text("buffer")} inputMode="numeric" placeholder="15" /></label>
+      <p className="ro note">{sv.check.rulesHint}</p>
+    </Form>
+  );
+}
+
 function BudgetMaxForm(p: Props) {
   const s = useSave(p);
   const { f, text } = useFields({ max: p.t.budgetMax !== undefined ? String(p.t.budgetMax).replace(".", ",") : "" });
@@ -565,6 +579,7 @@ export function EditDialog({ dlg, ...p }: Props & { dlg: EditDlg }) {
     case "trip": return <TripForm {...p} />;
     case "dates": return <DatesForm {...p} />;
     case "budgetMax": return <BudgetMaxForm {...p} />;
+    case "rules": return <RulesForm {...p} />;
     case "day": return <DayForm {...p} id={dlg.id} />;
     case "activity": return <ActivityForm {...p} dayId={dlg.dayId} id={dlg.id} />;
     case "booking": return <BookingForm {...p} id={dlg.id} proposal={dlg.proposal} />;

@@ -64,6 +64,20 @@ export function saveBudgetMax(t: Trip, input: string): Result {
   return Number.isNaN(n) ? fail(sv.badAmount) : ok([{ op: "set", path: "budgetMax", value: n }]);
 }
 
+/** The planning rules as the form shows them: hours of driving ("5,5"), minutes of buffer (DM-15). */
+export type RulesInput = { day: string; stretch: string; buffer: string };
+const hours = (min?: number) => (min === undefined ? "" : String(Math.round((min / 60) * 100) / 100).replace(".", ","));
+export const rulesForm = (t: Trip): RulesInput => ({ day: hours(t.rules?.maxTravelDayMin), stretch: hours(t.rules?.maxDriveStretchMin), buffer: t.rules?.bufferMin === undefined ? "" : String(t.rules.bufferMin) });
+/** Sets, changes or clears the planning rules; travel and driving must be more than nothing, the buffer may be 0. Saved by hand they
+ * are no longer marked as AI (DM-15, AI-93). */
+export function saveRules(t: Trip, input: RulesInput): Result {
+  const num = (s: string) => (s.trim() ? parseAmount(s) : undefined);
+  const day = num(input.day), stretch = num(input.stretch), buffer = num(input.buffer);
+  if ([day, stretch].some((x) => x !== undefined && (Number.isNaN(x) || x <= 0)) || (buffer !== undefined && (Number.isNaN(buffer) || buffer < 0))) return fail(sv.badAmount);
+  const rules = clean({ maxTravelDayMin: day && Math.round(day * 60), maxDriveStretchMin: stretch && Math.round(stretch * 60), bufferMin: buffer === undefined ? undefined : Math.round(buffer) });
+  return ok(Object.keys(rules).length ? [{ op: "set", path: "rules", value: rules }] : t.rules ? [{ op: "remove", path: "rules" }] : []);
+}
+
 export type DayInput = {
   date: string; title: string; summary: string; icons: string; start: string; end: string;
   startEstimated: boolean; endEstimated: boolean; location: string;

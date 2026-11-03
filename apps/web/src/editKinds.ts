@@ -3,7 +3,7 @@ import { sv } from "./sv.ts";
 import type { MailProposal } from "./api.ts";
 
 export type EditDlg =
-  | { kind: "trip" } | { kind: "dates" } | { kind: "budgetMax" } | { kind: "day"; id?: string } | { kind: "activity"; dayId: string; id?: string }
+  | { kind: "trip" } | { kind: "dates" } | { kind: "budgetMax" } | { kind: "rules" } | { kind: "day"; id?: string } | { kind: "activity"; dayId: string; id?: string }
   | { kind: "booking"; id?: string; proposal?: MailProposal } | { kind: "budget"; id?: string } // proposal: a mail to review (BK-17)
   | { kind: "task"; id?: string } | { kind: "placeEdit"; id?: string } | { kind: "info"; id?: string }
   | { kind: "album" } | { kind: "memory"; dreamId: string; by: string } | { kind: "split"; id: string } | { kind: "relink"; id: string } // MI-20, MI-17, MI-25, MI-32
@@ -11,7 +11,7 @@ export type EditDlg =
   | { kind: "tickets"; bookingId: string } // not a form: a booking's ticket files (BK-10)
   | { kind: "wish"; id: string } // not a form: Om önskan (DB-15)
   | { kind: "planWish"; id: string }; // Lägg på dag (DB-18)
-export const EDIT_KINDS = ["trip", "dates", "budgetMax", "day", "activity", "booking", "budget", "task", "placeEdit", "info", "album", "memory", "split", "relink", "planWish"];
+export const EDIT_KINDS = ["trip", "dates", "budgetMax", "rules", "day", "activity", "booking", "budget", "task", "placeEdit", "info", "album", "memory", "split", "relink", "planWish"];
 export const editTitle = (d: EditDlg) =>
   d.kind === "hidden" ? sv.hiddenActivity
   : d.kind === "wish" ? sv.wish.about
@@ -20,6 +20,7 @@ export const editTitle = (d: EditDlg) =>
   : d.kind === "trip" ? sv.editTrip
   : d.kind === "dates" ? sv.editDates
   : d.kind === "budgetMax" ? sv.editBudgetMax
+  : d.kind === "rules" ? sv.check.editRules
   : d.kind === "album" ? sv.minnas.albumLabel
   : d.kind === "memory" ? sv.minnas.note
   : d.kind === "split" ? sv.minnas.splitTitle

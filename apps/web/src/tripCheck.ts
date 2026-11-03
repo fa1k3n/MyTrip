@@ -7,8 +7,10 @@ import { fmtDuration } from "./transport.ts";
 
 export type Finding = { level: "warn" | "caution"; dayId: string; text: string };
 type CheckTrip = { days: { id: string; date: string }[]; bookings: { from: string; to: string; status: string; kind?: string }[] };
-type TimedAct = { text: string; start?: string; end?: string; durationMin?: number; estimated: boolean; travel?: { durationMin: number } };
-type TimeTrip = { days: { id: string; date: string; end: string; activities: TimedAct[] }[]; bookings: { name: string; from: string; status: string; kind?: string; checkIn?: string }[] };
+type TimedAct = { text: string; start?: string; end?: string; durationMin?: number; estimated: boolean; travel?: { vehicle?: string; durationMin: number } };
+type TimeTrip = { days: { id: string; date: string; start?: string; end: string; activities: TimedAct[]; legs?: LegLike[] }[]; bookings: { name: string; from: string; status: string; kind?: string; checkIn?: string }[];
+  rules?: { maxTravelDayMin?: number; maxDriveStretchMin?: number; bufferMin?: number } };
+type LegLike = { vehicle: string; origin: string; destination: string; durationMin?: number };
 
 /** The least time between two fixed times, the way there counted, until the trip can set its own (DQ-10, DM-15). */
 export const BUFFER_MIN = 15;
@@ -44,12 +46,14 @@ export function nightFindings(t: CheckTrip): Finding[] {
 }
 
 const dot = (time: string) => time.replace(":", ".");
+const dayName = (iso: string) => dayLabel(iso).replace(/^./, (c) => c.toUpperCase()); // first in its sentence
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 /** Each day's times: a fixed time that cannot be reached after the activity before it ends and the way there (red), an overlap with
  * an approximate time and too little buffer between fixed times (yellow), and a day that ends before its stay's check-in opens (yellow) (DQ-09, DQ-10). */
 export function timeFindings(t: TimeTrip): Finding[] {
-  const out: Finding[] = [];
+  const out: Finding[] = [], buffer = t.rules?.bufferMin ?? BUFFER_MIN;
   for (const d of t.days) {
-    const day = dayLabel(d.date).replace(/^./, (c) => c.toUpperCase()); // first in its sentence
+    const day = dayName(d.date);
     let latest: { min: number; a: TimedAct } | undefined; // the latest known end so far, as in the schedule (ED-17)
     for (const a of d.activities) {
       if (!a.start) continue;
@@ -58,7 +62,7 @@ export function timeFindings(t: TimeTrip): Finding[] {
         const spare = toMin(a.start) - latest.min - way, before = latest.a.text || sv.hiddenActivity, end = dot(activityEnd(latest.a)!);
         if (spare < 0) out.push(a.estimated ? { level: "caution", dayId: d.id, text: sv.check.lateCa(day, name, dot(a.start), before, end) }
           : { level: "warn", dayId: d.id, text: sv.check.late(day, name, dot(a.start), before, end, way ? fmtDuration(way) : undefined) });
-        else if (spare < BUFFER_MIN && !a.estimated && !latest.a.estimated) out.push({ level: "caution", dayId: d.id, text: sv.check.buffer(day, name, dot(a.start), fmtDuration(spare)) });
+        else if (spare < buffer && !a.estimated && !latest.a.estimated) out.push({ level: "caution", dayId: d.id, text: sv.check.buffer(day, name, dot(a.start), fmtDuration(spare)) });
       }
       const end = activityEnd(a);
       latest = end ? (latest && latest.min > toMin(end) ? latest : { min: toMin(end), a }) : undefined;
@@ -70,13 +74,35 @@ export function timeFindings(t: TimeTrip): Finding[] {
   return out;
 }
 
+/** Each day's load: activities and travel longer than the day (DQ-06), travel over the trip's rule per day and a car stretch over its
+ * rule without a break (DQ-07); all less serious. The legs and the ways to activities may describe the same travel, so the larger of the two counts. */
+export function loadFindings(t: TimeTrip): Finding[] {
+  const out: Finding[] = [], r = t.rules ?? {};
+  for (const d of t.days) {
+    const day = dayName(d.date), legs = d.legs ?? [], ways = d.activities.filter((a) => a.travel);
+    const length = (a: TimedAct) => a.durationMin ?? (a.start && activityEnd(a) ? toMin(activityEnd(a)!) - toMin(a.start) : 0);
+    const travel = Math.max(sum(legs.map((l) => l.durationMin ?? 0)), sum(ways.map((a) => a.travel!.durationMin)));
+    const need = sum(d.activities.map(length)) + travel, has = d.start ? toMin(d.end) - toMin(d.start) : undefined;
+    if (has !== undefined && need > has) out.push({ level: "caution", dayId: d.id, text: sv.check.full(day, fmtDuration(need), fmtDuration(has)) });
+    const riding = Math.max(sum(legs.filter((l) => l.vehicle !== "walk").map((l) => l.durationMin ?? 0)), sum(ways.filter((a) => a.travel!.vehicle !== "walk").map((a) => a.travel!.durationMin)));
+    if (r.maxTravelDayMin && riding > r.maxTravelDayMin) out.push({ level: "caution", dayId: d.id, text: sv.check.travel(day, fmtDuration(riding), fmtDuration(r.maxTravelDayMin)) });
+    const carLegs = legs.filter((l) => l.vehicle === "car"), carWays = ways.filter((a) => a.travel!.vehicle === "car");
+    if (r.maxDriveStretchMin) {
+      const max = r.maxDriveStretchMin, stretches = [...carLegs.map((l) => ({ what: `${l.origin} → ${l.destination}`, min: l.durationMin ?? 0 })),
+        ...carWays.map((a) => ({ what: sv.check.wayTo(a.text || sv.hiddenActivity), min: a.travel!.durationMin }))];
+      for (const s of stretches) if (s.min > max) out.push({ level: "caution", dayId: d.id, text: sv.check.stretch(day, s.what, fmtDuration(s.min), fmtDuration(max)) });
+    }
+  }
+  return out;
+}
+
 /** The trip's check as one level: red when anything is serious, yellow when only less serious, else ok. */
 export const checkLevel = (f: Finding[]) => (f.some((x) => x.level === "warn") ? "warn" : f.length ? "caution" : "ok");
 
-/** Everything "Kontrollera resan" finds: the serious first, then by day (DQ-08..DQ-10). */
+/** Everything "Kontrollera resan" finds: the serious first, then by day (DQ-06..DQ-10). */
 export function tripFindings(t: CheckTrip & TimeTrip): Finding[] {
   const order = new Map([...t.days].sort((a, b) => a.date.localeCompare(b.date)).map((d, i) => [d.id, i]));
-  return [...nightFindings(t), ...timeFindings(t)].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1) || order.get(a.dayId)! - order.get(b.dayId)!);
+  return [...nightFindings(t), ...timeFindings(t), ...loadFindings(t)].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1) || order.get(a.dayId)! - order.get(b.dayId)!);
 }
 
 type Dismissed = { text: string; reason: string; by?: string; at?: string };
@@ -107,4 +133,14 @@ export function byDay(found: Finding[]) {
     else { d.texts.push(f.text); if (f.level === "warn") d.level = "warn"; }
   }
   return m;
+}
+
+/** The planning rules in one line for the trip's settings, the buffer's 15 minutes when not set (DM-15). */
+export function rulesText(t: Pick<TimeTrip, "rules">) {
+  const r = t.rules ?? {};
+  if (r.maxTravelDayMin === undefined && r.maxDriveStretchMin === undefined && r.bufferMin === undefined) return sv.check.noRules;
+  return sv.check.rulesText([
+    ...(r.maxTravelDayMin ? [sv.check.ruleDayText(fmtDuration(r.maxTravelDayMin))] : []), ...(r.maxDriveStretchMin ? [sv.check.ruleStretchText(fmtDuration(r.maxDriveStretchMin))] : []),
+    sv.check.ruleBufferText(fmtDuration(r.bufferMin ?? BUFFER_MIN)),
+  ]);
 }

@@ -54,6 +54,13 @@ const tidyDay = (o: Op): Op => {
   return { ...o, value: { ...v, icons: icons.length ? icons : [fallback], aiTitle: true, country } }; // AI-86
 };
 
+/** The planning rules the draft read from the description: only their own fields, in sensible ranges, marked as AI (AI-93, DM-15). */
+const tidyRules = (o: Op): Op => {
+  if (o.op !== "set" || o.path !== "rules") return o;
+  const v = valueOf(o), within = (k: string, lo: number, hi: number) => (Number.isInteger(v[k]) && (v[k] as number) >= lo && (v[k] as number) <= hi ? { [k]: v[k] } : {});
+  return { ...o, value: { ...within("maxTravelDayMin", 30, 1440), ...within("maxDriveStretchMin", 15, 1440), ...within("bufferMin", 0, 240), ai: true } };
+};
+
 /** A draft of a new trip from "Beskriv din dröm", the trip's purpose: title, travelers and days, as one proposal (AI-10). */
 const draft: AiFeature = {
   area: "changes",
@@ -64,16 +71,20 @@ Add every person the description names, and as many more as it counts without na
 Erik, Anna, Barn 1, Barn 2 and Barn 3 (with the age in the name when given, as "Barn (7 år)"). Place the trip in time: use <today> to turn
 "höstlovet", "i sommar" or a week number into real dates in the future, and pick a sensible length when none is given.
 Add one day per date with where it is spent, and the legs between places with their means of transport.
-Respect limits the description gives, such as hours of driving per day, and mention them in the day's summary.
+Respect limits the description gives, such as hours of travel or driving per day, and mention them in the day's summary.
+When the description gives such limits, also set the trip's planning rules: maxTravelDayMin (most minutes of travel a day, any means but walking),
+maxDriveStretchMin (most minutes of driving without a break) and bufferMin (least minutes between fixed times; "god marginal" without a number is 30).
+Set only what the description asks for; set no rules when it gives no limits.
 Do not add activities, bookings or wishes: the family adds those themselves.`,
   task: `Propose the draft: set title; add travelers/- for each traveler as { id, name, age?, packing: [] };
 add days/- for each day as { id, date: "YYYY-MM-DD", title (a short Swedish title of at most 40 characters saying what the day holds, its travel and
 what it is about, for example "Färjan till Rostock" or "Lugn dag vid Alster"; never only the town's name or "Transport mot <town>"), summary (one Swedish sentence without clock times),
 icons (one or two of exactly these ids, never emoji: ${DAY_ICONS.join(", ")}; the means of transport on travel days, otherwise what the day is mostly about, or Resa),
 start: "09:00", end: "18:00", location (the town), country (the town's ISO 3166 country code, for example "DE"), legs: [{ vehicle: car|ferry|train|transit|walk, origin, destination, durationMin? }], activities: [] };
-and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place.`,
-  allows: (o) => (o.op === "set" && o.path === "title") || (o.op === "add" && ["travelers/-", "days/-", "stops/-"].includes(o.path)),
-  tidy: tidyDay,
+and add stops/- for the timeline as { label (the town), sub (a few words), dayId } where the trip moves to a new place;
+set rules as { maxTravelDayMin?, maxDriveStretchMin?, bufferMin? } only when the description gives limits.`,
+  allows: (o) => (o.op === "set" && (o.path === "title" || o.path === "rules")) || (o.op === "add" && ["travelers/-", "days/-", "stops/-"].includes(o.path)),
+  tidy: (o) => tidyRules(tidyDay(o)),
   applyToNew: true, // AI-78
 };
 

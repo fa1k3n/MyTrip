@@ -7,12 +7,13 @@ import { renameTraveler, tripRange } from "./edit.ts";
 import { addedMail, inviteMail, travelerLine, tripDates } from "./format.ts";
 import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
-import { Icon, IconButton } from "./Icons.tsx";
+import { AiMark, Icon, IconButton } from "./Icons.tsx";
 import { QrDialog } from "./QrDialog.tsx";
 import { Switch, TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
 import { sv } from "./sv.ts";
+import { rulesText } from "./tripCheck.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { svAdmin } from "./sv-admin.ts";
 import { onOutside } from "./outside.ts";
@@ -419,6 +420,7 @@ export function AdminPage({ t, superuser, manager, back, edit, addPerson, change
       <Detail label={sv.name} value={t.title} editLabel={sv.editTrip} edit={() => edit({ kind: "trip" })} />
       <Detail label={sv.tripDates} value={tripRange(t) ? tripDates(t) : sv.noDates} editLabel={sv.editDates} edit={() => edit({ kind: "dates" })} />
       <Detail label={sv.budgetMax} value={t.budgetMax !== undefined ? money(t.budgetMax, t.currency) : sv.noBudgetMax} editLabel={sv.editBudgetMax} edit={() => edit({ kind: "budgetMax" })} />
+      <Detail label={sv.check.rules} value={<>{t.rules?.ai && <AiMark label={sv.check.fromAi} />}{rulesText(t)}</>} editLabel={sv.check.editRules} edit={() => edit({ kind: "rules" })} /> {/* DM-15 */}
       <Detail label={sv.minnas.albumLabel} value={t.album ? <a className="place" href={t.album} target="_blank" rel="noopener noreferrer">{new URL(t.album).host}</a> : sv.minnas.noAlbum}
         editLabel={sv.minnas.editAlbum} edit={() => edit({ kind: "album" })} /></div>
     <Travelers t={t} add={addPerson} run={run} />

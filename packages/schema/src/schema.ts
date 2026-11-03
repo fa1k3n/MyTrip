@@ -130,6 +130,10 @@ export const Trip = z.object({
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   aiHelpers: z.record(z.string(), z.boolean()).optional(), // the AI helpers turned on for the trip, e.g. { prep: true } (AI-68)
+  // planning rules for Kontrollera resan: travel per day, driving without a break and the buffer between fixed times, in minutes (DM-15);
+  // ai: set by the draft from the description (AI-93)
+  rules: z.object({ maxTravelDayMin: z.number().int().positive().optional(), maxDriveStretchMin: z.number().int().positive().optional(), bufferMin: z.number().int().nonnegative().optional(),
+    ai: z.boolean().optional() }).optional(),
   // warnings of "Kontrollera resan" dismissed by a Planerare, by their text, so a change of what they say brings them back (DQ-11)
   dismissed: z.array(z.object({ text: z.string().min(1).max(400), reason: z.string().min(1).max(200), by: z.string().optional(), at: z.string().datetime().optional() })).optional(),
   aiConsent: z.object({ by: z.string().min(1), at: z.string().datetime() }).optional(), // who agreed to send the trip to the AI service, and when (AI-64)

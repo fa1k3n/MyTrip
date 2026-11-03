@@ -52,6 +52,19 @@ test("DP-10 only the named trips are loaded, and only their links and images", a
   assert.throws(() => pickTrips(trips, ["nope"]), /nope/);
 });
 
+// REQ: DP-10 the settings are loaded only from a folder that has settings.json, so loading one trip keeps the instance's settings
+test("DP-10 a folder without settings.json loads no settings", async () => {
+  const { folderSettings } = await import("../src/d1-load.ts");
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(join(tmpdir(), "d1-load-"));
+  assert.equal(await folderSettings(dir), undefined);
+  assert.ok(!loadSql({ trips: [trip("berlin")], settings: await folderSettings(dir) }).includes("settings"));
+  await writeFile(join(dir, "settings.json"), JSON.stringify({ ai: { enabled: true } }));
+  assert.equal((await folderSettings(dir))?.ai.enabled, true);
+});
+
 // REQ: DP-02 unknown paths outside /api go to the web files, whose start page answers them (not_found_handling in wrangler.jsonc);
 // unknown paths under /api stay API errors
 test("DP-02 links into the app reach the web files, unknown API paths do not", async () => {

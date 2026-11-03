@@ -1,9 +1,9 @@
 // Turns a local trip folder into SQL for D1, so trip data goes straight from the folder to Cloudflare (DP-10).
 // Usage: node apps/api/src/d1-load.ts <trip folder> <out.sql> [trip id …]   (no ids: every trip in the folder)
 // Cover images are included, split into parts. Running the SQL again updates the same rows.
-import { readFile, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Settings, Trip } from "@trip/schema";
+import { Settings, type Trip } from "@trip/schema";
 import { fileStore } from "./file-store.ts";
 
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
@@ -34,6 +34,13 @@ export function pickTrips(trips: Trip[], ids: string[]) {
   return ids.length ? trips.filter((t) => ids.includes(t.id)) : trips;
 }
 
+/** The folder's settings.json, or nothing when it has none: the defaults would reset the instance's settings (DP-10). */
+export async function folderSettings(dir: string): Promise<Settings | undefined> {
+  const file = join(dir, "settings.json");
+  if (!(await access(file).then(() => true, () => false))) return undefined;
+  return Settings.parse(JSON.parse(await readFile(file, "utf8")));
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [dir, out, ...ids] = process.argv.slice(2);
   if (!dir || !out) throw new Error("Usage: node apps/api/src/d1-load.ts <trip folder> <out.sql>");
@@ -41,6 +48,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const trips = pickTrips(await store.list(), ids);
   const images = await Promise.all(trips.flatMap((t) => (t.image ? [t.image] : [])).map(async (name) => ({ name, bytes: new Uint8Array(await readFile(join(dir, "img", name))) })));
   const links = Object.fromEntries(Object.entries(await store.links()).filter(([id]) => trips.some((t) => t.id === id)));
-  await writeFile(out, loadSql({ trips, settings: await store.loadSettings(), links, images }));
-  console.log(`${out}: ${trips.length} trips, ${images.length} images`);
+  const settings = await folderSettings(dir);
+  await writeFile(out, loadSql({ trips, settings, links, images }));
+  console.log(`${out}: ${trips.length} trips, ${images.length} images, ${settings ? "settings" : "no settings (the folder has no settings.json)"}`);
 }

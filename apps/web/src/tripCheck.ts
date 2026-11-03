@@ -1,4 +1,5 @@
 // "Kontrollera resan": rule-based checks of the plan, without network or AI (DQ-08..DQ-10, DQ-12). Pure, so it runs under node --test.
+import type { Op } from "@trip/schema";
 import { sv } from "./sv.ts";
 import { dayLabel } from "./format.ts";
 import { activityEnd, toMin } from "./time.ts";
@@ -76,4 +77,34 @@ export const checkLevel = (f: Finding[]) => (f.some((x) => x.level === "warn") ?
 export function tripFindings(t: CheckTrip & TimeTrip): Finding[] {
   const order = new Map([...t.days].sort((a, b) => a.date.localeCompare(b.date)).map((d, i) => [d.id, i]));
   return [...nightFindings(t), ...timeFindings(t)].sort((a, b) => (a.level === b.level ? 0 : a.level === "warn" ? -1 : 1) || order.get(a.dayId)! - order.get(b.dayId)!);
+}
+
+type Dismissed = { text: string; reason: string; by?: string; at?: string };
+/** The findings still to show, and those a Planerare dismissed with their reason; a dismissal holds while the text is the same (DQ-11). */
+export function splitDismissed(found: Finding[], dismissed: Dismissed[] = []) {
+  const by = new Map(dismissed.map((d) => [d.text, d]));
+  return { active: found.filter((f) => !by.has(f.text)), dismissed: found.flatMap((f) => (by.has(f.text) ? [{ ...f, reason: by.get(f.text)!.reason }] : [])) };
+}
+/** Dismisses a finding with a reason; dismissals of texts no longer found are dropped at the same time. None without a reason (DQ-11). */
+export function dismissOps(t: { dismissed?: Dismissed[] }, f: Finding, reason: string, by: string | undefined, at: string, found: Finding[]): Op[] {
+  const why = reason.trim().slice(0, 200);
+  if (!why) return [];
+  const now = new Set(found.map((x) => x.text));
+  const keep = (t.dismissed ?? []).filter((d) => now.has(d.text) && d.text !== f.text);
+  return [{ op: "set", path: "dismissed", value: [...keep, { text: f.text, reason: why, ...(by ? { by } : {}), at }] }];
+}
+/** Takes a dismissal back, so the warning shows again (DQ-11). */
+export function undismissOps(t: { dismissed?: Dismissed[] }, text: string): Op[] {
+  const i = (t.dismissed ?? []).findIndex((d) => d.text === text);
+  return i < 0 ? [] : [{ op: "remove", path: `dismissed/${i}` }];
+}
+/** The active findings per day, for the mark on its card: the worst level and every text (DQ-11). */
+export function byDay(found: Finding[]) {
+  const m = new Map<string, { level: Finding["level"]; texts: string[] }>();
+  for (const f of found) {
+    const d = m.get(f.dayId);
+    if (!d) m.set(f.dayId, { level: f.level, texts: [f.text] });
+    else { d.texts.push(f.text); if (f.level === "warn") d.level = "warn"; }
+  }
+  return m;
 }

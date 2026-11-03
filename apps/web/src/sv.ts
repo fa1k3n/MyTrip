@@ -314,6 +314,8 @@ export const sv = {
   check: { // DQ-08: "Kontrollera resan"
     title: "Kontrollera resan", ok: "Inga problem hittade.", warn: "Resan har allvarliga problem", caution: "Resan har något att se över", allOk: "Resan ser bra ut",
     what: "Kontrollerar nu: boende varje natt, att tiderna hinns med och incheckning.",
+    dismiss: "Avfärda varningen", dismissShort: "Avfärda", why: "Varför stämmer den inte?", whyHint: "T.ex. Vi sover hos släkt", undo: "Visa varningen igen", // DQ-11
+    dismissed: (n: number) => `Avfärdade (${n})`, because: (reason: string) => `Avfärdad: ${reason}`,
     late: (day: string, name: string, at: string, before: string, end: string, way?: string) => `${day}: ${name} ${at} hinns inte. ${before} slutar ${end}${way ? ` och vägen dit tar ${way}` : ""}.`,
     lateCa: (day: string, name: string, at: string, before: string, end: string) => `${day}: ${name} ca ${at} krockar med ${before}, som slutar ${end}.`,
     buffer: (day: string, name: string, at: string, spare: string) => `${day}: bara ${spare} marginal före ${name} ${at}.`,

@@ -15,6 +15,7 @@ import { wishSuggestions, type WishProposal, type WishSuggestion } from "./aiWis
 import { aiCounts, keepAi, keepAllAi, removeAi, removeDayAi, type AiItem } from "./aiReview.ts";
 import { fmtDuration, stepIcon, stepText, transitFrom, transitNote, wayUrl, type TransitStep } from "./transport.ts";
 import { CatIcon, CatIcons, LineIcon } from "./CatIcon.tsx";
+import { byDay, splitDismissed, tripFindings } from "./tripCheck.ts";
 
 // Uppleva and Minnas load when their tab is first opened (PF-01).
 const Uppleva = lazy(() => import("./Uppleva.tsx").then((m) => ({ default: m.Uppleva })));
@@ -219,8 +220,9 @@ function DaySuggestions({ list, review }: { list: WishSuggestion[]; review: Revi
 }
 
 type Review = NonNullable<TripViewProps["review"]>;
-function DayCard({ t, x, today, open, onToggle, onPlace, onTransport, edit, editing, run, marks, suggested = [], review }: {
+function DayCard({ t, x, today, open, onToggle, onPlace, onTransport, edit, editing, run, marks, suggested = [], review, check }: {
   suggested?: WishSuggestion[]; review?: Review; // AI-77: the wish helper's activities for the day
+  check?: { level: "warn" | "caution"; texts: string[] }; // what Kontrollera resan finds on the day, for a Planerare (DQ-11)
   marks?: DayMarks | null; // set: the day as a proposal would leave it, read only; null: unchanged by it (MC-17)
   t: Trip; x: Day; today: boolean; open: boolean; onToggle: () => void; onPlace: (id: string) => void; onTransport: () => void; edit: (d: EditDlg) => void;
   editing: boolean; run: Run; // editing: the role may change the plan, with no lock (ED-21, AU-21)
@@ -232,7 +234,7 @@ function DayCard({ t, x, today, open, onToggle, onPlace, onTransport, edit, edit
   const [hover, setHover] = useState(false); // a wish is dragged over the day (DB-17)
   const wishOver = (e: DragEvent) => editing && e.dataTransfer.types.includes(WISH_DRAG);
   return (
-    <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"} ${hover ? "dropday" : ""}`} id={`day-${x.id}`}
+    <article className={`card day ${open ? "open" : ""} ${editing ? "" : "lock"} ${hover ? "dropday" : ""} ${check?.level ?? ""}`} id={`day-${x.id}`}
       onDragOver={(e) => { if (wishOver(e)) { e.preventDefault(); setHover(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHover(false); }} onDropCapture={() => setHover(false)}
       onDrop={(e) => { // a drop among the open day's activities is placed there (Plan.tsx); elsewhere on the day it lands last
@@ -249,6 +251,7 @@ function DayCard({ t, x, today, open, onToggle, onPlace, onTransport, edit, edit
           {today && <small className="ro">{sv.today}</small>} {/* DC-15 */}
           <h3><button className="ttl" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>{dayTitle(x)}</button>
             {titleWho.length > 0 && <Eye t={t} who={titleWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}
+            {check && <span className={`limiticon inline ${check.level === "caution" ? "near" : ""}`} role="img" aria-label={check.texts.join(" ")} title={check.texts.join("\n")}><Icon name="alert" /></span> /* DQ-11 */}
             {!open && review && suggested.length > 0 && <AiMark label={sv.marks.suggestions(suggested.length)} /> /* AI-77: seen on a closed card too */}</h3>
           <div className="sum">{x.hiddenSummary ? <HiddenText /> : x.summary}{sumWho.length > 0 && <Eye t={t} who={sumWho} open={() => edit({ kind: "hidden", dayId: x.id })} />}</div>
           <button className="time when" onClick={(e) => { e.stopPropagation(); onTransport(); }} aria-label={`${sv.transport}, ${dayTime(x)}`}><LineIcon shape="clock" /> {dayTime(x)}</button>
@@ -312,6 +315,7 @@ export function TripView(p: TripViewProps) {
   const [preview, setPreview] = useState<Preview | null>(null); // a proposal shown in the plan (MC-17)
   useEffect(() => { setPreview(null); }, [tab, t.revision]);
   const reviews = !!p.review && (perms.manager || p.who?.role === "planner"); // MC-19, US-14
+  const checks = reviews && !preview ? byDay(splitDismissed(tripFindings(t), t.dismissed).active) : undefined; // DQ-11: for those who can act on them
   const days = [...(preview?.next ?? t).days].sort((a, b) => a.date.localeCompare(b.date));
   const now = todayId(t.days, p.today); // DC-15
   const [wishSugs, setWishSugs] = useState<WishSuggestion[]>([]); // AI-71, AI-77: read again after each change of the trip
@@ -335,7 +339,7 @@ export function TripView(p: TripViewProps) {
     {reviews && <Suspense fallback={null}><Proposals t={t} approve={p.review!.approve} reject={p.review!.reject} preview={preview} setPreview={setPreview} /></Suspense>}
     <div className="cols">
       <div>{days.map((x) => (
-        <DayCard key={x.id} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} onToggle={() => p.toggleDay(x.id)}
+        <DayCard key={x.id} check={checks?.get(x.id)} t={t} x={x} today={x.date === p.today} open={!!p.open[x.id] || !!preview?.marks.has(x.id)} onToggle={() => p.toggleDay(x.id)}
           onPlace={p.place} onTransport={() => p.transport(x.id)} edit={p.edit} run={p.run} marks={preview ? preview.marks.get(x.id) ?? null : undefined}
           editing={!preview && perms.view.nala.plan === "write"} suggested={wishSugs.filter((s) => s.day === x.id && s.activity)} review={reviews ? p.review : undefined} />
       ))}</div>

@@ -9,7 +9,7 @@ import { amountText } from "./budget.ts";
 import { MailInButton } from "./MailIn.tsx";
 import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleTask } from "./edit.ts";
 import { isOverdue } from "./today.ts";
-import { checkLevel, tripFindings } from "./tripCheck.ts";
+import { checkLevel, dismissOps, splitDismissed, tripFindings, undismissOps, type Finding } from "./tripCheck.ts";
 import { sv } from "./sv.ts";
 import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
@@ -269,13 +269,33 @@ function Packing({ t, run, part, tick, review }: { part: MayOf; t: Trip; run: Ru
 }
 
 /** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
-/** "Kontrollera resan": what the rules find in the plan, with a red or yellow triangle or a green check in the heading (DQ-08). */
-function TripCheck({ t }: { t: Trip }) {
-  const found = tripFindings(t), level = checkLevel(found), label = level === "ok" ? sv.check.allOk : sv.check[level];
+/** "Kontrollera resan": what the rules find in the plan, with a red or yellow triangle or a green check in the heading (DQ-08).
+ * A Planerare dismisses a warning with a reason and can take it back (DQ-11). */
+function TripCheck({ t, run }: { t: Trip; run: Run }) {
+  const found = tripFindings(t), { active, dismissed } = splitDismissed(found, t.dismissed), level = checkLevel(active);
+  const label = level === "ok" ? sv.check.allOk : sv.check[level];
+  const [asking, setAsking] = useState<string | null>(null), [why, setWhy] = useState("");
   const mark = <span className={`limiticon inline ${level === "caution" ? "near" : level === "ok" ? "allok" : level}`} role="img" aria-label={label} title={label}><Icon name={level === "ok" ? "allok" : "alert"} /></span>;
+  const dismiss = (e: FormEvent, f: Finding) => {
+    e.preventDefault();
+    run((cur) => dismissOps(cur, f, why, undefined, new Date().toISOString(), tripFindings(cur)), "dismiss warning");
+    setAsking(null); setWhy("");
+  };
   return (
     <Section title={sv.check.title} may flag={mark} tint={level === "ok" ? "" : level} id="sec-check">
-      {found.length ? <ul className="checks">{found.map((f) => <li key={f.text} className={f.level}><Icon name="alert" /><span>{f.text}</span></li>)}</ul> : <p>{sv.check.ok}</p>}
+      {active.length ? <ul className="checks">{active.map((f) => <li key={f.text} className={f.level}>
+        <Icon name="alert" /><span>{f.text}</span>
+        <IconButton icon="close" look="bare" tip="left" label={sv.check.dismiss} pressed={asking === f.text} onClick={() => { setAsking(asking === f.text ? null : f.text); setWhy(""); }} />
+        {asking === f.text && <form className="why" onSubmit={(e) => dismiss(e, f)}>
+          <label>{sv.check.why}<input value={why} onChange={(e) => setWhy(e.target.value)} placeholder={sv.check.whyHint} maxLength={200} autoFocus /></label>
+          <button className="btn ghost" type="submit" disabled={!why.trim()}>{sv.check.dismissShort}</button>
+        </form>}
+      </li>)}</ul> : <p>{sv.check.ok}</p>}
+      {dismissed.length > 0 && <details className="dismissed"><summary>{sv.check.dismissed(dismissed.length)}</summary>
+        <ul className="checks">{dismissed.map((f) => <li key={f.text} className="off">
+          <span>{f.text}<br /><small className="ro">{sv.check.because(f.reason)}</small></span>
+          <IconButton icon="refresh" look="bare" tip="left" label={sv.check.undo} onClick={() => run((cur) => undismissOps(cur, f.text), "show warning")} />
+        </li>)}</ul></details>}
       <p className="ro note">{sv.check.what}</p>
     </Section>
   );
@@ -289,7 +309,7 @@ export default function Side({ t, today, edit, run, onPlace, parts, wishes, revi
 }) {
   const part = (id: string) => parts[id] === "write";
   return <>
-    {parts.bookings !== "hidden" && <TripCheck t={t} />}
+    {review && <TripCheck t={t} run={run} />}
     {wishes && parts.plan === "write" && <Wishes t={t} edit={edit} />}
     {parts.bookings !== "hidden" && <Bookings part={part} t={t} edit={edit} onPlace={onPlace} review={review} run={run} />}
     {parts.budget !== "hidden" && <Budget part={part} t={t} edit={edit} />}

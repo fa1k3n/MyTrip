@@ -181,6 +181,8 @@ const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new U
 const accessRole = (role: Role): AccessRole | undefined => (role === "link" ? "follower" : role === "traveler" || role === "planner" ? role : undefined);
 /** Whether a link's role may make all these changes under the trip's permissions (AU-21, AU-22). Below "write" on expenses,
  * an expense is added one at a time and alone (AU-13). The permissions are set by a Planerare, not by a Resenär (AU-22). */
+/** A trip without its dismissed warnings, whose texts may name what is hidden from the viewer; only a Planerare dismisses (DQ-11). */
+const withoutDismissed = <T extends { dismissed?: unknown }>({ dismissed: _d, ...t }: T) => t as Omit<T, "dismissed">;
 function linkMayChange(t: Trip, ar: AccessRole, ops: Op[], travelerId?: string) {
   const rules = accessFor(t, ar);
   const ok = ops.length > 0 && ops.every((o) => {
@@ -495,7 +497,7 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     const ar = accessRole(role);
     if (!ar) return t;
     const rules = accessFor(t, ar), hide = (p: Part) => rules.parts[p] === "hidden";
-    const { budgetMax, access: _all, wishInbox: _w, ...rest } = ar === "planner" ? t : withoutInbox(t); // the address: BK-26, below
+    const { budgetMax, access: _all, wishInbox: _w, ...rest } = ar === "planner" ? t : withoutDismissed(withoutInbox(t)); // the address: BK-26, below
     const own = ar === "planner" ? undefined : t.access?.[ar]; // the role's own choices, so the app shows the same as the server sends
     const out: Trip = { ...rest, ...(!hide("budget") && budgetMax !== undefined ? { budgetMax } : {}), ...(own ? { access: { [ar]: own } } : {}) };
     if (hide("bookings")) out.bookings = [];

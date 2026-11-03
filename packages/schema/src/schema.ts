@@ -130,6 +130,8 @@ export const Trip = z.object({
   hiddenPurpose: z.boolean().optional(), hiddenNote: z.boolean().optional(), // only in what a Resenär or Följare receives (AU-30)
   ai: z.boolean().default(true), // AI-62: can only narrow the instance settings
   aiHelpers: z.record(z.string(), z.boolean()).optional(), // the AI helpers turned on for the trip, e.g. { prep: true } (AI-68)
+  // warnings of "Kontrollera resan" dismissed by a Planerare, by their text, so a change of what they say brings them back (DQ-11)
+  dismissed: z.array(z.object({ text: z.string().min(1).max(400), reason: z.string().min(1).max(200), by: z.string().optional(), at: z.string().datetime().optional() })).optional(),
   aiConsent: z.object({ by: z.string().min(1), at: z.string().datetime() }).optional(), // who agreed to send the trip to the AI service, and when (AI-64)
   currency: z.string().length(3).default("SEK"), // budget amounts are in this currency
   budgetMax: z.number().positive().optional(), // maximum budget in `currency` (BG-12)

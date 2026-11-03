@@ -4,7 +4,7 @@ import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
-  readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, type BookingInput, type Result,
+  readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, NEW_PLACE, type BookingInput, type NewPlace, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
 import { AiMark, Icon, IconButton } from "./Icons.tsx";
@@ -343,12 +343,13 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   const [target, setTarget] = useState(() => matches[0]?.id ?? ""), [picked, setPicked] = useState(false); // picked: by the reviewer
   const fillIn = (base: BookingInput, r: BookingReading, files: TicketFile[], into: string): BookingInput => {
     const to = p.t.bookings.find((x) => x.id === into);
-    const g = to ? matchedForm(p.t, to, r, files) : { ...readingToForm(base, r), files: [...(base.files ?? []), ...files] };
+    const g = to ? matchedForm(p.t, to, r, files) : { ...readingToForm(base, r, p.t), files: [...(base.files ?? []), ...files] };
     return g.kind === "ticket" && !g.activityId ? { ...g, activityId: ticketActivityFor(p.t, g.name, g.from, g.start) ?? "" } : g; // BK-23
   };
   const [f, setF] = useState<BookingInput>(() => (read ? fillIn(bookingForm(p.t, b), read.r, read.files, target) : bookingForm(p.t, b)));
   const retarget = (into: string) => { setTarget(into); setPicked(true); if (read) setF(fillIn(bookingForm(p.t), read.r, read.files, into)); };
   const text = (k: keyof BookingInput) => ({ value: (f[k] as string | undefined) ?? "", onChange: (e: Change) => setF((o) => ({ ...o, [k]: e.target.value })) });
+  const setNew = (k: keyof NewPlace, v: string) => setF((o) => ({ ...o, newPlace: { name: "", address: "", phone: "", website: "", ...o.newPlace, [k]: v } }));
   const [paste, setPaste] = useState<string | null>(null), [filled, setFilled] = useState(""); // BK-18
   const fill = () => {
     const r = readBooking({ text: paste ?? "" }, p.t.days.map((d) => d.date));
@@ -442,7 +443,15 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
         <label>{sv.currency}<select {...text("currency")}>{[...new Set([...sv.currencies, f.currency ?? p.t.currency])].map((c) => <option key={c}>{c}</option>)}</select></label>
       </div>
       <p className="ro note">{sv.mail.priceHint}</p>
-      <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} /></label>
+      <label>{sv.placeLabel}<PlaceSelect t={p.t} bind={text("placeId")} withNew /></label>
+      {f.placeId === NEW_PLACE && <> {/* BK-36: the place read from the confirmation, added with the booking */}
+        <label>{sv.placeName}<input value={f.newPlace?.name ?? ""} onChange={(e) => setNew("name", e.target.value)} placeholder={f.name} /></label>
+        <label>{sv.address}<input value={f.newPlace?.address ?? ""} onChange={(e) => setNew("address", e.target.value)} /></label>
+        <div className="two">
+          <label>{sv.phone}<input inputMode="tel" value={f.newPlace?.phone ?? ""} onChange={(e) => setNew("phone", e.target.value)} /></label>
+          <label>{sv.website}<input inputMode="url" value={f.newPlace?.website ?? ""} onChange={(e) => setNew("website", e.target.value)} /></label>
+        </div>
+      </>}
       <label>{sv.description}<textarea {...text("note")} /></label>
       <fieldset className="files"><legend>{sv.tickets.title}</legend>
         {(f.files ?? []).map((x) => (
@@ -487,10 +496,11 @@ function BudgetForm(p: Props & { id?: string }) {
   );
 }
 
-const PlaceSelect = ({ t, bind }: { t: Trip; bind: { value: string; onChange: (e: Change) => void } }) => (
+const PlaceSelect = ({ t, bind, withNew }: { t: Trip; bind: { value: string; onChange: (e: Change) => void }; withNew?: boolean }) => (
   <select {...bind}>
     <option value="">{sv.noPlace}</option>
     {t.places.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+    {withNew && <option value={NEW_PLACE}>{sv.newPlace}</option>}
   </select>
 );
 

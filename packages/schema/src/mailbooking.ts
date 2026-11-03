@@ -5,6 +5,7 @@ export type BookingReading = {
   kind?: "stay" | "ticket" | "other"; name?: string; from?: string; to?: string;
   checkIn?: string; checkOut?: string; start?: string; reference?: string; status?: "cancelled"; address?: string;
   price?: { value: number; currency: string }; // BK-24
+  phone?: string; website?: string; // the place's, for its place (BK-35, BK-36)
 };
 
 const ENTITIES: Record<string, string> = {
@@ -120,6 +121,34 @@ function subjectName(subject: string, text: string): string | undefined {
 const TEXT_NAME = /\b(?:bokning|vistelse|reservation|beställning|köp|booking|stay|order|purchase)\s+(?:hos|på|at|with)\s+(\p{Lu}[^\n.!,;:()]{1,58})/u;
 const textName = (text: string) => TEXT_NAME.exec(text)?.[1]?.trim();
 
+/** A telephone number after a telephone word on a line that is not about the guest's own number (BK-35). */
+const PHONE = /\b(?:tel(?:efon(?:nummer)?)?|telephone|phone|téléphone|tél|fon|teléfono|telefono)\b\.?[^\n\d+]{0,12}?(\+?\(?\d[\d \t()\/.-]{5,20}\d)/i;
+const GUEST = /\b(?:ihre?|your|din|ditt|er|guest|gast|kund|customer|votre|su)\b/i;
+function phone(text: string): string | undefined {
+  for (const line of text.split("\n")) { const m = PHONE.exec(line); if (m && !GUEST.test(line)) return m[1]!.trim(); }
+  return undefined;
+}
+/** "hotel.example/de" as "https://hotel.example/de"; none when it is not a web address. */
+function site(s: string): string | undefined {
+  try {
+    const u = new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`);
+    return u.hostname.includes(".") ? u.href.replace(/\/$/, s.endsWith("/") ? "/" : "") : undefined;
+  } catch { return undefined; }
+}
+const DOMAIN = String.raw`(?<![@\w.-])((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?![\w@-])(?:\/[^\s<>"]*)?)`;
+const WEB_WORDS = "webbplats|hemsida|webseite|website|homepage|internet|site web|sitio web|web";
+/** The place's web page: after a web word, a www address, or a link to the sender's own domain (BK-35). */
+function website(text: string, html: string, from?: string): string | undefined {
+  const after = new RegExp(`\\b(?:${WEB_WORDS})\\b[^\\n]{0,12}?${DOMAIN}`, "i").exec(text)?.[1] ?? /(?<![@\w.-])(www\.(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>"!,;)]*)?)/i.exec(text)?.[1];
+  if (after) return site(after.replace(/[.,;:!)]+$/, ""));
+  const domain = /@([a-z0-9.-]+\.[a-z]{2,})/i.exec(from ?? "")?.[1]?.toLowerCase();
+  if (!domain) return undefined;
+  for (const m of `${html}\n${text}`.matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+    try { const u = new URL(m[0]), host = u.hostname.toLowerCase().replace(/^www\./, ""); if (host === domain || host.endsWith(`.${domain}`) || domain.endsWith(`.${host}`)) return `${u.protocol}//${u.host}/`; } catch { /* not a link */ }
+  }
+  return undefined;
+}
+
 type Ld = Record<string, unknown>;
 /** Every object with a schema.org type in the mail's JSON-LD, also inside lists and @graph. */
 function ldObjects(html: string): Ld[] {
@@ -157,7 +186,9 @@ function fromLd(html: string): BookingReading {
   if (!r) return {};
   const type = String(r["@type"]), what = obj(r.reservationFor);
   const status = /Cancelled/i.test(str(r.reservationStatus) ?? "") ? "cancelled" as const : undefined;
-  const base = { name: str(what.name), reference: str(r.reservationNumber), status, price: ldPrice(r), address: address(what.address) ?? address(obj(what.location).address) };
+  const url = str(what.url) ?? str(obj(what.location).url);
+  const base = { name: str(what.name), reference: str(r.reservationNumber), status, price: ldPrice(r), address: address(what.address) ?? address(obj(what.location).address),
+    phone: str(what.telephone) ?? str(obj(what.location).telephone), website: url && /^https?:\/\//i.test(url) ? site(url) : undefined }; // BK-35
   if (type === "LodgingReservation")
     return clean({ kind: "stay", ...base, from: dateOf(r.checkinTime), to: dateOf(r.checkoutTime), checkIn: timeOf(r.checkinTime), checkOut: timeOf(r.checkoutTime) });
   const at = what.startDate ?? r.startTime ?? what.departureTime;
@@ -170,7 +201,7 @@ const SENT_LINE = /^[ \t>]*(?:date|datum|sent|skickat|gesendet|envoyé|fecha|dat
 const DAY = 864e5, NEAR = 30 * DAY;
 /** A booking read from a mail's subject, text and HTML; dates within the trip's dates are preferred, and dates more than 30 days
  * from them are left out (BK-16). */
-export function readBooking(mail: { subject?: string; text?: string; html?: string }, tripDates: string[] = []): BookingReading {
+export function readBooking(mail: { subject?: string; text?: string; html?: string; from?: string }, tripDates: string[] = []): BookingReading {
   const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n");
   const sorted = [...tripDates].sort(), year = sorted[0] ? +sorted[0].slice(0, 4) : undefined;
   const first = sorted[0], last = sorted[sorted.length - 1];
@@ -181,6 +212,7 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
   const stay = k === "stay" || (!k && !!checkIn);
   const fromText = clean({
     kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject, text) : undefined) ?? textName(text), reference: reference(text), price: price(text),
+    phone: phone(text), website: website(text, mail.html ?? "", mail.from), // BK-35
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) } : {}),
   });

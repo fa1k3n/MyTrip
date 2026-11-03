@@ -45,7 +45,7 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   }
   const from = m.from && "address" in m.from && m.from.address ? (m.from.name ? `${m.from.name} <${m.from.address}>` : m.from.address) : "";
   const subject = m.subject ?? "", at = new Date().toISOString();
-  const booking = readBooking({ subject, text: m.text, html: m.html }, t.days.map((d) => d.date));
+  const booking = readBooking({ subject, text: m.text, html: m.html, from }, t.days.map((d) => d.date));
   const wish = { ...readWish({ subject, text: m.text, html: m.html }), source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }; // BK-29
   const p: Proposal = {
     id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "pending", at,
@@ -125,7 +125,7 @@ async function keepMail(store: Store, t: Trip, m: Awaited<ReturnType<typeof Post
   const from = m.from && "address" in m.from && m.from.address ? (m.from.name ? `${m.from.name} <${m.from.address}>` : m.from.address) : "";
   const subject = m.subject ?? "", at = new Date().toISOString();
   await store.saveProposal({ id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "wish", wishId, at,
-    source: { kind: "mail", from, subject, at }, booking: readBooking({ subject, text: m.text, html: m.html }, t.days.map((d) => d.date)), mailText: mailText(subject, m.text, m.html) });
+    source: { kind: "mail", from, subject, at }, booking: readBooking({ subject, text: m.text, html: m.html, from }, t.days.map((d) => d.date)), mailText: mailText(subject, m.text, m.html) });
 }
 
 /** Adds a wish read from a mail, with an own photo when there is one (DB-23, BK-29); not one the trip already has (DB-27). */

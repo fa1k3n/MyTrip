@@ -258,7 +258,10 @@ export type BookingInput = {
   files?: TicketFile[]; // undefined: keep (BK-09)
   price?: string; currency?: string; // the booking's own budget item; undefined: keep, "": remove (BK-25)
   rate?: Rate; // fetched when saved, for a price in another currency (BK-25, BG-07)
+  newPlace?: NewPlace; // the place to add when placeId is "__new" (BK-36)
 };
+/** A place read from a confirmation, added with the booking (BK-36). */
+export type NewPlace = { name: string; address: string; phone: string; website: string };
 /** The trip's currency per unit of another, and the date of the rate (BG-07). */
 export type Rate = { rate: number; date: string };
 /** The rate fields of a budget item in `currency`: the new rate, else the old one of the same currency; none in the trip's currency (BG-07). */
@@ -287,14 +290,20 @@ export function saveBooking(t: Trip, input: BookingInput, id?: string): Result {
   const price = input.price?.trim() ? parseAmount(input.price) : undefined;
   if (Number.isNaN(price)) return fail(sv.badAmount);
   const files = input.files === undefined ? old?.files : input.files.length ? input.files : undefined;
+  let placeId = input.placeId || undefined, placeOps: Op[] = [];
+  if (placeId === NEW_PLACE) { // BK-36: the place first, so the booking points at something that exists
+    const r = savePlace(t, { bookingUrl: "", bookingLabel: "", notes: "", ...input.newPlace!, name: input.newPlace?.name.trim() || name });
+    if (!r.ok) return r;
+    placeOps = r.ops; placeId = (r.ops[0] as { value: { id: string } }).value.id;
+  }
   const { files: _f, checkIn: _ci, checkOut: _co, start: _s, activityId: _a, ...rest } = old ?? {};
   const booking = clean({
-    ...(input.kind === undefined ? old : rest), id: old?.id ?? uniqueId(name, allIds(t)), name, from: input.from, to: input.to, status: input.status,
-    reference: input.reference.trim() || undefined, placeId: input.placeId || undefined,
+    ...(input.kind === undefined ? old : rest), id: old?.id ?? uniqueId(name, [...allIds(t), ...(placeId ? [placeId] : [])]), name, from: input.from, to: input.to, status: input.status,
+    reference: input.reference.trim() || undefined, placeId,
     note: input.note === undefined ? old?.note : input.note.trim() || undefined,
     kind, ...times, files,
   });
-  return ok([old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking },
+  return ok([...placeOps, old ? { op: "set", path: `bookings/${i}`, value: booking } : { op: "add", path: "bookings/-", value: booking },
     ...(input.price === undefined ? [] : priceOps(t, booking as Booking, price, input.currency, input.rate))]);
 }
 
@@ -313,13 +322,25 @@ function priceOps(t: Trip, b: Booking, price: number | undefined, currency?: str
 /** A price as the form shows it: "1250" or "1250,50". */
 const priceText = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","));
 
+export const NEW_PLACE = "__new";
+const plain = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/** The place a reading points at: a place of the trip with its name, else a new one when an address was read; a place already chosen stays (BK-36). */
+function readPlace(t: Pick<Trip, "places"> | undefined, f: BookingInput, r: BookingReading): Partial<Pick<BookingInput, "placeId" | "newPlace">> {
+  if (f.placeId && f.placeId !== NEW_PLACE) return {};
+  const same = r.name ? t?.places.find((p) => plain(p.name) === plain(r.name!)) : undefined;
+  if (same) return { placeId: same.id };
+  if (!r.address) return {};
+  return { placeId: NEW_PLACE, newPlace: { name: r.name ?? f.newPlace?.name ?? "", address: r.address, phone: r.phone ?? "", website: r.website ?? "" } };
+}
+
 /** The fields read from a mail or a pasted confirmation fill in the form; what was not read stays (BK-17, BK-18). */
-export function readingToForm(f: BookingInput, r: BookingReading): BookingInput {
+export function readingToForm(f: BookingInput, r: BookingReading, t?: Pick<Trip, "places">): BookingInput {
   const kind = r.kind === "stay" || r.kind === "ticket" ? r.kind : r.kind ? "other" : f.kind;
   return {
     ...f, kind, name: r.name ?? f.name, from: r.from ?? f.from, to: r.to ?? r.from ?? f.to, reference: r.reference ?? f.reference,
     status: r.status ?? f.status, checkIn: r.checkIn ?? f.checkIn, checkOut: r.checkOut ?? f.checkOut, start: r.start ?? f.start,
     ...(r.price && { price: priceText(r.price.value), currency: r.price.currency }), // BK-25
+    ...readPlace(t, f, r), // BK-36
   };
 }
 
@@ -362,7 +383,7 @@ export const targetAfterAi = (t: Trip, r: BookingReading, target: string, picked
 
 /** The form for an "Att boka" booking filled in with a reading: now booked, with its own and the mail's ticket files (BK-22). */
 export function matchedForm(t: Trip, b: Booking, r: BookingReading, files: TicketFile[]): BookingInput {
-  const f = readingToForm(bookingForm(t, b), r);
+  const f = readingToForm(bookingForm(t, b), r, t);
   return { ...f, status: r.status ?? "ready", files: [...(b.files ?? []), ...files] };
 }
 

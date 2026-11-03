@@ -101,3 +101,18 @@ test("BK-17 approving and rejecting a mail proposal", async () => {
   const stale = await call(app, `/api/trips/berlin/proposals/${p.id}/approve`, "a", "POST", { baseRevision: 1, ops: [] });
   assert.equal(stale.status, 404);
 });
+
+// REQ: BK-39 a mail with a trip out and back becomes one proposed booking per direction, the attachments with the first
+test("BK-39 one proposal per direction", async () => {
+  const { app, store, address } = await setup();
+  const raw = new TextEncoder().encode([
+    "From: Anna Exempel <anna@example.org>", `To: ${address}`, "Subject: Fwd: Din resa", "MIME-Version: 1.0", 'Content-Type: multipart/mixed; boundary="xx"', "",
+    "--xx", "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "",
+    b64("Bokningsnummer: NT-7Q2K9\nUtresa 25 oktober 2026\nTåg 421 Stockholm C 07:12 – Göteborg C 10:15\nÅterresa 27 oktober 2026\nTåg 448 Göteborg C 16:20 – Stockholm C 19:23\n"),
+    "--xx", 'Content-Type: application/pdf; name="biljett.pdf"', 'Content-Disposition: attachment; filename="biljett.pdf"', "Content-Transfer-Encoding: base64", "", b64(pdf),
+    "--xx--", ""].join("\r\n"));
+  assert.ok("proposalId" in await receiveMail(store, raw, address));
+  const ps = await json(call(app, "/api/trips/berlin/proposals", "a"));
+  assert.deepEqual(ps.map((p: { booking: { name: string; from: string; files?: unknown[] } }) => [p.booking.name, p.booking.from, p.booking.files?.length ?? 0]),
+    [["Stockholm C → Göteborg C", "2026-10-25", 1], ["Göteborg C → Stockholm C", "2026-10-27", 0]]);
+});

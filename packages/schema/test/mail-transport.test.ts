@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readBooking } from "../src/mailbooking.ts";
+import { readBooking, readBookings } from "../src/mailbooking.ts";
 
 const trip = ["2027-11-01", "2027-11-05"];
 const ld = (o: object) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`;
@@ -27,4 +27,24 @@ test("BK-38 transport from the text", () => {
   const de = readBooking({ subject: "Ihre Fahrkarte", text: "Zug Hamburg – Berlin am 03.11.2027\nAbfahrt 09:05, Ankunft 10:51" }, trip);
   assert.deepEqual([de.kind, de.start, de.arrival], ["transport", "09:05", "10:51"]);
   assert.equal(readBooking({ subject: "Hotell", text: "Incheckning 15:00, nära tåget. Två nätter." }, trip).kind, "stay", "a hotel near the train is a stay");
+});
+
+// REQ: BK-39 a confirmation of a trip out and back gives one Resa per direction, from schema.org data or from the text
+test("BK-39 one Resa per direction", () => {
+  const leg = (from: string, to: string, dep: string, arr: string) => ({ "@type": "TrainReservation", reservationNumber: "NT-7Q2K9",
+    reservationFor: { "@type": "TrainTrip", departureStation: { name: from }, arrivalStation: { name: to }, departureTime: dep, arrivalTime: arr } });
+  const both = readBookings({ subject: "Din resa", html: ld([leg("Stockholm C", "Göteborg C", "2027-11-01T07:12", "2027-11-01T10:15"),
+    leg("Göteborg C", "Stockholm C", "2027-11-03T16:20", "2027-11-03T19:23")]) }, trip);
+  assert.deepEqual(both.map((r) => [r.name, r.from, r.start, r.arrival, r.reference]), [
+    ["Stockholm C → Göteborg C", "2027-11-01", "07:12", "10:15", "NT-7Q2K9"], ["Göteborg C → Stockholm C", "2027-11-03", "16:20", "19:23", "NT-7Q2K9"]]);
+  const text = "Bokningsnummer: NT-7Q2K9\n2 vuxna\n\nUtresa måndag 1 november 2027\nTåg 421  Stockholm C 07:12 – Göteborg C 10:15  Vagn 3\n\n"
+    + "Återresa onsdag 3 november 2027\nTåg 448  Göteborg C 16:20 – Stockholm C 19:23  Vagn 5\n\nTotalt: 1 236 kr";
+  const read = readBookings({ subject: "Din resebekräftelse NT-7Q2K9", text }, trip);
+  assert.deepEqual(read.map((r) => [r.kind, r.name, r.origin, r.destination, r.from, r.to, r.start, r.arrival, r.reference]), [
+    ["transport", "Stockholm C → Göteborg C", "Stockholm C", "Göteborg C", "2027-11-01", "2027-11-01", "07:12", "10:15", "NT-7Q2K9"],
+    ["transport", "Göteborg C → Stockholm C", "Göteborg C", "Stockholm C", "2027-11-03", "2027-11-03", "16:20", "19:23", "NT-7Q2K9"]]);
+  assert.deepEqual(read.map((r) => r.price?.value), [1236, undefined], "the price once, on the way out");
+  const one = { subject: "Bokningsbekräftelse färja", text: "Färja Puttgarden – Rødby\nDatum 2027-11-02\nAvgång 14:30\nAnkomst 15:15" };
+  assert.deepEqual(readBookings(one, trip), [readBooking(one, trip)]);
+  assert.equal(readBookings({ subject: "Hotell", text: "Incheckning 1 november 2027 15:00. Två nätter.\nRetur av nyckel i receptionen." }, trip).length, 1, "a stay is never split");
 });

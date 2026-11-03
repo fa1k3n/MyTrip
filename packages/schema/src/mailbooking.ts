@@ -184,8 +184,9 @@ function ldPrice(r: Ld): BookingReading["price"] {
 }
 
 /** The first reservation in the mail's schema.org data. */
-function fromLd(html: string): BookingReading {
-  const r = ldObjects(html).find((o) => String(o["@type"]).endsWith("Reservation"));
+const fromLd = (html: string): BookingReading => fromLdObject(ldObjects(html).find((o) => String(o["@type"]).endsWith("Reservation")));
+const TRANSPORT_LD = /^(Train|Bus|Flight|Boat)Reservation$/;
+function fromLdObject(r: Ld | undefined): BookingReading {
   if (!r) return {};
   const type = String(r["@type"]), what = obj(r.reservationFor);
   const status = /Cancelled/i.test(str(r.reservationStatus) ?? "") ? "cancelled" as const : undefined;
@@ -195,7 +196,7 @@ function fromLd(html: string): BookingReading {
   if (type === "LodgingReservation")
     return clean({ kind: "stay", ...base, from: dateOf(r.checkinTime), to: dateOf(r.checkoutTime), checkIn: timeOf(r.checkinTime), checkOut: timeOf(r.checkoutTime) });
   const place = (...vs: unknown[]) => vs.map((v) => str(obj(v).name) ?? str(obj(v).iataCode) ?? str(v)).find(Boolean);
-  if (/^(Train|Bus|Flight|Boat)Reservation$/.test(type)) { // BK-38: a Resa, from and to with its departure and arrival
+  if (TRANSPORT_LD.test(type)) { // BK-38: a Resa, from and to with its departure and arrival
     const origin = place(what.departureStation, what.departureBusStop, what.departureAirport, what.departureBoatTerminal);
     const destination = place(what.arrivalStation, what.arrivalBusStop, what.arrivalAirport, what.arrivalBoatTerminal);
     const from = dateOf(what.departureTime);
@@ -226,9 +227,33 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
     phone: phone(text), website: website(text, mail.html ?? "", mail.from), // BK-35
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) }
-      : k === "transport" ? { start: timeAfter(text, DEPART), arrival: timeAfter(text, ARRIVE) } : {}), // BK-38
+      : k === "transport" ? transportText(text) : {}), // BK-38
   });
   return clean({ ...fromText, ...(mail.html ? fromLd(mail.html) : {}) });
+}
+
+/** BK-39: a line such as "Tåg 421 Stockholm C 07:12 – Göteborg C 10:15", the places and times of departure and arrival. */
+const ROUTE = /(\p{L}[\p{L} .'-]*?)\s+(\d{1,2})[:.](\d\d)\s*(?:–|—|→|->|-)\s*(\p{L}[\p{L} .'-]*?)\s+(\d{1,2})[:.](\d\d)(?!\d)/u;
+function transportText(text: string): BookingReading {
+  const m = ROUTE.exec(text), hm = (h: string, mm: string) => (+h < 24 && +mm < 60 ? `${h.padStart(2, "0")}:${mm}` : undefined);
+  const route = m ? { origin: m[1]!.trim(), destination: m[4]!.trim(), start: hm(m[2]!, m[3]!), arrival: hm(m[5]!, m[6]!) } : {};
+  return clean({ ...route, ...(m ? { name: `${m[1]!.trim()} → ${m[4]!.trim()}` } : {}), start: timeAfter(text, DEPART) ?? route.start, arrival: timeAfter(text, ARRIVE) ?? route.arrival });
+}
+
+/** Where the way back starts in a confirmation of a journey out and back (BK-39). */
+const RETURN = /^.*?(?<!\p{L})(?:återresa|hemresa|retur|returresa|return|rückfahrt|rückreise|retour|hjemreise|hjemrejse|vuelta|ritorno|terugreis)(?!\p{L})/imu;
+/** The bookings of a mail: one per direction of a journey out and back, otherwise one (BK-39). */
+export function readBookings(mail: { subject?: string; text?: string; html?: string; from?: string }, tripDates: string[] = []): BookingReading[] {
+  const one = readBooking(mail, tripDates);
+  const legs = mail.html ? ldObjects(mail.html).filter((o) => TRANSPORT_LD.test(String(o["@type"]))) : [];
+  if (legs.length > 1) return legs.map((r, i) => clean({ ...one, ...fromLdObject(r), ...(i ? { price: undefined } : {}) }));
+  const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n"), back = RETURN.exec(text);
+  if (one.kind !== "transport" || !back || !back.index) return [one];
+  const part = (t: string, i: number) => { // the dates, places and times of its own part; the reference of the whole, the price once
+    const r = readBooking({ text: t, from: mail.from }, tripDates);
+    return clean({ ...one, from: r.from, to: r.to, start: undefined, arrival: undefined, origin: undefined, destination: undefined, ...transportText(t), price: i ? undefined : one.price });
+  };
+  return [part(text.slice(0, back.index), 0), part(text.slice(back.index), 1)];
 }
 
 const CONFIRM = /bokningsbekräftelse|orderbekräftelse|bekräftelse|e-biljett|kvitto|booking confirmation|order confirmation|reservation/i;

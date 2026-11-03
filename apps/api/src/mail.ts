@@ -2,7 +2,7 @@
 // with its ticket attachments and stored as a proposal that a Planerare or the superuser reviews (BK-17), so nothing in the trip
 // changes here; anything else becomes a wish at once (DB-23..DB-25).
 import PostalMime from "postal-mime";
-import { applyOps, checkTrip, mailKind, mailSure, readBooking, readWish, Trip, wishTwin, type WishReading } from "@trip/schema";
+import { applyOps, checkTrip, mailKind, mailSure, readBooking, readBookings, readWish, Trip, wishTwin, type WishReading } from "@trip/schema";
 import { MAX_FILE, newFileId, storeTicket, ticketType, type Proposal, type Store } from "./app.ts";
 import { IMAGE_MAX, imageType } from "./wishimage.ts";
 import { sv } from "../../web/src/sv.ts";
@@ -36,7 +36,7 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   const pending = (await store.proposals(t.id)).filter((p) => p.status === "pending" && p.source?.kind === "mail");
   if (pending.length >= MAX_PENDING) return { error: "too many" };
   const m = await PostalMime.parse(raw);
-  const files = [];
+  const files: Awaited<ReturnType<typeof storeTicket>>[] = [];
   for (const a of m.attachments) {
     const bytes = typeof a.content === "string" ? new TextEncoder().encode(a.content) : new Uint8Array(a.content);
     const type = ticketType(a.mimeType, bytes);
@@ -45,15 +45,15 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   }
   const from = m.from && "address" in m.from && m.from.address ? (m.from.name ? `${m.from.name} <${m.from.address}>` : m.from.address) : "";
   const subject = m.subject ?? "", at = new Date().toISOString();
-  const booking = readBooking({ subject, text: m.text, html: m.html, from }, t.days.map((d) => d.date));
+  const bookings = readBookings({ subject, text: m.text, html: m.html, from }, t.days.map((d) => d.date)); // BK-39: one per direction
   const wish = { ...readWish({ subject, text: m.text, html: m.html }), source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }; // BK-29
-  const p: Proposal = {
+  const ps: Proposal[] = bookings.map((booking, i) => ({
     id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "pending", at,
-    source: { kind: "mail", from, subject, at }, booking: { ...booking, ...(files.length ? { files } : {}) }, wish,
+    source: { kind: "mail", from, subject, at }, booking: { ...booking, ...(files.length && !i ? { files } : {}) }, wish, // the attachments with the first
     mailText: mailText(subject, m.text, m.html), // AI-60
-  };
-  await store.saveProposal(p);
-  return { proposalId: p.id };
+  }));
+  for (const p of ps) await store.saveProposal(p);
+  return { proposalId: ps[0]!.id };
 }
 
 const MAIL_TEXT_MAX = 12_000;

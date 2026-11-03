@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Trip } from "@trip/schema";
+import { Trip, type Op } from "@trip/schema";
 import { createApp, memoryStore } from "../src/app.ts";
 import { aiView, fromAi, runAi, type AiCall, type AiFeature } from "../src/ai.ts";
 
@@ -64,6 +64,28 @@ test("AI-04 fromAi maps references back", () => {
   const { refs } = aiView(Trip.parse(trip()));
   assert.deepEqual(fromAi([{ op: "add", path: "expenses/-", value: { paidBy: "r1", sharedBy: ["r2"], text: "r1" } }], refs),
     [{ op: "add", path: "expenses/-", value: { paidBy: "anna", sharedBy: ["olle"], text: "anna" } }]);
+});
+
+// REQ: AI-98 a traveler reference left in a text gets the traveler's name, "resenär" without one; other words stay
+test("AI-98 fromAi names travelers in texts", () => {
+  const t = Trip.parse({ ...trip(), travelers: [...trip().travelers, { id: "x", name: " ", packing: [] }] });
+  const { refs, names } = aiView(t);
+  const text = (s: string) => (fromAi([task("k", s) as Op], refs, names)[0]!.value as { text: string }).text;
+  assert.equal(text("Kontrollera att r1 och r2 har giltiga pass."), "Kontrollera att Anna och Olle har giltiga pass.");
+  assert.equal(text("Packa r2:s mössa och r3:s jacka"), "Packa Olles mössa och resenärs jacka");
+  assert.equal(text("r3 tar med laddaren"), "resenär tar med laddaren");
+  for (const same of ["Tr1 och R1-linjen", "Ta linje r9", "r1-pass", "r12 till Malmö"]) assert.equal(text(same), same);
+  assert.deepEqual(fromAi([{ op: "set", path: "expenses/0/paidBy", value: "r1" }], refs, names)[0]!.value, "anna");
+});
+
+// REQ: AI-98 the instructions ask for "båda", "alla" or a role in texts, and the reason shown to the user names the travelers
+test("AI-98 runAi asks for no references in texts and names them in the reason", async () => {
+  const r = reply([task("pass")]);
+  (r.content[0] as { input: { reason: string } }).input.reason = "Pass för r1 och r2.";
+  const ai = fake(r);
+  const out = await runAi(ai, tasksOnly, Trip.parse(trip()));
+  assert.equal("reason" in out && out.reason, "Pass för Anna och Olle.");
+  assert.match(String(ai.seen[0]!.system), /"båda"/);
 });
 
 // REQ: AI-65 fixed instructions, the trip as data, and a proposal that fails the dry run goes back to the service to be fixed

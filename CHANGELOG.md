@@ -13,6 +13,7 @@ Fixes from the first beta trips, and "Kör nu" for wish suggestions in Önska.
 - Changing the first date of a trip offers "Flytta resan", which moves the days with their plan and the due dates of Att göra, or "Ändra längden"; moving is preselected when the new dates do not overlap the old ones, and the last date follows the first; bookings still to be booked move along, and a booked one left outside the new dates is named before anything is saved, so the plan is no longer lost (ED-30, ED-31, ED-32, TK-11).
 - Suggestions after "Kör nu" appear at once, without switching tabs (AI-96).
 - A new trip's card on Drömmar shows your roles at once, without reloading the page (US-40).
+- Editing part of a filled-in date keeps the other digits; slashes are added only while typing forward (LC-05).
 - Texts written by the AI name the travelers instead of internal references such as "r1" (AI-98).
 - A wish gets an image only from an article with the same name, so "Riddle & Finns" no longer shows a map of Finnic languages (DB-29).
 

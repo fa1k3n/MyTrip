@@ -26,3 +26,20 @@ test("LC-05 typedDate", () => {
   assert.equal(typedDate("01/"), "01/", "a slash typed by hand stays");
   assert.equal(typedDate("1.11.2027"), "1.11.2027", "other separators are left as typed");
 });
+
+// REQ: LC-05 the slashes are put in only while typing forward at the end; an edit elsewhere in a filled-in date is kept as typed
+test("LC-05 typedDate keeps an edit in the middle", () => {
+  assert.equal(typedDate("011", "01"), "01/1", "typing forward");
+  assert.equal(typedDate("01/122", "01/12"), "01/12/2");
+  assert.equal(typedDate("4/10/2026", "24/10/2026"), "4/10/2026", "a digit removed in the middle");
+  assert.equal(parseDate("4/10/2026"), "2026-10-04");
+  assert.equal(typedDate("14/10/2026", "4/10/2026"), "14/10/2026", "a digit typed in the middle");
+  assert.equal(typedDate("24/10/202", "24/10/2026"), "24/10/202", "removed at the end");
+});
+
+// REQ: LC-05 typing forward after a one-digit day or month keeps it: "4/10/" and then the year
+test("LC-05 typedDate keeps parts that already have slashes", () => {
+  assert.equal(typedDate("4/10/2", "4/10/"), "4/10/2");
+  assert.equal(typedDate("4/10/2027", "4/10/202"), "4/10/2027");
+  assert.equal(typedDate("4/10/20271", "4/10/2027"), "4/10/2027");
+});

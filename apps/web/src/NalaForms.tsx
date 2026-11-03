@@ -55,7 +55,7 @@ function DateField({ label, value, onChange, autoFocus }: { label: string; value
   const set = (iso: string) => onChange({ target: { value: iso } } as Change);
   return <label>{label}<span className="datefield">
     <input value={typed} inputMode="numeric" placeholder={sv.datePlaceholder} autoFocus={autoFocus}
-      onChange={(e) => { const s = typedDate(e.target.value); setTyped(s); set(parseDate(s) ?? ""); }} />
+      onChange={(e) => { const s = typedDate(e.target.value, typed); setTyped(s); set(parseDate(s) ?? ""); }} />
     <span className="datepick" title={sv.pickDate}><Icon name="calendar" />
       <input type="date" tabIndex={-1} aria-label={sv.pickDate} value={value} onChange={(e) => set(e.target.value)}
         onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* opened by the tap itself, or not supported */ } }} /></span>
@@ -222,7 +222,10 @@ function DatesForm(p: Props) {
   const { f, text, set } = useFields({ from: r?.from ?? "", to: r?.to ?? "" });
   const [picked, setPicked] = useState<DatesMode | null>(null);
   const [toTyped, setToTyped] = useState(!r);
-  const { to, mode, offered } = datesForm(p.t, f.from, f.to, picked, toTyped); // the last date follows the first (ED-31)
+  const shown = useRef<ReturnType<typeof datesForm>>();
+  const now = datesForm(p.t, f.from, f.to, picked, toTyped); // the last date follows the first (ED-31)
+  if (f.from || !shown.current) shown.current = now; // while the first date is half typed the form keeps still (ED-30)
+  const { to, mode, offered } = shown.current;
   const submit = async () => {
     const dates = { from: f.from, to };
     const res = setTripDates(p.t, dates, mode);

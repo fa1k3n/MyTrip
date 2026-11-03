@@ -38,9 +38,20 @@ export function parseDate(text: string): string | undefined {
   const date = new Date(Date.UTC(y, mo - 1, d));
   return y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? date.toISOString().slice(0, 10) : undefined;
 }
-/** Digits typed in a date field with the slashes put in: "011" is "01/1" (LC-05); other separators are left as typed. */
-export function typedDate(text: string): string {
+/** Digits typed in a date field with the slashes put in: "011" is "01/1" (LC-05); other separators are left as typed. Given the
+ * text before, only typing forward at the end gets slashes; an edit elsewhere in a filled-in date is kept as typed. */
+export function typedDate(text: string, before?: string): string {
+  if (before !== undefined && !(text.startsWith(before) && text.length > before.length)) return text;
   if (!/^[\d/]*$/.test(text) || text.endsWith("/")) return text;
+  if (text.includes("/")) { // the parts already set stay as typed; a day or month of more than two digits goes on to the next part
+    const parts = text.split("/"), out: string[] = [];
+    for (let i = 0, carry = ""; i < parts.length || carry; i++) {
+      const seg = carry + (parts[i] ?? "");
+      if (out.length === 2) { out.push(seg.slice(0, 4)); break; }
+      out.push(seg.slice(0, 2)); carry = seg.slice(2);
+    }
+    return out.join("/");
+  }
   const d = text.replace(/\D/g, "").slice(0, 8);
   return [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join("/");
 }

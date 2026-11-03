@@ -31,8 +31,8 @@ export function Verdicts({ t, id, title, by, writes, run, comment }: { t: Trip; 
   return <div className="verdicts">
     {VERDICTS.map((v) => <span className="verdict" key={v}>{/* the count in the corner, as the money button once had (MI-17) */}
       {writes && by ? <IconButton icon={v} tip="up" pressed={mine === v} label={sv.minnas.give(sv.minnas.verdicts[v], title, n[v])}
-        onClick={() => (isOffline() ? verdictQueue.save(queueVerdict(verdictQueue.load(), { tripId: t.id, dreamId: id, by, verdict: mine === v ? null : v })) // UP-53
-          : run((x) => memoryOps(x, id, by, { verdict: v }), `verdict ${v}`))} />
+        onClick={() => { const keep = () => verdictQueue.save(queueVerdict(verdictQueue.load(), { tripId: t.id, dreamId: id, by, verdict: mine === v ? null : v })); // UP-53
+          if (isOffline()) keep(); else run((x) => memoryOps(x, id, by, { verdict: v }), `verdict ${v}`, keep); }} /> // no answer: kept too (UP-54)
         : <span className="btn ghost icon" role="img" aria-label={sv.minnas.count(sv.minnas.verdicts[v], n[v])} title={sv.minnas.verdicts[v]}><Icon name={v} /></span>}
       <Count n={n[v]} />
     </span>)}

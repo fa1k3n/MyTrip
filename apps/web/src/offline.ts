@@ -184,3 +184,6 @@ export function loadVerdicts(s: Store, slot: string): WaitingVerdict[] {
 export function saveVerdicts(s: Store, slot: string, q: WaitingVerdict[]) {
   try { if (q.length) s.setItem(VERDICTS_KEY + slot, JSON.stringify(q)); else s.removeItem(VERDICTS_KEY + slot); } catch { /* storage blocked */ }
 }
+/** A request that reached no server: fetch threw before any answer, as on a phone that says it is online without a network (UP-54).
+ * An answer from the server is an ApiError, never a TypeError. */
+export const noAnswer = (e: unknown) => e instanceof TypeError;

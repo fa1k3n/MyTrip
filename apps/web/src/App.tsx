@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, isOffline, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
-import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
+import { noAnswer, dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
@@ -367,7 +367,7 @@ export function App() {
     await load();
   };
   /** Inline edits (checkboxes, packing items): retried once with fresh data after a conflict; errors show as a notice. */
-  const run: Run = async (build, reason) => {
+  const run: Run = async (build, reason, offline) => {
     let cur = t!;
     for (let attempt = 0; attempt < 2; attempt++) {
       const r = build(cur);
@@ -384,6 +384,7 @@ export function App() {
           const fresh = (await api.trips()).find((x) => x.id === cur.id);
           if (fresh) { cur = fresh; continue; }
         }
+        if (offline && noAnswer(e)) { offline(); await load(); return; } // UP-54: kept on the phone instead
         setNotice([sv.couldNotSave, ...(e instanceof ApiError ? e.problems : [])].join(" "));
         await load();
         return;

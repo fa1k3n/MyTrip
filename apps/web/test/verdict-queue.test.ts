@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { queueVerdict, verdictOps, withVerdicts, type WaitingVerdict } from "../src/offline.ts";
 import { verdictCounts } from "../src/memories.ts";
@@ -33,4 +34,21 @@ test("UP-53 ops from the latest trip to the chosen verdict", () => {
   assert.deepEqual(verdictOps(latest, { tripId: "berlin", dreamId: "w1", by: "anna", verdict: null }), [{ op: "remove", path: "memories/1" }]);
   assert.deepEqual(verdictOps(latest, { tripId: "berlin", dreamId: "w2", by: "anna", verdict: "never" }),
     [{ op: "add", path: "memories/-", value: { id: "m-w2-anna", dreamId: "w2", by: "anna", verdict: "never" } }]);
+});
+
+// REQ: UP-54 a save that reaches no server is a network failure; an answer from the server is not
+test("UP-54 no answer is a network failure", async () => {
+  const { noAnswer } = await import("../src/offline.ts");
+  class Answered extends Error { status: number; constructor(status: number) { super(String(status)); this.status = status; } } // as the app's ApiError
+  assert.equal(noAnswer(new TypeError("Failed to fetch")), true);
+  assert.equal(noAnswer(new TypeError("Load failed")), true); // Safari on iPhone
+  assert.equal(noAnswer(new Answered(403)), false);
+  assert.equal(noAnswer(new Answered(503)), false);
+});
+
+// REQ: UP-54 the verdict buttons hand run a way to keep the verdict on the phone when the save gets no answer
+test("UP-54 the verdict falls back on the phone's queue", () => {
+  const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  assert.match(src("Verdicts.tsx"), /run\(\(x\) => memoryOps\(x, id, by, \{ verdict: v \}\), `verdict \$\{v\}`, keep\)/);
+  assert.match(src("App.tsx"), /if \(offline && noAnswer\(e\)\) \{ offline\(\); await load\(\); return; \}/);
 });

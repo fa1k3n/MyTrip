@@ -37,7 +37,7 @@ type Day = Trip["days"][number];
 export type Tab = "dr" | "nala" | "up" | "mi";
 const TAB_ICONS: Record<Tab, Parameters<typeof Icon>[0]["name"]> = { dr: "heart", nala: "list", up: "compass", mi: "memories" }; // the phone app's tab bar (PW-24)
 /** Inline edits without a dialog; `build` gets the latest trip so a retry after a conflict uses fresh data. */
-export type Run = (build: (t: Trip) => Op[] | Result, reason: string) => void;
+export type Run = (build: (t: Trip) => Op[] | Result, reason: string, offline?: () => void) => void; // offline: what to do when the save gets no answer (UP-54)
 
 /** A place name as a link that opens the place window (PL-01, PL-02). */
 export function PlaceLink({ t, id, text, onPlace }: { t: Trip; id?: string; text?: string; onPlace: (id: string) => void }) {

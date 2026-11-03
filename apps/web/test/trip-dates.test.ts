@@ -131,3 +131,28 @@ test("ED-31 the last date follows the first while Flytta resan is chosen, until 
   assert.deepEqual(datesForm(t, "2026-10-24", "2026-10-30", null, true), { to: "2026-10-30", mode: "length", offered: false });
   assert.deepEqual(datesForm({ ...t, days: [] }, "2026-07-01", "2026-07-03", null, true), { to: "2026-07-03", mode: "length", offered: false });
 });
+
+const booked = (status: "tobook" | "ready" | "paid" | "cancelled") => Trip.parse({
+  ...planned(), bookings: [{ id: "hotell", name: "Hotell Göteborg", kind: "stay", from: "2026-10-24", to: "2026-10-25", status }],
+});
+
+test("ED-32 Flytta resan moves a booking still to be booked by as many days", () => {
+  const t = moved(booked("tobook"), "2026-11-04", "2026-11-05");
+  assert.deepEqual([t.bookings[0]!.from, t.bookings[0]!.to], ["2026-11-04", "2026-11-05"]);
+  assert.deepEqual(checkTrip(t), []);
+});
+
+test("ED-32 a booked or paid booking left outside the new dates stops the change with its name and dates; a cancelled one does not", () => {
+  for (const status of ["ready", "paid"] as const) {
+    const r = setTripDates(booked(status), { from: "2026-11-04", to: "2026-11-05" }, "move");
+    assert.deepEqual(r, { ok: false, error: sv.errors.bookingsOutside("Hotell Göteborg 24–25 okt") });
+  }
+  const length = setTripDates(booked("paid"), { from: "2026-10-25", to: "2026-10-26" }, "length");
+  assert.equal(length.ok, false);
+  assert.ok(moved(booked("cancelled"), "2026-11-04", "2026-11-05"));
+});
+
+test("ED-32 a booking still to be booked that a shorter moved trip leaves outside also stops the change", () => {
+  const t = Trip.parse({ ...booked("tobook"), bookings: [{ id: "hotell", name: "Hotell Göteborg", kind: "stay", from: "2026-10-25", to: "2026-10-25", status: "tobook" }] });
+  assert.deepEqual(setTripDates(t, { from: "2026-11-04", to: "2026-11-04" }, "move"), { ok: false, error: sv.errors.bookingsOutside("Hotell Göteborg 25 okt") });
+});

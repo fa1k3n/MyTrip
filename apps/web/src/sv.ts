@@ -410,7 +410,7 @@ export const sv = {
     summary: "Skriv en kort sammanfattning av dagen.", icons: "Ange en eller två ikoner, t.ex. 🚗🏛️.",
     time: "Ange start- och sluttid.", endBeforeStart: "Sluttiden kan inte vara före starttiden.", day: "Dagen finns inte längre.",
     text: "Beskriv aktiviteten.", activityTime: "Ange tiden som TT:MM.", place: "Ange namn och adress för den nya platsen.",
-    name: "Ange ett namn.", person: "Personen finns inte längre.", travel: "Ange restiden i hela minuter.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.",
+    name: "Ange ett namn.", person: "Personen finns inte längre.", travel: "Ange restiden i hela minuter.", dates: "Ange första och sista datum.", toBeforeFrom: "Sista datum kan inte vara före första.", bookingsOutside: (list: string) => `Bokat utanför de nya datumen: ${list}. Ändra eller avboka först.`, // ED-32
     expenseText: "Beskriv utlägget.", category: "Välj en kategori.", range: "Det högre beloppet måste vara minst lika stort som det lägre.",
     taskText: "Beskriv uppgiften.", url: "Webbadressen ser inte ut att stämma, t.ex. www.exempel.se.", item: "Skriv vad som ska packas.",
     tooLong: "En resa kan vara högst 60 dagar.", activityDate: "Aktiviteten ligger inte på bokningens första datum.",

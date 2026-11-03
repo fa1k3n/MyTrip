@@ -1,6 +1,6 @@
 // Builds the changes (ops) for editing in Nåla. Pure, so it runs under node --test (ED-01..ED-08).
 import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
-import { dateBadge } from "./format.ts";
+import { bookingDates, dateBadge } from "./format.ts";
 import { parseAmount } from "./money.ts";
 import { sv } from "./sv.ts";
 import { TIME_POINT } from "./categories.ts";
@@ -189,10 +189,15 @@ export function setTripDates(t: Trip, input: { from: string; to: string }, mode:
   if (input.to < input.from) return fail(sv.errors.toBeforeFrom);
   const dates = datesBetween(input.from, input.to);
   if (dates.length > MAX_DAYS) return fail(sv.errors.tooLong);
+  const moving = mode === "move" && t.days.length > 0;
+  const shift = moving ? daysBetween(byDate(t)[0]!.date, input.from) : 0;
+  const after = (b: Trip["bookings"][number]) => (b.status === "tobook" ? { from: addDaysTo(b.from, shift), to: addDaysTo(b.to, shift) } : b);
+  const stuck = t.bookings.filter((b) => b.status !== "cancelled" && (after(b).from < input.from || after(b).to > input.to)); // ED-32, DQ-04
+  if (stuck.length) return fail(sv.errors.bookingsOutside(stuck.map((b) => `${b.name} ${bookingDates(b)}`).join(", ")));
   const taken = allIds(t);
   const ops: Op[] = [];
   let have = new Set(t.days.map((d) => d.date)), fresh = dates;
-  if (mode === "move" && t.days.length) {
+  if (moving) {
     // Sets first, by the days' places in the list as they are; the removals after them change those places.
     const order = byDate(t);
     order.slice(0, dates.length).forEach((d, i) => {
@@ -200,8 +205,9 @@ export function setTripDates(t: Trip, input: { from: string; to: string }, mode:
       ops.push({ op: "set", path: `days/${t.days.indexOf(d)}/date`, value: dates[i] });
       t.stops.forEach((s, j) => { if (s.dayId === d.id && s.sub === badgeOf(d.date)) ops.push({ op: "set", path: `stops/${j}/sub`, value: badgeOf(dates[i]!) }); });
     });
-    const shift = daysBetween(order[0]!.date, input.from);
     if (shift) t.tasks.forEach((k, n) => { if (k.due) ops.push({ op: "set", path: `tasks/${n}/due`, value: addDaysTo(k.due, shift) }); }); // TK-11
+    if (shift) t.bookings.forEach((b, n) => { if (b.status === "tobook") ops.push( // ED-32: what is still to be booked moves along
+      { op: "set", path: `bookings/${n}/from`, value: addDaysTo(b.from, shift) }, { op: "set", path: `bookings/${n}/to`, value: addDaysTo(b.to, shift) }); });
     have = new Set(); fresh = dates.slice(order.length);
   }
   const gone = new Set(removedDays(t, input, mode).map((d) => d.id));

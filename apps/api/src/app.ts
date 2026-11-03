@@ -4,19 +4,20 @@ import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part, type WishReading } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { checkTransit } from "./transit.ts";
-import { mailForAi, readBookingAi, readReceiptAi, type ReadOut } from "./ai-read.ts";
+import { mailForAi, readBookingAi, readMailKindAi, readReceiptAi, type ReadOut } from "./ai-read.ts";
 import { aiText, NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
 import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
 import { pushRequest, vapidPublicKey } from "./push.ts";
 import { sv } from "../../web/src/sv.ts";
-import { addWish, MIN_PHOTO, sortMail } from "./mail.ts";
+import { addWish, MIN_PHOTO, receiveMail, sortMail, type AskKind } from "./mail.ts";
 import { checkPassword, firstSuper, googleAuthUrl, googleIdentity, hashPassword, memberships, normEmail, PASSWORD_MIN, pkce, publicUser, RESET_ACCOUNT_MAX, RESET_DAY_MAX, RESET_GAP_MS, RESET_MS, SETUP_DAYS, sha256, validEmail, type Google, type User } from "./users.ts";
 import { escapeHtml, type Mailer } from "./mailer.ts";
 export type { User } from "./users.ts";
 
 export type Proposal = {
-  id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected"; at: string;
+  id: string; tripId: string; baseRevision: number; ops: Op[]; reason: string; status: "pending" | "approved" | "rejected" | "wish"; at: string;
+  wishId?: string; // status "wish": the mail of this mailed wish, kept so it can become a booking (BK-33)
   source?: { kind: "mail"; from: string; subject: string; at: string } // a mail to the trip's inbox (BK-15)
     | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string; memories?: string[] }; // memories: earlier trips used (AI-91); an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
@@ -877,8 +878,24 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
   // BK-15, BK-28: on the Node server a manager posts a raw message, sorted like mail through the Worker's email handler.
   app.post("/api/trips/:id/mail", async (c) => {
     if (!manager(c)) return c.json({ error: "forbidden" }, 403);
-    const r = await sortMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()));
+    const r = await sortMail(store, await load(c.req.param("id")), new Uint8Array(await c.req.arrayBuffer()), fetch, askKind);
     return "proposalId" in r ? c.json(r, 202) : "wishId" in r ? c.json(r, 201) : c.json(r, r.error === "too many" ? 429 : 422);
+  });
+  // BK-33: a wish that came by mail becomes the booking proposal of its kept mail; the wish goes, unless it is planned or has verdicts.
+  app.post("/api/trips/:id/dreams/:did/booking", async (c) => {
+    if (!manager(c)) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id")), did = c.req.param("did"), i = t.dreams.findIndex((w) => w.id === did);
+    const p = (await store.proposals(t.id)).find((x) => x.status === "wish" && x.wishId === did);
+    if (!p || i < 0) return c.json({ error: "no mail" }, 404);
+    if (t.days.some((d) => d.activities.some((a) => a.dreamId === did)) || t.memories.some((m) => m.dreamId === did)) return c.json({ error: "in use" }, 409);
+    const ops: Op[] = [{ op: "remove", path: `dreams/${i}` }], next = { ...Trip.parse(applyOps(t, ops)), revision: t.revision + 1 };
+    if (checkTrip(next).length || !(await store.save(next, t.revision))) return c.json({ error: "conflict" }, 409);
+    await store.appendLog({ at: clock().toISOString(), tripId: t.id, actor: actorName(c, t), reason: "wish to booking", ops });
+    const file = t.dreams[i]!.image?.kind === "own" ? t.dreams[i]!.image!.file : undefined;
+    if (file) await store.removeFiles([file]);
+    const { wishId: _w, ...rest } = p;
+    await store.saveProposal({ ...rest, status: "pending", baseRevision: next.revision });
+    return c.json({ proposalId: p.id }, 201);
   });
   // BK-29: a mail proposal becomes the wish DB-23 would have made, with the first attached photo; its other files go.
   app.post("/api/trips/:id/proposals/:pid/wish", async (c) => {
@@ -1336,5 +1353,17 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       return { tripId: t.id, title: t.title, owner: name(owners[t.id] ?? first ?? ""), ...(from ? { from, to } : {}), memories: t.memories.length, people, ai };
     }));
   });
-  return Object.assign(app, { aiTick });
+  /** BK-32: the mail is shown to the AI service only when the trip has accepted AI, the area is on and the cap not reached. */
+  async function askKind(...[t, text]: Parameters<AskKind>): ReturnType<AskKind> {
+    const s = await store.loadSettings();
+    if (!opts.ai || !aiOnForTrip(s, "mail", true, t) || !t.aiConsent) return undefined;
+    const at = clock().toISOString(), month = at.slice(0, 7);
+    if (capReached(s, await store.aiUses(month), "mejl")) return undefined;
+    const r = await readMailKindAi(opts.ai.call, mailForAi(text, t));
+    await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who: "mejl", feature: "mailsort", usd: r.cost.usd, result: "error" in r ? "error" : "proposal" });
+    return "reading" in r ? r.reading.kind : undefined;
+  }
+  /** BK-15, BK-32: a mail from the Worker's email handler, sorted with the AI service where the rules cannot. */
+  const receive = (raw: Uint8Array | ArrayBuffer, to: string) => receiveMail(store, raw, to, fetch, askKind);
+  return Object.assign(app, { aiTick, receive });
 }

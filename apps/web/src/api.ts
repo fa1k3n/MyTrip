@@ -199,7 +199,7 @@ async function call<T>(path: string, init: RequestInit = {}, key = link): Promis
 const trip = (id: string) => `/api/trips/${encodeURIComponent(id)}`;
 
 /** A mail to the trip's inbox, read into a proposed booking that waits for review (BK-15, BK-17). */
-export type MailProposal = { id: string; status: "pending" | "approved" | "rejected"; source?: { kind: "mail"; from: string; subject: string; at: string }; booking?: BookingReading & { files?: TicketFile[] } };
+export type MailProposal = { id: string; status: "pending" | "approved" | "rejected" | "wish"; source?: { kind: "mail"; from: string; subject: string; at: string }; booking?: BookingReading & { files?: TicketFile[] } };
 /** A traveler's personal link as the settings show it (AU-11). */
 export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner"; secret: string; account?: string; login?: "none" | "invited" | "active" | "disabled" }; // account: US-21, login: US-36
 /** An account as the superuser's list shows it (US-02). */
@@ -312,6 +312,7 @@ export const api = {
   inbox: (id: string) => call<{ enabled: boolean; address?: string }>(`${trip(id)}/inbox`), // BK-27: mail import on, for this viewer
   openInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox`, { method: "POST" }), // BK-26: made when first asked for
   replaceInbox: (id: string) => call<{ address: string }>(`${trip(id)}/inbox/replace`, { method: "POST" }),
+  wishToBooking: (tripId: string, did: string) => call<{ proposalId: string }>(`${trip(tripId)}/dreams/${encodeURIComponent(did)}/booking`, { method: "POST" }), // BK-33
   mailToWish: (tripId: string, pid: string) => call<unknown>(`${trip(tripId)}/proposals/${encodeURIComponent(pid)}/wish`, { method: "POST" }), // BK-29
   image: async (id: string, key = link) => {
     const r = await fetch(`${trip(id)}/image`, { headers: headers(key) });

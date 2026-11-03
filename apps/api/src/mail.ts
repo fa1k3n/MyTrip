@@ -2,7 +2,7 @@
 // with its ticket attachments and stored as a proposal that a Planerare or the superuser reviews (BK-17), so nothing in the trip
 // changes here; anything else becomes a wish at once (DB-23..DB-25).
 import PostalMime from "postal-mime";
-import { applyOps, checkTrip, mailKind, readBooking, readWish, Trip, wishTwin, type WishReading } from "@trip/schema";
+import { applyOps, checkTrip, mailKind, mailSure, readBooking, readWish, Trip, wishTwin, type WishReading } from "@trip/schema";
 import { MAX_FILE, newFileId, storeTicket, ticketType, type Proposal, type Store } from "./app.ts";
 import { IMAGE_MAX, imageType } from "./wishimage.ts";
 import { sv } from "../../web/src/sv.ts";
@@ -11,21 +11,24 @@ const MAX_PENDING = 20, MAX_FILES = 5;
 const MAX_WISHES = 20, DAY_MS = 86_400_000;
 export const MIN_PHOTO = 8 * 1024; // DB-24: smaller images are taken to be logos
 type Result = { proposalId: string } | { error: "unknown address" | "too many" };
+/** BK-32: asks the AI service whether a mail the rules could not sort is a booking; undefined when AI is off or fails. */
+export type AskKind = (t: Trip, mailText: string) => Promise<"booking" | "wish" | undefined>;
 export type WishResult = { wishId: string } | { error: "unknown address" | "too many" | "no title" | "invalid" | "duplicate" };
 
 /** A mail for the trip with this address, or with a booking or wish address made before BK-26; an unknown address is rejected
  * (BK-15, BK-26). `f` fetches a linked page for a wish without a title (DB-26). */
-export async function receiveMail(store: Store, raw: Uint8Array | ArrayBuffer, to: string, f: typeof fetch = fetch): Promise<Result | WishResult> {
+export async function receiveMail(store: Store, raw: Uint8Array | ArrayBuffer, to: string, f: typeof fetch = fetch, ask?: AskKind): Promise<Result | WishResult> {
   const address = (/<([^>]+)>/.exec(to)?.[1] ?? to).trim().toLowerCase();
   const t = address ? (await store.list()).find((x) => x.inbox?.toLowerCase() === address || x.wishInbox?.toLowerCase() === address) : undefined;
-  return t ? sortMail(store, t, raw, f) : { error: "unknown address" };
+  return t ? sortMail(store, t, raw, f, ask) : { error: "unknown address" };
 }
 
-/** A booking becomes a proposal, anything else a wish (BK-28). */
-export async function sortMail(store: Store, t: Trip, raw: Uint8Array | ArrayBuffer, f: typeof fetch = fetch): Promise<Result | WishResult> {
-  const m = await PostalMime.parse(raw);
+/** A booking becomes a proposal, anything else a wish (BK-28, BK-31); what the rules cannot sort, the AI service may (BK-32). */
+export async function sortMail(store: Store, t: Trip, raw: Uint8Array | ArrayBuffer, f: typeof fetch = fetch, ask?: AskKind): Promise<Result | WishResult> {
+  const m = await PostalMime.parse(raw), mail = { subject: m.subject, text: m.text, html: m.html };
   const pdf = m.attachments.some((a) => ticketType(a.mimeType, typeof a.content === "string" ? new TextEncoder().encode(a.content) : new Uint8Array(a.content)) === "application/pdf");
-  return mailKind({ subject: m.subject, text: m.text, html: m.html }, pdf) === "booking" ? importMail(store, t, raw) : importWish(store, t, raw, f);
+  const kind = mailKind(mail, pdf) === "booking" || (!mailSure(mail, pdf) && ask && await ask(t, mailText(m.subject ?? "", m.text, m.html)) === "booking") ? "booking" : "wish";
+  return kind === "booking" ? importMail(store, t, raw) : importWish(store, t, raw, f);
 }
 
 /** Reads the mail into a pending proposal for the trip, with at most five PDF, PNG or JPEG attachments of at most 2 MB. */
@@ -113,7 +116,16 @@ export async function importWish(store: Store, t: Trip, raw: Uint8Array | ArrayB
   if (photo && file) await store.saveFile({ id: file, tripId: t.id, type: photo.type! }, photo.bytes);
   const r2 = await addWish(store, t, { ...r, title: r.title, titleFromLink, source: wishSource(m.from && "name" in m.from ? m.from.name : undefined) }, file, "mejl", now);
   if ("error" in r2 && file) await store.removeFiles([file]);
+  if ("wishId" in r2) await keepMail(store, t, m, r2.wishId); // BK-33
   return r2;
+}
+
+/** BK-33: the mail of a wish, kept on the server as a closed proposal read as a booking, so the wish can become one later. */
+async function keepMail(store: Store, t: Trip, m: Awaited<ReturnType<typeof PostalMime.parse>>, wishId: string) {
+  const from = m.from && "address" in m.from && m.from.address ? (m.from.name ? `${m.from.name} <${m.from.address}>` : m.from.address) : "";
+  const subject = m.subject ?? "", at = new Date().toISOString();
+  await store.saveProposal({ id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "wish", wishId, at,
+    source: { kind: "mail", from, subject, at }, booking: readBooking({ subject, text: m.text, html: m.html }, t.days.map((d) => d.date)), mailText: mailText(subject, m.text, m.html) });
 }
 
 /** Adds a wish read from a mail, with an own photo when there is one (DB-23, BK-29); not one the trip already has (DB-27). */

@@ -49,7 +49,8 @@ export function DreamCard({ t, d, i, vote, votes = true, open, planned, children
 }
 
 /** Om önskan: the image larger and whole, the wish's page and, for a Commons image, its credit (DB-15). */
-export function WishView({ t, id }: { t: Trip; id: string }) {
+/** DB-15; a wish that came by mail can be moved to Bokningar by those who plan (BK-33). */
+export function WishView({ t, id, toBooking }: { t: Trip; id: string; toBooking?: () => void }) {
   const w = t.dreams.find((x) => x.id === id), v = w && wishDetail(w);
   if (!v) return null;
   const c = v.image?.credit;
@@ -60,6 +61,7 @@ export function WishView({ t, id }: { t: Trip; id: string }) {
     {c && <p className="credit-s">{sv.wish.photoBy} {c.author && <>{c.author} · </>}
       {c.licenceUrl ? <a href={c.licenceUrl} target="_blank" rel="noopener noreferrer">{c.licence}</a> : c.licence} · <a href={c.page} target="_blank" rel="noopener noreferrer">{sv.wish.commons}</a></p>}
     {v.url && <p><a className="btn" href={v.url} target="_blank" rel="noopener noreferrer">{sv.wish.openPage}</a></p>}
+    {toBooking && w.mailedAt && <p><IconButton icon="ticket" tip="right" label={sv.mail.toBooking} onClick={toBooking} /></p>}
   </>;
 }
 

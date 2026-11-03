@@ -55,7 +55,7 @@ test("DB-23 a mail becomes a wish", async () => {
   assert.deepEqual([w.id, w.title, w.url, w.category, w.source, w.votes], [r.wishId, "Tropiska Badparadiset", "https://example.org/bad", "Bad", "Mejl från Anna", 0]);
   assert.ok(w.mailedAt);
   assert.equal((await store.log()).at(-1)!.actor, "mejl");
-  assert.equal((await store.proposals("berlin")).length, 0, "no proposal");
+  assert.equal((await store.proposals("berlin")).filter((p) => p.status !== "wish").length, 0, "no proposal; only the kept mail (BK-33)");
   assert.deepEqual(await receiveMail(store, bare(address, "Fwd:", ""), address), { error: "no title" }, "neither a title nor a link");
   assert.deepEqual(await receiveMail(store, mail("nagon@resa.example.org"), "nagon@resa.example.org"), { error: "unknown address" });
 });

@@ -97,7 +97,7 @@ test("BK-28 mail is sorted", async () => {
   assert.ok("proposalId" in (await receiveMail(store, mail(address, "Liseberg", "", [{ type: "application/pdf", name: "b.pdf", bytes: "%PDF-1.4\n%%EOF\n" }]), address)));
   const t = (await store.load("berlin"))!;
   assert.deepEqual(t.dreams.map((w) => w.title), ["Tropiska Badparadiset"]);
-  const ps = await store.proposals("berlin");
+  const ps = (await store.proposals("berlin")).filter((p) => p.status !== "wish"); // a wish's kept mail is no proposal (BK-33)
   assert.deepEqual(ps.map((p) => p.booking?.name), ["Hotell Kusten", "Bord på Fischereihafen", "Liseberg"]);
   const post = await a.request("/api/trips/berlin/mail", { method: "POST", headers: { authorization: "Bearer a" }, body: booking(address) });
   assert.equal(post.status, 202, "the Node server sorts a posted mail too");

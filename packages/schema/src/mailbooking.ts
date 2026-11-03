@@ -171,12 +171,25 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
 }
 
 const CONFIRM = /bokningsbekräftelse|orderbekräftelse|bekräftelse|e-biljett|kvitto|booking confirmation|order confirmation|reservation/i;
+/** BK-31: a line with a label of any language, a colon and a code with capital letters and digits, such as "예약번호: K7Q2-881". */
+const CODE_LINE = /^[^\n:：]{1,40}[:：][ \t]*(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9][A-Z0-9-]{4,19}[ \t]*$/m;
+const MONEY = String.raw`[€$£¥₩₹₺฿₫₱]|\b(?:SEK|EUR|NOK|DKK|ISK|USD|GBP|CHF|JPY|KRW|CNY|THB|PLN|CZK|HUF|TRY|AUD|CAD|NZD|INR|IDR|VND|PHP|MYR|SGD|HKD|TWD|MXN|BRL|ZAR|AED|kr|zł|Kč|Ft)\b|원|円|元`;
+/** BK-31: a price with a currency, the sign or code before or after the figures. */
+const PRICE = new RegExp(`(?:${MONEY})\\s?\\d[\\d\\s.,']*\\d|\\d[\\d\\s.,']*\\d\\s?(?:${MONEY})`, "u");
+/** BK-31: a date in figures, as most languages write one. */
+const FIGURE_DATE = /\b\d{4}[-./]\d{1,2}[-./]\d{1,2}\b|\b\d{1,2}[./-]\d{1,2}[./-](?:\d{4}|\d{2})\b|\d{4}\s*[年년]\s*\d{1,2}\s*[月월]/u;
+const signals = (mail: { subject?: string; text?: string; html?: string }, pdf: boolean) => {
+  const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n");
+  const ld = mail.html ? ldObjects(mail.html).some((o) => String(o["@type"]).endsWith("Reservation")) : false;
+  return ld || !!reference(text) || CONFIRM.test(mail.subject ?? "") || pdf || CODE_LINE.test(text) || (PRICE.test(text) && FIGURE_DATE.test(text));
+};
 /** Whether a mail to the trip's one address is a booking or a wish, without AI (BK-28): the sender's prefix decides, else
- * schema.org reservation data, a reference, a confirmation word in the subject or a PDF attachment make it a booking. */
+ * schema.org reservation data, a reference, a confirmation word in the subject, a PDF attachment or a signal in any language (BK-31). */
 export function mailKind(mail: { subject?: string; text?: string; html?: string }, pdf = false): "booking" | "wish" {
   const kind = KIND_PREFIX.exec((mail.subject ?? "").replace(FORWARD_PREFIX, ""))?.[1]?.toLowerCase();
   if (kind) return kind === "bokning" ? "booking" : "wish";
-  const text = [mail.text ?? "", mail.html ? htmlText(mail.html) : ""].join("\n");
-  const ld = mail.html ? ldObjects(mail.html).some((o) => String(o["@type"]).endsWith("Reservation")) : false;
-  return ld || reference(text) || CONFIRM.test(mail.subject ?? "") || pdf ? "booking" : "wish";
+  return signals(mail, pdf) ? "booking" : "wish";
 }
+/** Whether the rules decide by themselves: a prefix or a booking signal; otherwise the AI service may (BK-32). */
+export const mailSure = (mail: { subject?: string; text?: string; html?: string }, pdf = false) =>
+  KIND_PREFIX.test((mail.subject ?? "").replace(FORWARD_PREFIX, "")) || signals(mail, pdf);

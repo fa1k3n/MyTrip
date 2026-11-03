@@ -362,6 +362,13 @@ export function App() {
     }
   };
   const rejectMail = async (pid: string) => { await api.rejectMail(t!.id, pid).catch(() => setNotice(sv.couldNotSave)); await load(); };
+  /** BK-33: a mailed wish becomes the booking proposal of its kept mail, after asking. */
+  const wishToBooking = async (id: string) => {
+    if (!(await ask(sv.mail.toBookingAsk, { ok: sv.mail.toBooking }))) return;
+    try { await api.wishToBooking(t!.id, id); setDlg(null); setNotice(sv.mail.movedToBooking); }
+    catch (e) { setNotice(e instanceof ApiError && e.status === 404 ? sv.mail.noMailKept : e instanceof ApiError && e.status === 409 ? sv.mail.wishInUse : sv.couldNotSave); }
+    await load();
+  };
   const mailToWish = async (pid: string) => { // BK-29; a wish the trip already has leaves the mail pending (DB-27)
     await api.mailToWish(t!.id, pid).catch((e) => setNotice(e instanceof ApiError && e.problems.includes("duplicate") ? sv.mail.wishExists : sv.couldNotSave));
     await load();
@@ -527,7 +534,7 @@ export function App() {
       {dlg?.kind === "hidden" && t && <HiddenView t={t} dayId={dlg.dayId} id={dlg.id} />}
       {dlg?.kind === "notices" && t && <NoticeSettings tripId={t.id} />}
       {dlg?.kind === "tickets" && t && <TicketView t={t} bookingId={dlg.bookingId} />}
-      {dlg?.kind === "wish" && t && <WishView t={t} id={dlg.id} />}
+      {dlg?.kind === "wish" && t && <WishView t={t} id={dlg.id} toBooking={perms(t).settings ? () => void wishToBooking(dlg.id) : undefined} />}
       {dlg?.kind === "wishImage" && t && <WishImage key={dlg.id} t={t} id={dlg.id} change={change} done={() => { setDlg(null); load(); }} />}
       {dlg?.kind === "dream" && (
         <form onSubmit={(e) => { e.preventDefault(); saveDream(e.currentTarget); }}>

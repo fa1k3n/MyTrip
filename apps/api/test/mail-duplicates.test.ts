@@ -39,6 +39,6 @@ test("DB-27 Gör till önskan of a wish that exists", async () => {
   const res = await app.request(`/api/trips/berlin/proposals/${r.proposalId}/wish`, { method: "POST", headers: { authorization: "Bearer a" } });
   assert.equal(res.status, 409);
   assert.deepEqual(await res.json(), { error: "duplicate", problems: ["duplicate"] });
-  assert.equal((await store.proposals("berlin"))[0]!.status, "pending");
+  assert.equal((await store.proposals("berlin")).find((p) => p.id === r.proposalId)!.status, "pending"); // the first mail's kept copy is no proposal (BK-33)
   assert.equal((await store.load("berlin"))!.dreams.length, 1);
 });

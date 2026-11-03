@@ -3,7 +3,6 @@
 // The Worker configuration (wrangler.jsonc) lives in the private repository; it serves the web files and sends /api/* here first.
 import { createApp } from "./app.ts";
 import { d1Store, type D1Like, type R2Like } from "./d1-store.ts";
-import { receiveMail } from "./mail.ts";
 import { googleOf } from "./users.ts";
 import { brevoMailer } from "./mailer.ts";
 import { anthropicCall, CLOCK_DELAY_MS } from "./ai.ts";
@@ -85,7 +84,7 @@ export default {
   /** BK-15: a mail to a trip's inbox address becomes a proposed booking; DB-23: one to its wish address a wish.
    * An unknown address, a full inbox, too many wishes in a day (DB-25) or a mail without a title is rejected. */
   async email(message: IncomingMail, env: WorkerEnv): Promise<void> {
-    const r = await receiveMail(d1Store(env.DB, env.IMAGES), await new Response(message.raw).arrayBuffer(), message.to);
+    const r = await appFor(env).receive(await new Response(message.raw).arrayBuffer(), message.to); // BK-32: with the AI service
     if ("error" in r) message.setReject(REJECT[r.error]);
   },
 };

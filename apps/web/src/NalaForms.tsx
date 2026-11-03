@@ -4,7 +4,7 @@ import type { BookingReading, Op, TicketFile, Trip } from "@trip/schema";
 import {
   daysOutside, removeActivity, removeBooking, removeBudgetItem, removeInfo, removePlace, removeTask,
   saveActivity, travelInput, wishByDefault, saveBooking, saveBudgetItem, saveDay, saveInfo, savePlace, saveTask, saveTrip, saveBudgetMax, setTripDates, tripRange,
-  readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, type BookingInput, type Result,
+  readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, targetAfterAi, type BookingInput, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
 import { AiMark, Icon, IconButton } from "./Icons.tsx";
@@ -340,14 +340,14 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   // What was read from the mail or a pasted text, and the "Att boka" booking it fills in, "" for a new one (BK-17, BK-18, BK-22)
   const [read, setRead] = useState<{ r: BookingReading; files: TicketFile[] } | null>(() => (mail?.booking ? { r: mail.booking, files: mail.booking.files ?? [] } : null));
   const matches = !p.id && read ? toBookMatches(p.t, read.r) : [];
-  const [target, setTarget] = useState(() => matches[0]?.id ?? "");
+  const [target, setTarget] = useState(() => matches[0]?.id ?? ""), [picked, setPicked] = useState(false); // picked: by the reviewer
   const fillIn = (base: BookingInput, r: BookingReading, files: TicketFile[], into: string): BookingInput => {
     const to = p.t.bookings.find((x) => x.id === into);
     const g = to ? matchedForm(p.t, to, r, files) : { ...readingToForm(base, r), files: [...(base.files ?? []), ...files] };
     return g.kind === "ticket" && !g.activityId ? { ...g, activityId: ticketActivityFor(p.t, g.name, g.from, g.start) ?? "" } : g; // BK-23
   };
   const [f, setF] = useState<BookingInput>(() => (read ? fillIn(bookingForm(p.t, b), read.r, read.files, target) : bookingForm(p.t, b)));
-  const retarget = (into: string) => { setTarget(into); if (read) setF(fillIn(bookingForm(p.t), read.r, read.files, into)); };
+  const retarget = (into: string) => { setTarget(into); setPicked(true); if (read) setF(fillIn(bookingForm(p.t), read.r, read.files, into)); };
   const text = (k: keyof BookingInput) => ({ value: (f[k] as string | undefined) ?? "", onChange: (e: Change) => setF((o) => ({ ...o, [k]: e.target.value })) });
   const [paste, setPaste] = useState<string | null>(null), [filled, setFilled] = useState(""); // BK-18
   const fill = () => {
@@ -365,8 +365,9 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
     if (!r.ok) { setAiNote({ text: aiErrorText(r) }); return; }
     const { ai, ...reading } = r.reading;
     if (!ai.length) { setAiNote({ text: sv.aiRead.mailNothing }); return; }
-    setRead({ r: reading, files: read.files });
-    setF((o) => fillIn({ ...o, files: (o.files ?? []).filter((x) => !read.files.some((y) => y.id === x.id)) }, reading, read.files, target));
+    const into = p.id ? "" : targetAfterAi(p.t, reading, target, picked); // BK-22: the AI's dates may match an "Att boka" booking
+    setRead({ r: reading, files: read.files }); setTarget(into);
+    setF((o) => fillIn({ ...o, files: (o.files ?? []).filter((x) => !read.files.some((y) => y.id === x.id)) }, reading, read.files, into));
     setAiNote({ text: sv.aiRead.mailDone(ai.map((k) => sv.aiRead.fields[k] ?? k).join(", ")), ai: true });
   };
   const [uploading, setUploading] = useState(false), pick = useRef<HTMLInputElement>(null);

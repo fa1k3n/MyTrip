@@ -356,6 +356,10 @@ export function toBookMatches(t: Trip, r: BookingReading): Booking[] {
   }).sort((x, y) => y.n - x.n || x.d - y.d).map((x) => x.b);
 }
 
+/** The "Att boka" booking a reading completed by "Läs med AI" fills in: the reviewer's choice, else the best match (BK-22, AI-60). */
+export const targetAfterAi = (t: Trip, r: BookingReading, target: string, picked: boolean) =>
+  target || picked ? target : toBookMatches(t, r)[0]?.id ?? "";
+
 /** The form for an "Att boka" booking filled in with a reading: now booked, with its own and the mail's ticket files (BK-22). */
 export function matchedForm(t: Trip, b: Booking, r: BookingReading, files: TicketFile[]): BookingInput {
   const f = readingToForm(bookingForm(t, b), r);

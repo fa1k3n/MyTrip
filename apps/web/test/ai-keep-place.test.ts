@@ -30,3 +30,11 @@ test("DQ-01 a checked place keeps its wish", () => {
 test("AI-84 keeping all confirms the places", () => {
   assert.deepEqual(marks(after(keepAllAi(t()))), [undefined, undefined, undefined, undefined]);
 });
+
+// REQ: DQ-01 AI-83 Kontrollerad keeps the AI wish also when its activity was already kept, and a wish named after the place that is on no day
+test("DQ-01 a checked place keeps its wish also without an AI activity", () => {
+  const kept = Trip.parse(applyOps(t(), [{ op: "remove", path: "days/0/activities/0/ai" }]));
+  assert.equal(Trip.parse(applyOps(kept, confirmPlaceOps(kept, "zoo"))).dreams[0]!.ai, undefined, "the activity was kept before");
+  const unplanned = Trip.parse(applyOps(t(), [{ op: "set", path: "days/0/activities", value: [] }]));
+  assert.equal(Trip.parse(applyOps(unplanned, confirmPlaceOps(unplanned, "zoo"))).dreams[0]!.ai, undefined, "on no day: by the place's name");
+});

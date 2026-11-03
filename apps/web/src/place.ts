@@ -18,11 +18,15 @@ export function placeView(p: Place) {
   };
 }
 
-/** A Planerare has checked a place from the AI: it is no longer marked, and the AI activities that use it and their wishes are kept
- * with it, one step for what belongs together (DQ-01, AI-83). */
+const plain = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/** A Planerare has checked a place from the AI: it is no longer marked, and so are the AI activities that use it and the AI wishes
+ * they make come true, kept or not, and an AI wish named after the place that is on no day: one step for what belongs together (DQ-01, AI-83). */
 export function confirmPlaceOps(t: Trip, id: string): Op[] {
-  const i = t.places.findIndex((p) => p.id === id);
-  if (i < 0 || !t.places[i]!.ai) return [];
-  const acts = t.days.flatMap((d) => d.activities.filter((a) => a.ai && a.placeIds.includes(id)).map((a) => ({ kind: "activity" as const, dayId: d.id, id: a.id })));
-  return once([{ op: "remove", path: `places/${i}/ai` }, ...acts.flatMap((a) => keepAi(t, a))]);
+  const i = t.places.findIndex((p) => p.id === id), place = t.places[i];
+  if (!place?.ai) return [];
+  const using = t.days.flatMap((d) => d.activities.filter((a) => a.placeIds.includes(id)).map((a) => ({ d, a })));
+  const wishes = new Set([...using.flatMap(({ a }) => (a.dreamId ? [a.dreamId] : [])), ...t.dreams.filter((w) => plain(w.title) === plain(place.name)).map((w) => w.id)]);
+  return once([{ op: "remove", path: `places/${i}/ai` },
+    ...using.filter(({ a }) => a.ai).flatMap(({ d, a }) => keepAi(t, { kind: "activity", dayId: d.id, id: a.id })),
+    ...[...wishes].filter((w) => t.dreams.find((x) => x.id === w)?.ai).flatMap((w) => keepAi(t, { kind: "wish", id: w }))]);
 }

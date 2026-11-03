@@ -215,6 +215,7 @@ function Inbox({ t }: { t: Trip }) {
 function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: Run }) {
   const [links, setLinks] = useState<PersonLinkInfo[] | null>(null);
   const [open, setOpen] = useState<string | null>(null), [sharing, setSharing] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false); // opened from the row's mail button: straight to the address (US-30)
   useEffect(() => {
     api.people(t.id).then(async (ls) => {
       const made = await Promise.all(missingLinks(t.travelers, ls).map((id) => api.setPerson(t.id, id, "traveler")));
@@ -237,13 +238,15 @@ function Travelers({ t, add, run }: { t: Trip; add: (id?: string) => void; run: 
               <span className={`rolemark initial ${role}`} role="img" aria-label={svAdmin.people.roles[role]} title={svAdmin.people.roles[role]}>{x.name.slice(0, 1).toUpperCase()}</span>
               <span className="tname"><b>{x.name}</b><small className="ro">{travelerLine(role, x.shares !== false)}</small></span>
             </button>
-            {l && <span className="end"><IconButton icon="link" look="bare" tip="left" label={svAdmin.people.share(x.name)} onClick={() => setSharing(x.id)} /></span>}
+            {l && <span className="end">
+              <IconButton icon="mail" look="bare" tip="left" label={svAdmin.people.invite(x.name)} onClick={() => { setInviting(true); setOpen(x.id); }} /> {/* US-30 */}
+              <IconButton icon="link" look="bare" tip="left" label={svAdmin.people.share(x.name)} onClick={() => setSharing(x.id)} /></span>}
           </div>
         );
       })}
       <div className="add"><IconButton icon="plus" label={sv.addPerson} onClick={() => add()} tip="right" /> {/* never the click as an id */}</div> {/* AU-26, UI-09 */}
       {shared && linkOf(shared.id) && <ShareDialog t={t} name={shared.name} link={linkOf(shared.id)!} put={put} close={() => setSharing(null)} />}
-      {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} run={run} close={() => setOpen(null)} />}
+      {who && linkOf(who.id) && <TravelerDialog t={t} x={who} link={linkOf(who.id)!} put={put} run={run} invite={inviting} close={() => { setOpen(null); setInviting(false); }} />}
     </div>
   );
 }
@@ -264,8 +267,9 @@ function ShareDialog({ t, name, link, put, close }: { t: Trip; name: string; lin
 }
 
 /** AU-38: a traveler's name (AU-32), permission (AU-11), Delar på kostnader (MI-38) and account (US-21), saved together. */
-function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["travelers"][number]; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; run: Run; close: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
+function TravelerDialog({ t, x, link, put, run, invite, close }: { t: Trip; x: Trip["travelers"][number]; link: PersonLinkInfo; put: (l: PersonLinkInfo) => void; run: Run; invite?: boolean; close: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null), mailField = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (invite) requestAnimationFrame(() => { mailField.current?.scrollIntoView({ block: "center" }); mailField.current?.focus(); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, when opened for an invitation (US-30)
   const [name, setName] = useState(x.name), [role, setRole] = useState(link.role), [shares, setShares] = useState(x.shares !== false);
   const [account, setAccount] = useState(link.account ?? ""), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -305,7 +309,7 @@ function TravelerDialog({ t, x, link, put, run, close }: { t: Trip; x: Trip["tra
         </fieldset>
         <label className="check switch"><input type="checkbox" role="switch" checked={shares} onChange={(e) => setShares(e.target.checked)} />{svAdmin.people.shares}</label>
         <p className="ro note">{svAdmin.people.sharesHint}</p>
-        <label>{svAdmin.people.account}<input type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
+        <label>{svAdmin.people.account}<input ref={mailField} type="email" inputMode="email" autoComplete="off" placeholder={svAdmin.people.accountPlaceholder} value={account} onChange={(e) => setAccount(e.target.value)} /></label>
         <p className="ro note">{svAdmin.people.accountHint}</p>
         <Invite t={t} x={x} to={account.trim().toLowerCase()} ready={async () => { // US-30: a typed address is saved first
           const to = account.trim().toLowerCase();

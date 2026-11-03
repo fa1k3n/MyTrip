@@ -105,7 +105,8 @@ Put each on a day spent in or near the place, fitting the day's pace: nothing on
 Give every activity an estimated start time that fits the day's start and end, the activities already on the day and the travel to it,
 and the way there from the place before (the previous activity, or where the day starts): walking, public transport or car, with a realistic duration.
 <memories>, when given, lists places from the family's earlier trips with how many said Igen (again), Okej and Inte igen (never again), and their comments.
-Lean towards places and kinds of places they marked Igen, avoid kinds they marked Inte igen, and heed the comments (for example booking ahead or avoiding crowds).`,
+Lean towards places and kinds of places they marked Igen, avoid kinds they marked Inte igen, and heed the comments (for example booking ahead or avoiding crowds).
+Every suggestion is a different place: never the same place under another name, nor one in <avoid>, and at most one branch of a chain of restaurants or shops.`,
   memories: true, // AI-14
   task: `For each suggestion add three operations, the wish first:
 add dreams/- with { id, title (the place's name, short), category (one of ${WISH_CATEGORIES.join(", ")}), url (its official page) };
@@ -124,8 +125,9 @@ the day's activities and travel, for example "Hagenbeck och hamnrundtur"; never 
       purpose: t.purpose, ages: t.travelers.map((x) => x.age ?? null), // AI-88: not the trip's places, which activities and the helper itself add
       days: t.days.map((d) => [d.date, d.location ?? ""]),
     }),
-    known: (t: Trip) => t.dreams.map((w) => w.title),
+    known: (t: Trip) => [...t.dreams.map((w) => w.title), ...t.places.map((p) => p.name)],
     textOf: (o) => String(valueOf(o).title ?? valueOf(o).text ?? ""),
+    names: (g) => g.filter((o) => o.path === "dreams/-" || o.path === "places/-").map((o) => String(valueOf(o).title ?? valueOf(o).name ?? "")), // AI-95
     finish: (o) => (o.path === "dreams/-" ? { ...o, value: { ...valueOf(o), source: "AI-hjälpen", icon: "✨", votes: 0, ai: true } }
       : ON_DAY.test(o.path) ? { ...o, value: { ...valueOf(o), estimated: true, ai: true } }
       : o.path === "places/-" ? { ...o, value: { ...valueOf(o), ai: true } } : o), // DQ-01, DQ-02: its address and facts to check

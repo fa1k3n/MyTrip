@@ -34,6 +34,7 @@ export type AiHelper = {
   fingerprint(t: Trip): string; // the data the helper uses; unchanged means no new run
   known(t: Trip): string[]; // what the trip already has, never suggested again
   textOf(op: Op): string; // a suggestion's text, to compare with what is known
+  names?(group: Op[]): string[]; // every name of one suggestion to compare, such as its wish and its place (AI-95); its main text when missing
   finish(op: Op): Op; // the suggestion as stored, e.g. marked as AI-generated
   group?(ops: Op[], t?: Trip): Op[][]; // the changes that make one suggestion, its main change first (AI-77); one each when missing
 };
@@ -83,11 +84,27 @@ export function aiView(t: Trip) {
 /** A text of the trip as the AI service may see it (AI-04). */
 export const aiText = (s: string, t: Trip) => (aiView({ ...t, purpose: s }).view.purpose);
 
-/** The same suggestion in other words or letter case: equal, or one contains the other (AI-70). */
+const norm = (s: string) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const LITTLE = new Set(["och", "med", "vid", "till", "för", "the", "and", "von", "der", "die", "das", "des", "del", "les"]);
+/** The words that name a thing, without short and little words. */
+const words = (s: string) => norm(s).split(" ").filter((w) => w.length > 2 && !LITTLE.has(w));
+/** The same word in another form: "göteborgs" and "göteborg", "stadsmuseet" and "stadsmuseum". */
+const sameWord = (a: string, b: string) => {
+  if (a === b) return true;
+  const short = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < short && a[i] === b[i]) i++;
+  return short >= 5 && i >= short - 2;
+};
+/** The same suggestion in other words or letter case: equal, or one contains the other (AI-70); the same words in another
+ * order or form, or the same name before a comma, dash or bracket, as two branches of a chain (AI-95). */
 export const sameSuggestion = (a: string, b: string) => {
-  const n = (s: string) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const x = n(a), y = n(b);
-  return x === y || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x)));
+  const x = norm(a), y = norm(b);
+  if (x === y || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x)))) return true;
+  const core = (s: string) => norm(s.split(/\s[–—-]\s|[,(]/)[0]!);
+  if (/\s[–—-]\s|[,(]/.test(a) && /\s[–—-]\s|[,(]/.test(b) && core(a).length >= 4 && core(a) === core(b)) return true;
+  const [p, q] = [words(a), words(b)].sort((m, n) => m.length - n.length) as [string[], string[]];
+  return p.length >= 2 && p.every((w) => q.some((v) => sameWord(w, v)));
 };
 
 /** Turns the r1, r2 … references in proposed changes back into the travelers' ids (AI-04). */

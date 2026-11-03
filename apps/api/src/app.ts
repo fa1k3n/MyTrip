@@ -1078,9 +1078,9 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     let groups: Op[][] = ops.length ? [ops] : [];
     if (h) { // AI-70: nothing the trip has or the travelers rejected, each suggestion with ids of its own; AI-77: a wish and its activity together
       const taken = new Set([...allIds(t), ...own.flatMap((p) => p.ops.map((o) => String((o.value as { id?: unknown })?.id)))]);
-      const textOf = (g: Op[]) => h.textOf(g[0]!);
+      const names = (g: Op[]) => (h.names?.(g) ?? [h.textOf(g[0]!)]).filter(Boolean), same = (g: Op[], xs: string[]) => names(g).some((n) => xs.some((x) => sameSuggestion(x, n)));
       groups = (h.group ?? ((xs: Op[]) => xs.map((o) => [o])))(ops.map(h.finish), t)
-        .filter((g, i, all) => !avoid.some((x) => sameSuggestion(x, textOf(g))) && all.findIndex((y) => sameSuggestion(textOf(y), textOf(g))) === i)
+        .filter((g, i, all) => !same(g, avoid) && all.findIndex((y) => same(g, names(y))) === i) // AI-95: also its place, in other words
         .map((g) => {
           const ids = new Map<string, string>();
           const own = (o: Op) => !!o.value && typeof o.value === "object" && "id" in o.value; // not a set title (AI-86)

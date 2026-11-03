@@ -216,6 +216,15 @@ export type HelperStatus = { available: boolean; on: boolean; at?: string; resul
 export type AiAdded = { activities: number; tasks: number; bookings: number; wishes: number; info?: number; packing?: number }; // info: AI-87, packing: AI-89
 export type AiStart = { ok: true; proposalId: string | null; proposalIds: string[]; reason: string; applied?: boolean; added?: AiAdded } | { ok: false; error: string; scope?: string };
 
+type AiRead<T> = { ok: true; reading: T } | { ok: false; error: string; scope?: string };
+async function aiCall<T>(path: string, body: BodyInit, type: string): Promise<AiRead<T>> {
+  try {
+    const r = await fetch(path, { method: "POST", headers: { ...headers(), "content-type": type }, body });
+    const b = (await r.json().catch(() => ({}))) as { reading?: T; error?: string; scope?: string };
+    return r.ok && b.reading ? { ok: true, reading: b.reading } : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
+  } catch { return { ok: false, error: "network" }; }
+}
+
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
   login: (password: string, email = "") => call<void>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
@@ -237,6 +246,9 @@ export const api = {
         : { ok: false, error: b.error ?? (r.status === 403 ? "forbidden" : "failed"), ...(b.scope ? { scope: b.scope } : {}) };
     } catch { return { ok: false, error: "network" }; }
   },
+  // AI-60, AI-42: a reading with AI, with the server's reason when it did not run (as ai())
+  mailRead: (tripId: string, pid: string) => aiCall<BookingReading & { ai: string[] }>(`${trip(tripId)}/mailread/${encodeURIComponent(pid)}`, "{}", "application/json"),
+  receipt: (tripId: string, photo: Blob) => aiCall<{ amount?: number; currency?: string; date?: string; text?: string; category?: string }>(`${trip(tripId)}/receipt`, photo, photo.type),
   aiStatus: (tripId: string) => call<{ enabled: boolean; consent: boolean; helpers: Record<string, HelperStatus> }>(`${trip(tripId)}/ai`), // AI-68, AI-72
   aiConsent: (tripId: string, helper?: string) => call<{ revision: number }>(`${trip(tripId)}/ai/consent`, { method: "POST", body: JSON.stringify(helper ? { helper } : {}) }), // AI-64, AI-68
   users: () => call<UserInfo[]>("/api/users"), // US-02, US-03, US-04, US-12

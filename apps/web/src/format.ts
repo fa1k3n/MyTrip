@@ -158,6 +158,12 @@ export function inviteMail(x: { to: string; name: string; trip: string; url: str
   const q = (v: string) => encodeURIComponent(v);
   return `mailto:${q(x.to)}?subject=${q(sv.invite.subject(x.trip))}&body=${q(sv.invite.body(x.name, x.trip, x.url, x.until))}`;
 }
+/** AI-42: a receipt's reading as the expense form's values: the amount as typed in Swedish, only a currency the form offers. */
+export function receiptFill(r: { amount?: number; currency?: string; date?: string; text?: string; category?: string }, currencies: string[]) {
+  const amount = r.amount === undefined ? undefined : Number.isInteger(r.amount) ? String(r.amount) : r.amount.toFixed(2).replace(".", ",");
+  return { ...(amount ? { amount } : {}), ...(r.currency && currencies.includes(r.currency) ? { currency: r.currency } : {}),
+    ...(r.date ? { date: r.date } : {}), ...(r.text ? { text: r.text } : {}), ...(r.category ? { category: r.category } : {}) };
+}
 /** US-34: an answer to one's feedback that came after the dialog was last opened on this device. */
 export const newReply = (notes: { replyAt?: string }[], seen: string | null) => notes.some((n) => !!n.replyAt && (!seen || n.replyAt > seen));
 export const travelerLine = (role: "traveler" | "planner", shares: boolean) => [sv.people[role], ...(shares ? [] : [sv.people.noShare])].join(" · ");

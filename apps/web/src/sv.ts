@@ -298,6 +298,12 @@ export const sv = {
     uploading: "Laddar upp…", tooBig: "PDF:en är större än 2 MB.", badType: "Bara PDF, PNG eller JPEG går att lägga till.", badImage: "Bilden gick inte att göra mindre än 2 MB.",
     failed: "Kunde inte ladda upp filen.", loading: "Hämtar biljetten…", error: "Kunde inte visa biljetten.", page: (name: string, n: number) => `${name}, sida ${n}`,
   },
+  aiRead: { // AI-60, AI-42
+    mail: "Läs med AI", mailBusy: "AI läser mejlet…", mailDone: (fields: string) => `AI fyllde i ${fields}. Kontrollera innan du sparar.`, mailNothing: "AI hittade inget mer i mejlet.",
+    fields: { kind: "typ", name: "namn", from: "första dag", to: "sista dag", checkIn: "incheckning", checkOut: "utcheckning", start: "starttid", address: "adress", price: "pris" } as Record<string, string>,
+    receipt: "Läs kvitto", receiptBusy: "AI läser kvittot…", receiptDone: "Ifyllt från kvittot med AI. Kontrollera innan du sparar.", receiptNothing: "AI kunde inte läsa kvittot. Fyll i själv.",
+    badPhoto: "Det där gick inte att läsa som foto.",
+  },
   mail: { // BK-17, BK-18
     review: "Bokning från mejl", from: (subject: string, from: string) => `Från mejl: ${subject}${from ? ` (${from})` : ""}`,
     waiting: (n: number) => (n === 1 ? "1 bokning från mejl att granska" : `${n} bokningar från mejl att granska`), open: (s: string) => `Granska ${s}`,

@@ -1,9 +1,10 @@
-// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC: sparkle, grip, qr, ticket, bed, mail, paste, file, attach, calendar-check, calendar-plus, pin, crown, compass, luggage, user-x, heart, phone), inline so no image files are loaded (CP-05).
+// Icon buttons (UI-07). Icons from Feather Icons (MIT) and Lucide (ISC: sparkle, grip, qr, ticket, bed, mail, paste, file, attach, calendar-check, calendar-plus, pin, crown, compass, luggage, user-x, heart, phone, camera), inline so no image files are loaded (CP-05).
 import type { ReactNode } from "react";
 import { sv } from "./sv.ts";
 import { roleIcons, type Me } from "./access.ts";
 
 const paths: Record<string, ReactNode> = {
+  camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>, // AI-42
   plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
   edit: <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />,
   expand: <><polyline points="7 13 12 18 17 13" /><polyline points="7 6 12 11 17 6" /></>,

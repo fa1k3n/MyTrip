@@ -7,10 +7,10 @@ import {
   readingToForm, ticketActivities, bookingForm, matchedForm, ticketActivityFor, toBookMatches, type BookingInput, type Result,
 } from "./edit.ts";
 import { lookupPlace } from "./weather.ts";
-import { Icon, IconButton } from "./Icons.tsx";
+import { AiMark, Icon, IconButton } from "./Icons.tsx";
 import { ACTIVITY_CATEGORIES, TIME_POINT } from "./categories.ts";
 import { replaceNeedsAsk, suggestPurpose } from "./purpose.ts";
-import { dayLabel, dayTitle, shortDate } from "./format.ts";
+import { aiErrorText, dayLabel, dayTitle, shortDate } from "./format.ts";
 import { activityMissing, defaultDuration, planWish, suggestStart } from "./schedule.ts";
 import { CatIcon } from "./CatIcon.tsx";
 import { pickedLabel } from "./hiddenView.ts";
@@ -36,6 +36,7 @@ type Props = {
   t: Trip; save: Save; close: () => void; self?: string; // self: the traveler of a personal link (AU-18)
   approveMail?: (pid: string, ops: Op[]) => Promise<string | null>; rejectMail?: (pid: string) => Promise<void>; // BK-17
   mailToWish?: (pid: string) => Promise<void>; // BK-29
+  aiRead?: boolean; // "Läs med AI" on a mail proposal (AI-60)
   wishes?: boolean; // the role may change wishes, so a new activity can make one (ED-29)
 };
 
@@ -336,6 +337,18 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
     const into = p.id ? "" : toBookMatches(p.t, r)[0]?.id ?? "";
     setRead({ r, files: [] }); setTarget(into); setF((o) => fillIn(o, r, [], into)); setPaste(null);
   };
+  const [aiNote, setAiNote] = useState<{ text: string; ai?: boolean } | null>(null); // AI-60
+  const readAi = async () => {
+    if (!mail || !read) return;
+    setAiNote({ text: sv.aiRead.mailBusy });
+    const r = await api.mailRead(p.t.id, mail.id);
+    if (!r.ok) { setAiNote({ text: aiErrorText(r) }); return; }
+    const { ai, ...reading } = r.reading;
+    if (!ai.length) { setAiNote({ text: sv.aiRead.mailNothing }); return; }
+    setRead({ r: reading, files: read.files });
+    setF((o) => fillIn({ ...o, files: (o.files ?? []).filter((x) => !read.files.some((y) => y.id === x.id)) }, reading, read.files, target));
+    setAiNote({ text: sv.aiRead.mailDone(ai.map((k) => sv.aiRead.fields[k] ?? k).join(", ")), ai: true });
+  };
   const [uploading, setUploading] = useState(false), pick = useRef<HTMLInputElement>(null);
   const addFiles = async (list: FileList | null) => { // BK-09
     setUploading(true);
@@ -365,7 +378,9 @@ function BookingForm(p: Props & { id?: string; proposal?: MailProposal }) {
   return (
     <Form title={mail ? sv.mail.review : p.id ? sv.editBooking : sv.newBooking} {...s} close={p.close} onSubmit={submit} onRemove={remove}>
       {mail && <p className="ro note mailfrom"><span className="ico"><Icon name="mail" /></span>{sv.mail.from(mail.source?.subject || sv.mail.noSubject, mail.source?.from ?? "")}<br />{sv.mail.checkFilled}
+        {p.aiRead && <IconButton icon="sparkle" look="bare" tip="left" label={sv.aiRead.mail} onClick={readAi} /> /* AI-60 */}
         {p.mailToWish && <IconButton icon="refresh" look="bare" tip="left" label={sv.mail.toWish} onClick={async () => { if (await ask(sv.mail.confirmToWish, { ok: sv.mail.toWish })) p.mailToWish!(mail.id).then(p.close); }} /> /* BK-29 */}</p>}
+      {aiNote && <p className="ro note" role="status">{aiNote.ai && <AiMark />}{aiNote.text}</p>}
       {matches.length > 0 && <label>{sv.mail.target}<select value={target} onChange={(e) => retarget(e.target.value)}>
         <option value="">{sv.mail.newBooking}</option>
         {matches.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

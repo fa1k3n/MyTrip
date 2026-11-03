@@ -47,9 +47,18 @@ export async function importMail(store: Store, t: Trip, raw: Uint8Array | ArrayB
   const p: Proposal = {
     id: crypto.randomUUID(), tripId: t.id, baseRevision: t.revision, ops: [], reason: `mail: ${subject}`, status: "pending", at,
     source: { kind: "mail", from, subject, at }, booking: { ...booking, ...(files.length ? { files } : {}) }, wish,
+    mailText: mailText(subject, m.text, m.html), // AI-60
   };
   await store.saveProposal(p);
   return { proposalId: p.id };
+}
+
+const MAIL_TEXT_MAX = 12_000;
+/** The mail as plain text for "Läs med AI", without mejl addresses and telephone numbers (AI-04, AI-60). */
+export function mailText(subject: string, text?: string, html?: string) {
+  const body = text?.trim() || (html ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ");
+  return `${subject}\n\n${body}`.replace(/[^\s@<>()]+@[^\s@<>()]+\.[a-z]{2,}/gi, "[mejl]").replace(/(?:\+|00)\d[\d\s-]{6,}\d|\b0\d{1,3}[\s-]?\d{2,3}[\s-]?\d{2}[\s-]?\d{2}\b/g, "[telefon]")
+    .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, MAIL_TEXT_MAX);
 }
 
 const PAGE_MAX = 64 * 1024, PAGE_MS = 5000;

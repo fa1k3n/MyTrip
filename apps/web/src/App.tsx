@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Op, Settings, Trip } from "@trip/schema";
-import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
+import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, isOffline, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
 import { dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
 import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
@@ -20,7 +20,7 @@ import { TripView, type Run, type Tab } from "./TripView.tsx";
 import { defaultTab, todayIn } from "./today.ts";
 import { burst, burstLabel } from "./celebrate.ts";
 import { activityCategory, activityExpense, defaultSharers, newExpense, plainExpense, parseAmount, pickAdder, wishExpense, type Transfer } from "./money.ts";
-import { ExpenseSheet, type Choice } from "./ExpenseFields.tsx";
+import { ExpenseSheet, ReceiptButton, type Choice } from "./ExpenseFields.tsx";
 import { BetaButton, Gear, IconButton, TripRoles } from "./Icons.tsx";
 
 // The settings views, the trip's settings page and the login load when first opened (PF-01).
@@ -290,6 +290,8 @@ export function App() {
   };
   /** AI for the draft: the service, the main switch and Ändra mina planer (AI-07), for a user allowed AI (US-16). */
   const draftAi = !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas.changes !== false;
+  /** AI in an area for the trip on screen: the service and its area (AI-07), allowed for the user (US-16), the trip's switch and consent (AI-62, AI-64). */
+  const aiFor = (area: "mail" | "receipts", x = t) => !!settings?.aiService && !!settings.ai.enabled && settings.ai.areas[area] !== false && !!x?.aiConsent && x.ai !== false;
   const removeTrip = async () => {
     if (!(await ask(sv.confirmDelete))) return;
     await api.remove(tripId); setView("portal"); load();
@@ -400,7 +402,8 @@ export function App() {
       const payer = self ?? (short?.payer ? str("paidBy") : adder()); // a personal link pays and adds in its own name; the superuser picks who paid in Summera (UP-13, AU-13)
       const all = defaultSharers(t!.travelers); // shared by all who share costs (MI-02, MI-38)
       const cur = str("currency") || t!.currency;
-      const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, today); // UP-25
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(str("date")) ? str("date") : today; // the receipt's date (AI-42)
+      const rate = cur === t!.currency ? undefined : await (await import("./currency.ts")).rateFor(cur, t!.currency, day); // UP-25
       const queued = !!linkKey() || account; // kept on the phone: it may wait for its rate (UP-49)
       if (rate === null && !queued) return setErr(sv.up.noRate(cur));
       const foreign = rate ? { currency: cur, rate: rate.rate, rateDate: rate.date } : rate === null ? { currency: cur } : undefined;
@@ -409,7 +412,7 @@ export function App() {
       const input = { ...(activity ? activityExpense(activity, typed, payer, all) // the card's activity and its wish (UP-22, UP-23, UP-47)
         : wish ? wishExpense(wish, { ...typed, category: str("category") || activityCategory(wish.category) }, payer, all) // the tiles can change the category
         : plainExpense({ text: str("text"), amount: str("amount"), category: str("category") }, payer, all)), ...(foreign ? { foreign } : {}) }; // shared by all; split in Summera (MI-02)
-      const r = newExpense(t!, input, today, new Date().toISOString(), newId("exp"));
+      const r = newExpense(t!, input, day, new Date().toISOString(), newId("exp"));
       if (!r.ok) return setErr(r.error);
       if (!self && short?.payer) try { localStorage.setItem(`${ADDER_KEY}.${t!.id}`, payer); } catch { /* not remembered in private mode */ }
       if (queued) { // kept on the phone at once and sent from there, with or without a network (PW-06, PW-07, PW-22)
@@ -536,7 +539,7 @@ export function App() {
         </form>
       )}
       {dlg && t && EDIT_KINDS.includes(dlg.kind) && (
-        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} mailToWish={mailToWish} wishes={perms(t).view.dr.dreams === "write"} />
+        <EditDialog key={JSON.stringify(dlg)} dlg={dlg as EditDlg} t={t} save={apply} close={() => setDlg(null)} self={self} approveMail={approveMail} rejectMail={rejectMail} mailToWish={mailToWish} aiRead={aiFor("mail")} wishes={perms(t).view.dr.dreams === "write"} />
       )}
       </Suspense>
       {(dlg?.kind === "expense" || dlg?.kind === "payment" || dlg?.kind === "person") && (
@@ -544,6 +547,7 @@ export function App() {
           {dlg.kind === "expense" && !dlg.short.activity && <small className="kicker">{sv.up.sheetKicker}</small> /* UP-42 */}
           <h3>{dlg.kind === "expense" && dlg.short.activity ? sv.up.expenseTitle(dlg.short.activity.text) : dlg.kind === "person" && dlg.id ? sv.renamePerson : dlgTitle[dlg.kind]}</h3>
           {dlg.kind === "person" && <label>{sv.name}<input name="name" autoFocus defaultValue={dlg.id ? t?.travelers.find((x) => x.id === dlg.id)?.name : undefined} /></label>}
+          {dlg.kind === "expense" && t && aiFor("receipts") && !isOffline() && <ReceiptButton tripId={t.id} currencies={[...new Set([dlg.short.currency, t.currency, ...sv.currencies])]} /> /* AI-42 */}
           {dlg.kind === "expense" && dlg.short.activity && <> {/* an activity's expense: amount, currency and a short description (UP-22, UP-30) */}
             <div className="two">
               <label>{sv.amount.replace(" (kr)", "")}<input name="amount" inputMode="decimal" autoFocus /></label>

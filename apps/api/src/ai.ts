@@ -100,7 +100,7 @@ export function fromAi(ops: Op[], refs: Map<string, string>): Op[] {
 /** Price per million tokens, and per web search, in USD (AI-03). An unknown model counts at the higher Opus price. */
 const PRICE: Record<string, [number, number]> = { "claude-opus-5-5": [4, 20], "claude-opus-5": [5, 25] };
 const SEARCH_USD = 0.01;
-function costOf(m: Anthropic.Beta.BetaMessage): AiCost {
+export function costOf(m: Anthropic.Beta.BetaMessage): AiCost {
   const [inp, out] = PRICE[m.model] ?? [5, 25], u = m.usage;
   const searches = u.server_tool_use?.web_search_requests ?? 0;
   const usd = (u.input_tokens * inp + (u.cache_creation_input_tokens ?? 0) * inp * 1.25 + (u.cache_read_input_tokens ?? 0) * inp * 0.1 + u.output_tokens * out) / 1e6 + searches * SEARCH_USD;

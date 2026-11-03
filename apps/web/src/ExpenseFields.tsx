@@ -1,5 +1,8 @@
 // The activity an expense applies to and its category tiles, which follow each other (UP-42, UP-47, MI-41).
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { api } from "./api.ts";
+import { aiErrorText, receiptFill } from "./format.ts";
+import { AiMark, IconButton } from "./Icons.tsx";
 import { activityCategory, expenseTiles } from "./money.ts";
 import { ShapeIcon } from "./CatIcon.tsx";
 import { sv } from "./sv.ts";
@@ -43,4 +46,32 @@ export function ExpenseSheet({ choices = [], guess, currency, payer }: { choices
     </div>
     {payer}
   </>;
+}
+
+/** AI-42: "Läs kvitto": a photo of a receipt, scaled on the phone, read by the AI service into the form around it, to check and save. */
+export function ReceiptButton({ tripId, currencies }: { tripId: string; currencies: string[] }) {
+  const pick = useRef<HTMLInputElement>(null), [note, setNote] = useState<{ text: string; ai?: boolean } | null>(null);
+  const read = async (file?: File) => {
+    const form = pick.current?.form;
+    if (!file || !form) return;
+    setNote({ text: sv.aiRead.receiptBusy });
+    const photo = await import("./photo.ts").then((m) => m.shrinkPhoto(file)).catch(() => null);
+    if (!photo) { setNote({ text: sv.aiRead.badPhoto }); return; }
+    const r = await api.receipt(tripId, photo);
+    if (pick.current) pick.current.value = "";
+    if (!r.ok) { setNote({ text: aiErrorText(r) }); return; }
+    const f = receiptFill(r.reading, currencies);
+    if (!Object.keys(f).length) { setNote({ text: sv.aiRead.receiptNothing }); return; }
+    const set = (name: string, v?: string) => { const el = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null; if (v && el && "value" in el) el.value = v; };
+    set("amount", f.amount); set("currency", f.currency); set("text", f.text); set("date", f.date);
+    const tile = f.category && form.querySelector<HTMLInputElement>(`input[name="category"][value="${CSS.escape(f.category)}"]`);
+    if (tile) tile.click(); // through the tiles' own handler, so their state follows
+    setNote({ text: sv.aiRead.receiptDone, ai: true });
+  };
+  return <div className="receipt">
+    <input ref={pick} type="file" hidden accept="image/*" capture="environment" onChange={(e) => read(e.target.files?.[0])} />
+    <input type="hidden" name="date" />
+    <IconButton icon="camera" tip="right" label={sv.aiRead.receipt} onClick={() => pick.current?.click()} />
+    {note && <p className="ro note" role="status">{note.ai && <AiMark />}{note.text}</p>}
+  </div>;
 }

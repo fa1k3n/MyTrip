@@ -4,6 +4,7 @@ import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { CAP_ACCOUNT_USD, CAP_USD, Settings, Trip, aiOn, aiOnForTrip, TicketFile, accessFor, applyOps, atLeast, checkTrip, pinBreaks, describeError, hiddenFromIn, opNeeds, secretsOf, similarTitles, whoFor, type AccessRole, type BookingReading, type Op, type Part, type WishReading } from "@trip/schema";
 import { checkTraffic, type TrafficOpts } from "./traffic.ts";
 import { checkTransit } from "./transit.ts";
+import { mailForAi, readBookingAi, readReceiptAi, type ReadOut } from "./ai-read.ts";
 import { NO_COST, runAi, sameSuggestion, type AiCall, type AiFeature, type AiResult } from "./ai.ts";
 import { FEATURES } from "./ai-features.ts";
 import { describeChange, noticeBody } from "./notify.ts";
@@ -19,6 +20,7 @@ export type Proposal = {
     | { kind: "ai"; feature: string; by: string; at: string; item?: boolean; day?: string }; // an AI feature in the app (AI-01, AI-65); item: one suggestion of a helper (AI-70); day: the day its activity is on (AI-77)
   booking?: BookingReading & { files?: TicketFile[] }; // what was read from it; approved with the edited booking (BK-17)
   wish?: WishReading & { source: string }; // the same mail read as a wish, for Gör till önskan (BK-29)
+  mailText?: string; // the mail's subject and text without mejl addresses and telephone numbers, for "Läs med AI"; never sent to the browser (AI-60)
 };
 /** A ticket file's owner and type; its bytes are kept apart from the trip data (BK-13). */
 export type FileMeta = { id: string; tripId: string; type: TicketFile["type"] | "image/webp" }; // webp: wish images (DB-08); tripId "_commons": the shared cache (DB-11)
@@ -167,6 +169,8 @@ function same(a: string, b: string) {
   return d === 0;
 }
 const SESSION_DAYS = 30, MAX_FAILS = 5, FAIL_WINDOW_MS = 15 * 60_000;
+/** Bytes as base64, in parts so a large photo does not overflow the call stack (AI-42). */
+const toBase64 = (b: Uint8Array) => { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 /** 144 random bits as base64url (AU-01). */
 /** 80 random bits in lowercase letters and digits, for an inbox address (BK-14). */
 const inboxSecret = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => "abcdefghijklmnopqrstuvwxyz234567"[b & 31]).join("");
@@ -604,7 +608,8 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
     return c.json(day.hiddenRoute ? { status: "none" } : await checkTransit(t, day.id, c.req.param("aid"), opts));
   });
   app.get("/api/trips/:id/check", async (c) => c.json({ problems: checkTrip(await load(c.req.param("id"))) }));
-  app.get("/api/trips/:id/proposals", async (c) => (["link", "traveler"].includes(c.get("role")) ? c.json({ error: "forbidden" }, 403) : c.json(await store.proposals(c.req.param("id")))));
+  app.get("/api/trips/:id/proposals", async (c) => (["link", "traveler"].includes(c.get("role")) ? c.json({ error: "forbidden" }, 403)
+    : c.json((await store.proposals(c.req.param("id"))).map(({ mailText: _m, ...p }) => p)))); // the mail's text stays on the server (AI-60)
 
   // AU-06: the admin creates, reads and replaces a trip's share link; replacing it stops the old one at once.
   app.get("/api/trips/:id/link", async (c) => {
@@ -1094,6 +1099,44 @@ export function createApp(store: Store, tokens: Tokens, opts: { aiService?: bool
       }
     }
     return c.json({ proposalId: r.proposalIds[0] ?? null, proposalIds: r.proposalIds, reason: r.reason }, r.proposalIds.length ? 202 : 200);
+  });
+
+  /** Runs a reading with AI for a person and counts its cost (AI-03); undefined with the reason it did not run. */
+  async function aiReading<T>(c: Context<Env>, t: Trip, area: "mail" | "receipts", feature: string, run: (call: AiCall) => Promise<ReadOut<T>>) {
+    const s = await store.loadSettings();
+    if (!opts.ai || !aiOnForTrip(s, area, true, t)) return { status: 409 as const, error: "off" };
+    if (!t.aiConsent) return { status: 409 as const, error: "consent" }; // AI-64
+    const now = clock(), at = now.toISOString(), month = at.slice(0, 7), who = c.get("user")?.id ?? whoOf(c);
+    const cap = capReached(s, await store.aiUses(month), who);
+    if (cap) return { status: 429 as const, error: "cap", scope: cap };
+    const r = await run(opts.ai.call);
+    await store.saveAiUse({ id: crypto.randomUUID(), at, month, tripId: t.id, who, feature, usd: r.cost.usd, result: "error" in r ? "error" : "proposal" });
+    return "error" in r ? { status: 502 as const, error: r.error } : { reading: r.reading };
+  }
+  // AI-60: "Läs med AI" on a mail proposal: what the rules missed, from the scrubbed mail; the reference stays the rules'.
+  app.post("/api/trips/:id/mailread/:pid", async (c) => {
+    if (!mayStart(c)) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id")), p = (await store.proposals(t.id)).find((x) => x.id === c.req.param("pid") && x.status === "pending" && x.source?.kind === "mail");
+    if (!p?.mailText) return c.json({ error: "not found" }, 404);
+    const rules = p.booking ?? {};
+    const r = await aiReading(c, t, "mail", "mailread", (call) => readBookingAi(call, mailForAi(p.mailText!, t, rules.reference),
+      { dates: t.days.map((d) => d.date), currency: t.currency, today: clock().toISOString().slice(0, 10) }));
+    if (!("reading" in r)) return c.json({ error: r.error, ...("scope" in r ? { scope: r.scope } : {}) }, r.status);
+    const { files: _f, ...had } = rules as BookingReading & { files?: unknown };
+    const ai = (Object.keys(r.reading ?? {}) as (keyof BookingReading)[]).filter((k) => had[k] === undefined || had[k] === "");
+    return c.json({ reading: { ...r.reading, ...Object.fromEntries(Object.entries(had).filter(([, v]) => v !== undefined && v !== "")), ai } });
+  });
+  // AI-42: "Läs kvitto": a photo of a receipt becomes values for the expense form, which the person checks and saves.
+  app.post("/api/trips/:id/receipt", async (c) => {
+    const u = c.get("user"), role = c.get("role");
+    if (role === "link" || role === "read" || role === "propose" || !(u ? u.superuser || u.ai : manager(c))) return c.json({ error: "forbidden" }, 403);
+    const t = await load(c.req.param("id")), bytes = new Uint8Array(await c.req.arrayBuffer());
+    if (bytes.length > MAX_FILE) return c.json({ error: "too large" }, 413);
+    const type = imageType(bytes);
+    if (!type) return c.json({ error: "a JPEG, PNG or WebP photo" }, 400);
+    const r = await aiReading(c, t, "receipts", "receipt", (call) => readReceiptAi(call, { type, data: toBase64(bytes) },
+      { currency: t.currency, dates: t.days.map((d) => d.date), categories: sv.budgetCategories, today: clock().toISOString().slice(0, 10) }));
+    return "reading" in r ? c.json(r) : c.json({ error: r.error, ...("scope" in r ? { scope: r.scope } : {}) }, r.status);
   });
 
   // US-02, US-03, US-04, US-12: the superuser manages the accounts; the admin password acts as the first superuser (US-18).

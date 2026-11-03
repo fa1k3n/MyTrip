@@ -62,3 +62,13 @@ export function focusActivity<A extends Timed>(list: A[], now: string | undefine
   if (!now) return undefined;
   return list.find((a, i) => a.start && !hasEnded(list, i, now))?.id;
 }
+
+/** How far the day is pulled sideways by a finger that has moved `dx`: all of it when there is a day that way, else a quarter, at most 40 px (UP-55). */
+export const dragOffset = (dx: number, hasTarget: boolean) => (hasTarget ? dx : Math.max(-40, Math.min(40, dx / 4)));
+
+/** What a released drag does: 1 for the next day, -1 for the previous, 0 to spring back. It must be a swipe (UP-52) and either a
+ * third of the width or quick: 0.4 px per ms (UP-55). */
+export function settle(dx: number, dy: number, ms: number, width: number) {
+  const step = swipeStep(dx, dy);
+  return step && (Math.abs(dx) >= width / 3 || Math.abs(dx) / Math.max(ms, 1) >= 0.4) ? step : 0;
+}

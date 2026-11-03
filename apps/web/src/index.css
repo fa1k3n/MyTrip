@@ -349,6 +349,8 @@ button.row.mail svg{width:16px;height:16px;vertical-align:-3px;color:var(--acct)
 /* Uppleva: the day as a timeline of cards that do not fold out (UP-16), all alike (UP-27); the "Nu" line (UP-29); clash (UP-28); the eye in the corner (UP-32); buttons (UP-20, UP-21). */
 .upday{list-style:none;margin:0 0 14px;padding:0}
 .upact{position:relative;display:flex;gap:12px;align-items:flex-start;padding:12px 12px 8px 14px;margin-bottom:10px;border:1.5px solid transparent}
+.upslide{touch-action:pan-y;transition:transform .2s ease-out} /* UP-55: the day follows the finger, then settles */
+@media (prefers-reduced-motion:reduce){.upslide{transition:none}}
 .upact{scroll-margin-top:72px} /* UP-56: below the header when the view scrolls to it */
 .upeye{position:absolute;top:4px;right:4px}.upeye .eye{margin:0}.upact.hiddenrow .upbody .what{padding-right:30px} /* UP-32 */
 .upact.hiddenrow{background:color-mix(in srgb,var(--acc) 7%,var(--card))}

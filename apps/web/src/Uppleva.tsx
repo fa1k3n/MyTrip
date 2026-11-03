@@ -1,8 +1,8 @@
 // Uppleva: one day of the trip, read-only except for adding expenses (UP-01..UP-13).
-import { useEffect, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from "react";
 import { bookingDates, bookingTimes, dateBadge, dayTitle, kr, titleHiddenFrom, statusBadge } from "./format.ts";
 import { adjacentDay, bookingsOn, clockIn, dayHeading, pickDay } from "./today.ts";
-import { addChoices, clashes, durationText, focusActivity, hasEnded, nowAt, swipeStep, upDayTime, upTime } from "./upday.ts";
+import { addChoices, clashes, durationText, dragOffset, focusActivity, hasEnded, nowAt, settle, upDayTime, upTime } from "./upday.ts";
 import { verdictWish } from "./memories.ts";
 import { Verdicts } from "./Verdicts.tsx"; // UP-50
 import { currencyFor, dayCountry, expenseAmountText, keptCountries, lookupCountry, rateFor } from "./currency.ts";
@@ -25,8 +25,17 @@ import { ask } from "./Ask.tsx"; // UI-11
 
 export function Uppleva(p: TripViewProps) {
   const { t } = p;
-  const touch = useRef<{ x: number; y: number } | null>(null); // where a swipe on the day began (UP-52)
+  const touch = useRef<{ x: number; y: number; at: number; sideways: boolean } | null>(null); // where a swipe on the day began and when (UP-52)
+  const slide = useRef<HTMLDivElement>(null), entering = useRef(0); // the day that is dragged, and from which side the next one comes (UP-55)
   const day = t.days.find((d) => d.id === p.upDay) ?? pickDay(t.days, p.today);
+  useLayoutEffect(() => { // UP-55: the new day slides in from the side the old one left
+    const el = slide.current, from = entering.current;
+    entering.current = 0;
+    if (!el || !from) return;
+    el.style.transition = "none"; el.style.transform = `translateX(${from * 100}%)`;
+    void el.offsetWidth;
+    el.style.transition = ""; el.style.transform = "";
+  }, [day?.id]);
   if (!day) return <section className="card"><p className="ro">{sv.noDays}</p></section>;
   const bookings = bookingsOn(t.bookings, day.date);
   const badge = dateBadge(day.date); // the same date badge as the day cards in Nåla
@@ -38,21 +47,33 @@ export function Uppleva(p: TripViewProps) {
   const titleWho = titleHiddenFrom(day, t); // AU-29, AU-30
   const prev = adjacentDay(t.days, day.id, -1), next = adjacentDay(t.days, day.id, 1);
   /** A sideways swipe on the day goes to the next or the previous day; not from a map, a field or anything that scrolls sideways (UP-52). */
+  const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const swipeStart = (e: TouchEvent) => {
     const at = e.touches[0], own = (e.target as Element).closest("input, select, textarea, .map, .cstrip, [data-noswipe]");
-    touch.current = at && e.touches.length === 1 && !own ? { x: at.clientX, y: at.clientY } : null;
+    touch.current = at && e.touches.length === 1 && !own ? { x: at.clientX, y: at.clientY, at: Date.now(), sideways: false } : null;
   };
+  /** The day follows the finger once the move is clearly sideways; vertical moves scroll as before (UP-55). */
+  const swipeMove = (e: TouchEvent) => {
+    const from = touch.current, at = e.touches[0], el = slide.current;
+    if (!from || !at || !el || reduced()) return;
+    const dx = at.clientX - from.x, dy = at.clientY - from.y;
+    if (!from.sideways && Math.abs(dx) > 10 && Math.abs(dx) >= 1.5 * Math.abs(dy)) from.sideways = true;
+    if (!from.sideways) return;
+    el.style.transition = "none"; el.style.transform = `translateX(${dragOffset(dx, !!(dx < 0 ? next : prev))}px)`;
+  };
+  const swipeCancel = () => { touch.current = null; if (slide.current) { slide.current.style.transition = ""; slide.current.style.transform = ""; } };
   const swipeEnd = (e: TouchEvent) => {
-    const from = touch.current, at = e.changedTouches[0];
+    const from = touch.current, at = e.changedTouches[0], el = slide.current;
     touch.current = null;
     if (!from || !at) return;
-    const step = swipeStep(at.clientX - from.x, at.clientY - from.y), to = step === 1 ? next : step === -1 ? prev : undefined;
-    if (to) p.setUpDay(to.id);
+    const dx = at.clientX - from.x, step = settle(dx, at.clientY - from.y, Date.now() - from.at, el?.offsetWidth ?? innerWidth), to = step === 1 ? next : step === -1 ? prev : undefined;
+    if (el) { el.style.transition = ""; el.style.transform = ""; } // springs back, or the new day takes over below
+    if (to) { entering.current = reduced() ? 0 : step; p.setUpDay(to.id); }
   };
   return <>
     {/* no timeline of stops: the day changes with the arrows (UP-31) */}
     <div className={`cols uppage ${side ? "" : "one"}`}>
-      <div onTouchStart={swipeStart} onTouchEnd={swipeEnd}>
+      <div ref={slide} className="upslide" onTouchStart={swipeStart} onTouchMove={swipeMove} onTouchEnd={swipeEnd} onTouchCancel={swipeCancel}>
         {p.waiting.length > 0 && <section className="card waitcard">{/* first, not in the budget, so nothing hides it (UP-46) */}
           <h3>{sv.queue.title}</h3>
           {p.waiting.map((x) => { // marked until the server has them, with why, when and Skicka nu (PW-06, PW-09, PW-18, PW-19)

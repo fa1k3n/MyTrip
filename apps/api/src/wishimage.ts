@@ -1,6 +1,8 @@
 // Images for wishes without AI, only from Wikimedia Commons with a free licence (DB-06), copied and kept in a cache that all
 // trips share (DB-08, DB-11). Only Wikimedia's own https hosts are fetched, with a size limit and a timeout.
 
+import { sameSuggestion } from "./ai.ts";
+
 type Fetch = typeof fetch;
 export type CommonsImage = { image: string; page: string; author?: string; licence: string; licenceUrl?: string };
 
@@ -35,12 +37,14 @@ export function licenceOk(name: string) {
 /** A title as the cache knows it: lower case, single spaces (DB-11). */
 export const cacheKey = (title: string) => title.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 
-/** The image of the Wikipedia article found by the title, in Swedish, English, then German, when it is a Commons file with an
- * allowed licence and no restrictions; as a thumbnail 500 px wide, under the 640 px limit (DB-06). */
+/** The image of the Wikipedia article found by the title, in Swedish, English, then German, when the article has the same name
+ * (DB-29) and its image is a Commons file with an allowed licence and no restrictions; as a thumbnail 500 px wide, under the
+ * 640 px limit (DB-06). */
 export async function commonsImage(title: string, f: Fetch = fetch): Promise<CommonsImage | undefined> {
   for (const lang of ["sv", "en", "de"]) {
-    const hit = (await json<{ pages?: { key: string; thumbnail?: unknown }[] }>(`https://${lang}.wikipedia.org/w/rest.php/v1/search/title?q=${encodeURIComponent(title)}&limit=1`, f))?.pages?.[0];
+    const hit = (await json<{ pages?: { key: string; title?: string; thumbnail?: unknown }[] }>(`https://${lang}.wikipedia.org/w/rest.php/v1/search/title?q=${encodeURIComponent(title)}&limit=1`, f))?.pages?.[0];
     if (!hit?.thumbnail) continue; // no article, or one without an image: no further calls (Wikimedia limits the rate)
+    if (!sameSuggestion(title, hit.title ?? hit.key.replace(/_/g, " "))) continue; // "Riddle & Finns" is not the article "Finns" (DB-29)
     type Summary = { thumbnail?: { source: string }; originalimage?: { source: string; width: number } };
     const s = await json<Summary>(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(hit.key)}`, f);
     if (!s?.thumbnail || !s.originalimage) continue;

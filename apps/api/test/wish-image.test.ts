@@ -75,6 +75,30 @@ const auto = (app: App, wid: string, auth = "a", tripId = "berlin") => call(app,
 const upload = (app: App, wid: string, bytes: Uint8Array, auth = "a", type = "image/jpeg") =>
   app.request(`/api/trips/berlin/dreams/${wid}/image/upload`, { method: "POST", headers: { "content-type": type, authorization: `Bearer ${auth}` }, body: new Blob([Uint8Array.from(bytes)]) });
 
+// REQ: DB-29 the article is used only when its title is the same name as the wish's; otherwise the next language, then nothing
+test("DB-29 an article with another name is not used", async () => {
+  const search = (hits: Record<string, string>): typeof fetch => (async (input: string | URL | Request) => {
+    const url = new URL(String(input instanceof Request ? input.url : input));
+    if (url.pathname.endsWith("/search/title")) {
+      const title = hits[`${url.hostname.slice(0, 2)}:${url.searchParams.get("q")}`];
+      return Response.json({ pages: title ? [{ key: title.replace(/ /g, "_"), title, thumbnail: { url: "//x" } }] : [] });
+    }
+    return wikimedia({ x: {} })(input);
+  }) as typeof fetch;
+  const summaries: string[] = [];
+  const f = (hits: Record<string, string>): typeof fetch => (async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.includes("/page/summary/")) { summaries.push(decodeURIComponent(url.split("/summary/")[1]!)); return Response.json({}); }
+    return search(hits)(input);
+  }) as typeof fetch;
+  assert.equal(await commonsImage("Riddle & Finns", f({ "en:Riddle & Finns": "Finns" })), undefined);
+  assert.deepEqual(summaries, [], "an article with another name is not opened");
+  await commonsImage("Royal Pavilion", f({ "sv:Royal Pavilion": "Finns", "en:Royal Pavilion": "Royal Pavilion" }));
+  await commonsImage("Brighton Palace Pier", f({ "en:Brighton Palace Pier": "Palace Pier" }));
+  await commonsImage("Kungliga slottet", f({ "sv:Kungliga slottet": "Kungliga slottet, Stockholm" }));
+  assert.deepEqual(summaries, ["Royal_Pavilion", "Palace_Pier", "Kungliga_slottet,_Stockholm"]);
+});
+
 // REQ: DB-07 the first image found is used automatically, once; nothing found marks the wish as tried; a busy service does not
 test("DB-07 an image chosen automatically", async () => {
   const app = createApp(memoryStore([trip()]), tokens, { fetch: wikimedia() });

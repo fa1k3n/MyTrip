@@ -6,6 +6,7 @@ Requirement IDs refer to `requirements/*.md` in the planning repository. Interfa
 
 ### Fixed
 - Texts written by the AI name the travelers instead of internal references such as "r1" (AI-98).
+- A wish gets an image only from an article with the same name, so "Riddle & Finns" no longer shows a map of Finnic languages (DB-29).
 
 ## 0.2.0 – 2026-11-03
 

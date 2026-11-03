@@ -103,6 +103,19 @@ export const sv = {
   budgetMaxHint: "Prognosen jämförs med maxbudgeten: planen, eller utfallet där det är större. Lämna tomt för att ta bort den.",
   unused: "Oanvänt", // BG-18
   who: { traveler: "Resenär", planner: "Planerare", follower: "Följare" }, // the role in the header (AU-16)
+  whatsNew: { // US-41: the news of a version, shown once per device
+    title: (v: string) => `Nytt i Basläger ${v}`, more: "Allt som är nytt", ok: "Okej", open: "Nytt i den här versionen",
+    news: {
+      "0.2.0": [
+        "Egna konton: logga in med lösenord eller Google och bjud in de andra. Den som skapar en resa är dess Planerare.",
+        "Skapa med AI: beskriv drömresan, så gör Basläger ett första utkast med dagar, förslag på önskningar, bra att veta och packlistor. AI är frivilligt.",
+        "En mejladress per resa: vidarebefordra bekräftelser och tips. Hotell, tåg, buss, flyg och färja blir förslag på bokningar, en resa per riktning.",
+        "Kontrollera resan: ett kort i Nåla som varnar för nätter utan boende, byten som inte hinns och för långa resdagar.",
+        "Uppleva visar dagen som en tidslinje, med utlägg i alla valutor. I Minnas sätter ni omdömen som hjälper nästa resa.",
+        "I telefonen öppnar appen alltid på dagens dag i Uppleva, och den fungerar utan nät.",
+      ],
+    } as Record<string, readonly string[]>,
+  },
   beta: { // US-26..US-29: the beta
     version: (v: string) => `Version ${v}`, // US-38
     tag: "Beta", feedback: "Tyck till (beta)", title: "Tyck till", lead: "Basläger är i beta. Skriv vad som var krångligt, vad du saknar eller vad du gillar.",

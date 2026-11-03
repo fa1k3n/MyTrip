@@ -1,3 +1,24 @@
 // The app's version, from the web app's package.json at build time; "dev" when not built, as under node --test (US-38).
+import { sv } from "./sv.ts";
 declare const __APP_VERSION__: string | undefined;
 export const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
+/** US-41: the changelog with all that is new, in the public repository. */
+export const CHANGELOG_URL = "https://github.com/fa1k3n/MyTrip/blob/main/CHANGELOG.md";
+/** The device's last version whose news was shown (US-41). */
+export const NEWS_KEY = "mytrip.newsSeen";
+/** Whether version a comes after version b, number by number. */
+export function laterVersion(a: string, b: string) {
+  const x = a.split(".").map(Number), y = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+}
+/** US-41: the version whose news to show: on a device that used the app before, once, when news is written for it. */
+export function whatsNewFor(version: string, seen: string | null, usedBefore: boolean, news: Record<string, readonly string[]> = sv.whatsNew.news) {
+  if (version === "dev" || !news[version] || !usedBefore) return undefined;
+  return !seen || laterVersion(version, seen) ? version : undefined;
+}
+/** Whether this device has used the app: anything of Basläger kept in its storage besides the news (US-41). */
+export function usedBefore() {
+  try { return Object.keys(localStorage).some((k) => k.startsWith("mytrip.") && k !== NEWS_KEY); } catch { return false; }
+}

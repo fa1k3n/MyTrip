@@ -51,9 +51,9 @@ test("US-39 a new trip has its creator as a Planerare", async () => {
 test("US-39 the admin password: the first superuser, or nobody", async () => {
   const { app, admin } = await setup();
   assert.deepEqual((await json(call(app, "/api/trips", { method: "POST", cookie: admin, body: { title: "Utan konto" } }))).travelers, []);
-  await account(app, admin, "Johan", "johan@example.org");
+  await account(app, admin, "Lisa", "lisa@example.org");
   const t = await json(call(app, "/api/trips", { method: "POST", cookie: admin, body: { title: "Med konto" } }));
-  assert.deepEqual(t.travelers.map((x: { name: string }) => x.name), ["Johan"]);
+  assert.deepEqual(t.travelers.map((x: { name: string }) => x.name), ["Lisa"]);
 });
 
 // REQ: US-40 an owner tied to a traveler shows Skapare and the traveler's permission

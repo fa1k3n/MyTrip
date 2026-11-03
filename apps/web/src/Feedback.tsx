@@ -8,7 +8,7 @@ import { onOutside } from "./outside.ts";
 
 const when = (iso: string) => new Date(iso).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?: string; close: () => void }) {
+export function FeedbackDialog({ page, tripId, close, news }: { page: string; tripId?: string; close: () => void; news?: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [text, setText] = useState(""), [state, setState] = useState<"" | "busy" | "sent" | "failed">("");
   const [mine, setMine] = useState<MyNote[]>([]); // US-34: one's own notes with their answers
@@ -30,7 +30,7 @@ export function FeedbackDialog({ page, tripId, close }: { page: string; tripId?:
       <p className="ro">{sv.beta.lead}</p>
       <form onSubmit={submit}>
         <label>{sv.beta.label}<textarea rows={5} maxLength={2000} value={text} onChange={(e) => { setText(e.target.value); if (state === "sent") setState(""); }} autoFocus /></label>
-        <p className="ro note">{sv.beta.goes} {sv.beta.version(APP_VERSION)}.</p>
+        <p className="ro note">{sv.beta.goes} {sv.beta.version(APP_VERSION)}.{news && <> <button className="linkbtn" type="button" onClick={news}>{sv.whatsNew.open}</button></>}</p> {/* US-41 */}
         {state === "sent" && <p className="ro" role="status">{sv.beta.sent}</p>}
         {state === "failed" && <p className="err" role="alert">{sv.beta.failed}</p>}
         <button className="btn" type="submit" disabled={!text.trim() || state === "busy"}>{sv.beta.send}</button>

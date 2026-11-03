@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, isOffline, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
 import { noAnswer, dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
+import { APP_VERSION, NEWS_KEY, usedBefore, whatsNewFor } from "./version.ts";
 import { ABOUT_PAGE, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
@@ -29,6 +30,7 @@ const AiSettings = lazy(() => import("./Settings.tsx").then((m) => ({ default: m
 const AppAdmin = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.AppAdmin })));
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
+const WhatsNewDialog = lazy(() => import("./WhatsNew.tsx").then((m) => ({ default: m.WhatsNewDialog }))); // US-41
 const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
 const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
 const NewTripDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.NewTripDialog }))); // AI-10
@@ -98,6 +100,12 @@ export function App() {
   const [expired, setExpired] = useState(false);
   const [setupLink, setSetupLink] = useState(() => parseSetupHash(location.hash)); // a password link was opened (US-04)
   const [feedbackOpen, setFeedbackOpen] = useState(false); // "Tyck till" during the beta (US-27)
+  const [news, setNews] = useState(() => { // US-41: the news of a new version, once per device that used an earlier one
+    let seen: string | null = null;
+    try { seen = localStorage.getItem(NEWS_KEY); } catch { /* storage blocked: usedBefore is false, nothing shown */ }
+    return whatsNewFor(APP_VERSION, seen, usedBefore());
+  });
+  const closeNews = () => { try { localStorage.setItem(NEWS_KEY, APP_VERSION); } catch { /* blocked */ } setNews(undefined); };
   const [newOpen, setNewOpen] = useState(false); // AI-10: "Beskriv din dröm"
   const aiRun = useRef<{ tripId: string; before: Trip; undone: boolean } | null>(null); // AI-80: the trip before "Skapa med AI", for Ångra of all it added
   const [choosing, setChoosing] = useState(false); // the start page with the trips of the links on the phone (PW-16)
@@ -518,7 +526,9 @@ export function App() {
       {page}</div>
     {notice && <div className="toast" role="alert">{notice}</div>}
     {newOpen && <Suspense fallback={null}><NewTripDialog ai={draftAi} created={(id, msg, drafted) => void created(id, msg, drafted)} helperDone={helperDone} allDone={(id, added, from) => void allDone(id, added, from)} close={() => setNewOpen(false)} /></Suspense>}
-    {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)} /></Suspense>}
+    {feedbackOpen && <Suspense fallback={null}><FeedbackDialog page={view === "trip" ? tab : view} tripId={view === "portal" ? undefined : t?.id} close={() => setFeedbackOpen(false)}
+      news={sv.whatsNew.news[APP_VERSION] ? () => { setFeedbackOpen(false); setNews(APP_VERSION); } : undefined} /></Suspense>}
+    {news && me && !needsConsent(me) && !setupLink && !choosing && <Suspense fallback={null}><WhatsNewDialog version={news} close={closeNews} /></Suspense>} {/* US-41 */}
     {undo && !notice && <div className="toast undo" role="status"><span>{undo.text}</span><button type="button" className="btn ghost" onClick={runUndo}>{sv.undo.button}</button></div>}
     <dialog
       ref={dialog} className={dlg?.kind === "tickets" ? "full" : dlg?.kind === "expense" && !dlg.short.activity ? "sheet" : undefined} aria-label={!dlg ? undefined

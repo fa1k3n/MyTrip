@@ -2,13 +2,15 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
-## 0.2.0 – unreleased
+## 0.2.0 – 2026-11-03
 
 The first beta release: accounts, AI help, bookings by mail and a check of the plan.
 
 ### Accounts and beta
 - User accounts with password or Google login, own trips and role icons (US-01..US-24); invitations, forgotten password by mail and answers to beta notes (US-30..US-37).
 - Beta notice to accept, a "Tyck till" button and a usage overview (US-26..US-29); each note carries the app's version (US-38).
+- The creator of a trip is its first traveler, a Planerare; the trip card shows Skapare and that permission (US-39, US-40).
+- "Nytt i Basläger": the news of a new version shown once per device, with a link to this changelog, and again from "Tyck till" (US-41).
 - Trip settings: Resenärer with a dialog per traveler, permissions per content for Resenär and Följare, a permission matrix with one button per cell (AU-34..AU-41).
 
 ### Uppleva and Minnas
@@ -27,14 +29,14 @@ The first beta release: accounts, AI help, bookings by mail and a check of the p
 - Date fields as dd/mm/åååå in every browser language (LC-05).
 
 ### AI help (optional, per trip)
-- Skapa med AI: a draft of a new trip from its description, applied at once, with planning rules the description gives (AI-10, AI-75..AI-80, AI-93).
-- Helpers Bra att veta inför resan, Förslag på önskningar and Packlistor, behind switches and spending caps (AI-01..AI-04, AI-64..AI-74, AI-86..AI-92).
+- Skapa med AI: a draft of a new trip from its description, applied at once, with planning rules the description gives, keeping the creator as one of the travelers (AI-10, AI-75..AI-80, AI-93, AI-94).
+- Helpers Bra att veta inför resan, Förslag på önskningar and Packlistor, behind switches and spending caps, without the same place twice under other names or two branches of one chain (AI-01..AI-04, AI-64..AI-74, AI-86..AI-92, AI-95).
 - Everything the AI adds is marked; keep or remove it in its row, or Behåll allt; a wish and its place are confirmed in one step (AI-83..AI-85).
 - Läs med AI for booking mails and Läs kvitto for receipts (AI-60, AI-42).
 
 ### Bookings
 - One mail address per trip for bookings and wishes, sorted without AI in any language (BK-26..BK-33).
-- Reading a confirmation: name, dates, reference, price, the place with its telephone and web page, and train, bus, flight and ferry trips with their departure and arrival (BK-16, BK-22..BK-25, BK-35..BK-38).
+- Reading a confirmation: name, dates, reference, price, the place with its telephone and web page, and train, bus, flight and ferry trips with their departure and arrival, one booking per direction of a journey out and back (BK-16, BK-22..BK-25, BK-35..BK-39).
 - The kind Resa with from, to, departure and arrival (BK-37); bookings still to book shown as a yellow warning (BK-34).
 
 ### Kontrollera resan

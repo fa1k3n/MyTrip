@@ -220,7 +220,8 @@ export function App() {
   const today = t ? todayIn(t.timezone) : "";
 
   useEffect(() => {
-    const d = dialog.current!;
+    const d = dialog.current;
+    if (!d) return; // US-43: the news page in its own tab renders no dialog
     setErr("");
     if (dlg && !d.open) { opener.current = document.activeElement as HTMLElement; d.showModal(); }
     if (!dlg && d.open) d.close();

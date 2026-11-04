@@ -1,0 +1,5 @@
+Contact: mailto:security@falkenproduktion.se
+Expires: 2027-11-04T00:00:00.000Z
+Policy: https://github.com/fa1k3n/MyTrip/blob/main/SECURITY.md
+Preferred-Languages: sv, en
+Canonical: https://baslager.app/.well-known/security.txt

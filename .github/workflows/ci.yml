@@ -1,7 +1,14 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+permissions:
+  contents: read
 jobs:
   check:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -14,3 +21,21 @@ jobs:
       - run: npm test
       # builds the web app, checks it for secrets and fails when the page file is over the limit of PF-01
       - run: npm run build -w @trip/web
+  # DP-22: a CycloneDX SBOM of the platform, attached to the GitHub Release that is made for a version
+  sbom:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --output-format JSON --output-file sbom.cdx.json
+      - run: gh release upload "$TAG" sbom.cdx.json --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}

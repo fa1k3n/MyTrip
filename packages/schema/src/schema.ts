@@ -1,4 +1,4 @@
-import { z, ZodError } from "zod";
+import { z, ZodError } from "./zod.ts";
 import { AccessConfig } from "./access.ts";
 
 const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/);

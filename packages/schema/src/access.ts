@@ -1,6 +1,6 @@
 // The stored form of a trip's permissions (AU-36), checked against the levels each content offers (AU-22); the form stored
 // before AU-36, per page and component, is still read and turned into content levels.
-import { z } from "zod";
+import { z } from "./zod.ts";
 import { CONTENT, contentLevels, fromLegacy, levelsFor, PAGE_PARTS, PAGES, type AccessConfig as Config, type AccessRole, type Level, type Page } from "./rules.ts";
 
 const pageOf = (role: AccessRole, page: Page) => z.object({

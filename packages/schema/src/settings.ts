@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod.ts";
 
 /** AI areas by capability: what the AI may do with the user's data (AI-07). */
 export const AI_AREAS = ["images", "texts", "suggestions", "changes", "mail", "receipts", "web", "location"] as const;

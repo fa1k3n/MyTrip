@@ -123,7 +123,7 @@ export function App() {
   const [notice, setNotice] = useState("");
   const [undo, setUndo] = useState<{ text: string; before: Trip; after: Trip; draft?: boolean } | null>(null); // ED-22: for 10 seconds after a change; 30 for a draft (AI-78)
   const [settingsBack, setSettingsBack] = useState<"portal" | "admin">("portal");
-  const [settings, setSettings] = useState<Settings & { aiService: boolean }>();
+  const [settings, setSettings] = useState<Settings & { aiService: boolean; aiAccount?: false }>();
   const dialog = useRef<HTMLDialogElement>(null);
   const origin = useRef<Element | null>(null); // the button that opened Uppleva's expense form, for the burst (UP-35)
   const opener = useRef<HTMLElement | null>(null);
@@ -204,7 +204,7 @@ export function App() {
     setSettings((s) => s && { ...s, ...next }); // optimistic; the server answer wins
     api.saveSettings(next).then((saved) => setSettings((s) => s && { ...s, ...saved }), () => api.settings().then(setSettings, () => {}));
   };
-  const aiCard = settings && <Suspense fallback={null}><AiSettings s={settings} service={settings.aiService} onChange={saveSettings} /></Suspense>;
+  const aiCard = settings && <Suspense fallback={null}><AiSettings s={settings} service={settings.aiService} accountOff={settings.aiAccount === false} onChange={saveSettings} /></Suspense>;
   const t = trips?.find((x) => x.id === tripId);
   const covers = useCovers(trips ?? []);
   const [forecast, forecastAt] = useForecast(view === "trip" ? t : undefined);

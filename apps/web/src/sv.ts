@@ -268,6 +268,7 @@ export const sv = {
     aiMade: "Föreslagen av AI", checkSource: "Kolla källan", dayGone: "Dagen finns inte längre, så förslaget passar inte. Det är borttaget.", // AI-77
     wishRow: "Förslag", wishRowHint: "Förslag från AI-hjälpen. Tar du med ett kommer önskan och en aktivitet på dagen in.", onDay: (d: string) => `Förslag för ${d}`, // AI-71 // AI-70: check the rule at its source (PI-04)
   },
+  aiNoAccount: "AI är inte påslaget för ditt konto. Den som administrerar Basläger kan slå på det.",
   aiNoService: "Ingen AI-tjänst är kopplad till den här instansen. Inställningarna börjar gälla när en nyckel finns.",
   aiAreas: {
     images: ["Generera bilder", "Omslagsbilder till resor och bilder till önskningar"],

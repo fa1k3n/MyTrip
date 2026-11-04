@@ -72,8 +72,9 @@ export function TripAi({ t, superuser, change, reload, openSettings }: {
   );
 }
 
-export function AiSettings({ s, service, onChange }: { s: Settings; service: boolean; onChange: (next: Settings) => void }) {
+export function AiSettings({ s, service, accountOff, onChange }: { s: Settings; service: boolean; accountOff?: boolean; onChange: (next: Settings) => void }) {
   const set = (enabled: boolean, areas = s.ai.areas) => onChange({ ...s, ai: { ...s.ai, enabled, areas } });
+  if (accountOff) return <div className="card"><h3>{sv.ai}</h3><p className="ro">{sv.aiNoAccount}</p></div>; // AI-99
   return (
     <div className="card">
       <h3>{sv.ai}</h3>

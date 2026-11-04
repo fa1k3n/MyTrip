@@ -224,3 +224,8 @@ export const newReply = (notes: { replyAt?: string }[], seen: string | null) => 
  * share costs (AU-40, US-36, MI-38). */
 export const travelerLine = (role: "traveler" | "planner", shares: boolean, login: keyof typeof sv.people.login = "none") =>
   [sv.people[role], sv.people.login[login], ...(shares ? [] : [sv.people.noShare])].join(" · ");
+
+/** AI-99: which text the AI card in the settings shows: the account is not allowed AI, the instance has no service, or the switches. */
+export function aiCardKind(s: { aiService: boolean; aiAccount?: false }): "account" | "service" | "full" {
+  return s.aiAccount === false ? "account" : s.aiService ? "full" : "service";
+}

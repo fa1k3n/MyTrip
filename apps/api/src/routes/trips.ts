@@ -37,7 +37,8 @@ export function tripRoutes(app: Hono<Env>, k: Ctx) {
   });
   app.get("/api/settings", async (c) => { // AI-08; US-16: the AI service only for users allowed it
     const u = c.get("user");
-    return c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService && (!u || u.superuser || u.ai) });
+    const allowed = !u || u.superuser || u.ai;
+    return c.json({ ...(await store.loadSettings()), aiService: !!opts.aiService && allowed, ...(opts.aiService && !allowed ? { aiAccount: false } : {}) }); // AI-99: the account, not the instance, lacks AI
   });
   app.put("/api/settings", async (c) => {
     if (!need(c, "admin")) return c.json({ error: "forbidden" }, 403); // AI-09

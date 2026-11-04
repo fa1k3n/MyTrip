@@ -283,7 +283,7 @@ export const api = {
   traffic: (tripId: string, dayId: string) => call<Traffic>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/traffic`),
   transit: (tripId: string, dayId: string, aid: string, from?: { lat: number; lng: number }) => // TR-23; from: the phone's position
     call<TransitAnswer>(`${trip(tripId)}/days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(aid)}/transit${from ? `?from=${from.lat.toFixed(5)},${from.lng.toFixed(5)}` : ""}`),
-  settings: () => call<Settings & { aiService: boolean }>("/api/settings"),
+  settings: () => call<Settings & { aiService: boolean; aiAccount?: false }>("/api/settings"),
   saveSettings: (s: Settings) => call<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
   // BK-09, BK-10: ticket files go up and come down as they are, with the link's credentials.
   uploadFile: async (tripId: string, blob: Blob, name: string) => {

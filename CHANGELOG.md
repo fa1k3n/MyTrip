@@ -2,6 +2,14 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.3.2 – 2026-11-04
+
+Dependency updates; nothing new to see in the app.
+
+### Internal
+- zod 4 for the trip schema, the API validation and the MCP server; @hono/node-server 2 for the local server; vite 6 for the web build. `npm audit` finds no known vulnerabilities (DP-20).
+- CI runs `npm audit --omit=dev --audit-level=high` and fails on a high or critical advisory in a runtime dependency (DP-20).
+
 ## 0.3.1 – 2026-11-04
 
 Privacy and security.

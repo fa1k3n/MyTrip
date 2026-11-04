@@ -8,10 +8,10 @@ export type AiArea = (typeof AI_AREAS)[number];
 export const Settings = z.object({
   ai: z.object({
     enabled: z.boolean().default(false),
-    areas: z.record(z.enum(AI_AREAS), z.boolean()).default({}),
+    areas: z.partialRecord(z.enum(AI_AREAS), z.boolean()).default({}),
     capUsd: z.number().nonnegative().optional(), // the monthly cap for the instance; missing: CAP_USD (AI-03)
     capAccountUsd: z.number().nonnegative().optional(), // the monthly cap per person; missing: CAP_ACCOUNT_USD
-  }).default({}),
+  }).prefault({}), // prefault: a missing ai is parsed as {}, so its fields get their defaults (zod 4)
 });
 export type Settings = z.infer<typeof Settings>;
 /** The spending caps per month in USD when none is set (AI-03). */

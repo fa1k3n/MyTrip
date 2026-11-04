@@ -8,6 +8,9 @@ export type User = {
   invitedBy?: string; // the account that invited it from a trip (US-30)
   sessions?: number; // the session generation: a new password moves it, so older sessions stop working (US-35)
   resets?: string[]; // when password links were mailed for a forgotten password, the last day kept (US-35)
+  totp?: { secret: string; used?: number }; // the superuser's second factor and the last time step it accepted (SP-13)
+  totpPending?: string; // a secret shown for setup, until its first code is given (SP-13)
+  recovery?: string[]; // hashes of the unused recovery codes (SP-13)
 };
 /** The Google OAuth client of the instance (US-10). */
 export type Google = { clientId: string; clientSecret: string };
@@ -44,8 +47,59 @@ export async function checkPassword(password: string, stored: string) {
 }
 export const sha256 = async (s: string) => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s))));
 
-/** What the superuser's list shows of an account: never a hash (US-02). */
-export const publicUser = ({ passwordHash, googleId, setup: _s, ...u }: User) => ({ ...u, password: !!passwordHash, google: !!googleId });
+/** What the superuser's list shows of an account: never a hash or a second factor's secret (US-02, SP-13). */
+export const publicUser = ({ passwordHash, googleId, setup: _s, totp: _t, totpPending: _p, recovery: _r, ...u }: User) => ({ ...u, password: !!passwordHash, google: !!googleId });
+
+// SP-13: the superuser's second factor, a time-based one-time code (RFC 6238: HMAC-SHA1, 30 seconds, 6 digits) and recovery codes.
+export const TOTP_STEP_MS = 30_000, RECOVERY_CODES = 10;
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function base32(b: Uint8Array) {
+  let bits = 0, n = 0, out = "";
+  for (const x of b) { n = (n << 8) | x; bits += 8; while (bits >= 5) { out += B32[(n >>> (bits - 5)) & 31]; bits -= 5; } }
+  return bits ? out + B32[(n << (5 - bits)) & 31] : out;
+}
+function unbase32(s: string) {
+  let bits = 0, n = 0;
+  const out: number[] = [];
+  for (const ch of s.toUpperCase().replace(/[\s=]/g, "")) {
+    const v = B32.indexOf(ch);
+    if (v < 0) return undefined;
+    n = ((n << 5) | v) & 0xffff; bits += 5;
+    if (bits >= 8) { out.push((n >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return new Uint8Array(out);
+}
+/** A new secret for an authenticator app: 160 random bits in base32 (RFC 4226 recommends 160). */
+export const newTotpSecret = () => base32(crypto.getRandomValues(new Uint8Array(20)));
+/** The code of one time step. */
+export async function totpCode(secret: string, step: number) {
+  const raw = unbase32(secret);
+  if (!raw) return "";
+  const key = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const msg = new DataView(new ArrayBuffer(8));
+  msg.setUint32(0, Math.floor(step / 2 ** 32)); msg.setUint32(4, step >>> 0);
+  const h = new Uint8Array(await crypto.subtle.sign("HMAC", key, msg.buffer)), o = h[19]! & 15;
+  const n = ((h[o]! & 0x7f) << 24) | (h[o + 1]! << 16) | (h[o + 2]! << 8) | h[o + 3]!;
+  return String(n % 1_000_000).padStart(6, "0");
+}
+/** The step a code matches, one step either side for a clock that drifts, and only after the last used step so a code works
+ * once; undefined when it does not match. */
+export async function checkTotp(secret: string, code: string, now: number, used = -1) {
+  if (!/^\d{6}$/.test(code)) return undefined;
+  const at = Math.floor(now / TOTP_STEP_MS);
+  for (const s of [at - 1, at, at + 1]) if (s > used && same6(await totpCode(secret, s), code)) return s;
+  return undefined;
+}
+const same6 = (a: string, b: string) => { let d = a.length ^ b.length; for (let i = 0; i < Math.min(a.length, b.length); i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+/** The link an authenticator app reads from a QR code. */
+export const otpauthUri = (secret: string, email: string, issuer: string) =>
+  `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?${new URLSearchParams({ secret, issuer, algorithm: "SHA1", digits: "6", period: "30" })}`;
+/** Recovery codes as `xxxxx-xxxxx` (50 random bits each), and how a typed one is compared: lower case, no spaces or dash. */
+export const newRecoveryCodes = () => Array.from({ length: RECOVERY_CODES }, () => {
+  const s = base32(crypto.getRandomValues(new Uint8Array(7))).slice(0, 10).toLowerCase();
+  return `${s.slice(0, 5)}-${s.slice(5)}`;
+});
+export const normRecovery = (s: string) => s.toLowerCase().replace(/[\s-]/g, "");
 
 /** The first superuser, who owns what no one else does and whom the admin password acts as (US-13, US-18). */
 export const firstSuper = (users: User[]) =>

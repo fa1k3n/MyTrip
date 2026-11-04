@@ -59,7 +59,7 @@ const appFor = (env: WorkerEnv) => {
     const tokens = { read: env.TRIP_READ_TOKEN ?? "", propose: env.TRIP_PROPOSE_TOKEN ?? "", admin: env.TRIP_ADMIN_TOKEN ?? "" };
     app = createApp(d1Store(env.DB, env.IMAGES), tokens, {
       aiService: !!aiOf(env), ...(aiOf(env) ? { ai: { call: aiOf(env)! } } : {}), routesKey: env.ROUTES_API_KEY, trafficThresholdMin: Number(env.TRAFFIC_DELAY_MIN ?? 10),
-      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY, google: googleOf(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET) }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN, mail: mailOf(env),
+      auth: { adminPassword: env.ADMIN_PASSWORD, sessionKey: env.SESSION_KEY, google: googleOf(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET), secondFactor: true /* SP-13 */ }, vapidKey: env.VAPID_KEY, inboxDomain: env.INBOX_DOMAIN, mail: mailOf(env),
       onChange: env.AI_CLOCK ? async (id) => { // AI-69: move the trip's timer
         const ns = env.AI_CLOCK!;
         await ns.get(ns.idFromName(id)).fetch(`https://clock/${encodeURIComponent(id)}`, { method: "POST" });

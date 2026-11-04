@@ -18,7 +18,7 @@ const store = fileStore(dir);
 const trafficThresholdMin = Number(process.env.TRAFFIC_DELAY_MIN ?? 10);
 // ADMIN_PASSWORD and SESSION_KEY turn on the admin login (AU-04); without them the dev token is the only admin access.
 // GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET turn on Google login for accounts (US-10).
-const auth = { adminPassword: process.env.ADMIN_PASSWORD, sessionKey: process.env.SESSION_KEY, google: googleOf(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET) };
+const auth = { adminPassword: process.env.ADMIN_PASSWORD, sessionKey: process.env.SESSION_KEY, google: googleOf(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET), secondFactor: true }; // SP-13
 // AI-73: through Cloudflare AI Gateway when AI_GATEWAY_URL and AI_GATEWAY_TOKEN are set, else with AI_API_KEY.
 const ai = process.env.AI_GATEWAY_URL && process.env.AI_GATEWAY_TOKEN ? anthropicCall({ gateway: { url: process.env.AI_GATEWAY_URL, token: process.env.AI_GATEWAY_TOKEN } })
   : process.env.AI_API_KEY ? anthropicCall({ apiKey: process.env.AI_API_KEY }) : undefined;

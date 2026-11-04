@@ -205,6 +205,8 @@ export type PersonLinkInfo = { travelerId: string; role: "traveler" | "planner";
 /** An account as the superuser's list shows it (US-02). */
 export type UserInfo = { id: string; name: string; email: string; superuser: boolean; disabled: boolean; ai: boolean; createdAt: string; lastLogin?: string; password: boolean; google: boolean };
 export type SetupLink = { secret: string; expires: string }; // US-04
+/** A superuser's first factor was right: the code comes next, or setting it up the first time (SP-13). */
+export type SecondStep = { second?: "code" | "enroll" };
 export type FeedbackNote = { id: string; at: string; name: string; text: string; page: string; tripId?: string; reply?: string; replyAt?: string; version?: string }; // US-27, US-34, US-38
 export type MyNote = { id: string; at: string; text: string; page: string; reply?: string; replyAt?: string }; // US-34
 export type TripUsage = { tripId: string; title: string; owner: string; from?: string; to?: string; memories: number;
@@ -227,11 +229,13 @@ async function aiCall<T>(path: string, body: BodyInit, type: string): Promise<Ai
 
 export const api = {
   me: () => kept<Me>("me", "/api/me"),
-  login: (password: string, email = "") => call<void>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
+  login: (password: string, email = "") => call<SecondStep | undefined>("/api/login", { method: "POST", body: JSON.stringify(email.trim() ? { email, password } : { password }) }), // US-07; no address: the admin password (US-18)
+  loginCode: (code: string) => call<{ left?: number; recovery?: string[] } | undefined>("/api/login/code", { method: "POST", body: JSON.stringify({ code }) }), // SP-13
+  loginEnroll: () => call<{ secret: string; uri: string }>("/api/login/enroll", { method: "POST" }), // SP-13
   authConfig: () => call<{ google: boolean; reset?: boolean }>("/api/auth/config"), // US-10, US-35
   reset: (email: string) => call<{ sent: true }>("/api/reset", { method: "POST", body: JSON.stringify({ email }) }), // US-35
   setupInfo: (user: string, secret: string) => call<{ name: string; email: string }>("/api/setup/info", { method: "POST", body: JSON.stringify({ user, secret }) }), // US-05
-  setup: (user: string, secret: string, password: string, consent = false) => call<void>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password, consent }) }),
+  setup: (user: string, secret: string, password: string, consent = false) => call<SecondStep | undefined>("/api/setup", { method: "POST", body: JSON.stringify({ user, secret, password, consent }) }),
   consent: () => call<void>("/api/consent", { method: "POST" }), // US-26
   feedback: (text: string, page: string, tripId?: string, version?: string) => call<void>("/api/feedback", { method: "POST", body: JSON.stringify({ text, page, tripId, version }) }), // US-27, US-38
   notes: () => call<FeedbackNote[]>("/api/feedback"),

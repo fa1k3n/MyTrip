@@ -11,6 +11,7 @@ import { bookingRoutes } from "./routes/bookings.ts";
 import { dreamRoutes } from "./routes/dreams.ts";
 import { aiRoutes } from "./routes/ai.ts";
 import { securityHeaders } from "./security-headers.ts";
+import { firstSuper } from "./users.ts";
 
 // Callers import the store, its types and the helpers from here as before.
 export * from "./routes/shared.ts";
@@ -29,11 +30,14 @@ export function createApp(store: Store, tokens: Tokens, opts: AppOpts = {}) {
   app.use("/api/*", async (c, next) => {
     if (sessionKey) {
       const v = await getSignedCookie(c, sessionKey, "session");
-      const [kind, a, b, gen] = v ? v.split(".") : [];
-      if (kind === "admin" && Number(a) * 1000 > Date.now()) { c.set("role", "admin"); return next(); }
+      const [kind, a, b, gen, mark] = v ? v.split(".") : [];
+      // SP-13: with the second step on, a superuser's session counts only when it was made with it (marked "2"); the admin password's
+      // own session without it only while there is no superuser account yet.
+      const twoStep = !!opts.auth?.secondFactor;
+      if (kind === "admin" && Number(a) * 1000 > Date.now() && (!twoStep || b === "2" || !firstSuper(await store.users()))) { c.set("role", "admin"); return next(); }
       if (kind === "user" && Number(b) * 1000 > Date.now()) {
         const u = (await store.users()).find((x) => x.id === a); // checked on every request, so a disabled account is out at once
-        if (u && !u.disabled && Number(gen ?? 0) === (u.sessions ?? 0)) { c.set("user", u); c.set("role", u.superuser ? "admin" : "account"); return next(); }
+        if (u && !u.disabled && Number(gen ?? 0) === (u.sessions ?? 0) && (!twoStep || !u.superuser || mark === "2")) { c.set("user", u); c.set("role", u.superuser ? "admin" : "account"); return next(); }
       }
     }
     const t = (c.req.header("authorization") ?? "").replace(/^Bearer /, "");

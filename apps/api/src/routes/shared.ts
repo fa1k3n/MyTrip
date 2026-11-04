@@ -90,8 +90,9 @@ export type CacheEntry = { key: string; at: string; found?: { file: string; page
 /** The form of a ticket file id; checked before any store uses it. */
 export const isFileId = (id: string) => /^[a-z0-9]{16,40}$/.test(id);
 export type Tokens = { read: string; propose: string; admin: string };
-/** Admin login (AU-04): off when no password is set. The session key signs the cookie. */
-export type Auth = { adminPassword?: string; sessionKey?: string; google?: Google };
+/** Admin login (AU-04): off when no password is set. The session key signs the cookie. secondFactor: a superuser logs in with a
+ * second step (SP-13); the Worker and the Node server turn it on, createApp alone leaves it off. */
+export type Auth = { adminPassword?: string; sessionKey?: string; google?: Google; secondFactor?: boolean };
 /** owner: a user on a trip they own (US-14); account: a user without the superuser flag, before a trip is chosen. */
 export type Role = "read" | "propose" | "admin" | "link" | "traveler" | "planner" | "owner" | "account";
 export const rank: Record<Role, number> = { link: 1, read: 1, traveler: 1, account: 1, propose: 2, planner: 2, owner: 2, admin: 3 };

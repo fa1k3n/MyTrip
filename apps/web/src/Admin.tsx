@@ -9,6 +9,7 @@ import { money } from "./budget.ts";
 import { sharesOps } from "./money.ts";
 import { AiMark, Icon, IconButton } from "./Icons.tsx";
 import { QrDialog } from "./QrDialog.tsx";
+import { qr, qrSvgPath } from "./qr.ts";
 import { Switch, TripAi } from "./Settings.tsx";
 import type { EditDlg } from "./editKinds.ts";
 import type { Run } from "./TripView.tsx";
@@ -25,25 +26,34 @@ const googleAnswer = (() => {
   history.replaceState(null, "", location.pathname + location.search);
   return h === "#login=nokonto" ? sv.login.noAccount : sv.login.googleFailed;
 })();
+/** SP-13: Google was right for a superuser, so the second step comes next. Read once and cleared. */
+const googleSecond = (() => {
+  const h = location.hash;
+  if (h !== "#login=kod" && h !== "#login=ny") return undefined;
+  history.replaceState(null, "", location.pathname + location.search);
+  return h === "#login=kod" ? "code" as const : "enroll" as const;
+})();
 
 /** AU-04, AU-07, US-07..US-10, US-19: the login with address and password or Google, also shown when a link is missing or no longer
- * valid. Without an address, the password is the admin password (US-18). */
+ * valid. Without an address, the password is the admin password (US-18). A superuser then gives the second step (SP-13). */
 export function Login({ expired, onDone }: { expired: boolean; onDone: () => void }) {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [err, setErr] = useState(googleAnswer), [busy, setBusy] = useState(false);
   const [google, setGoogle] = useState(false), [reset, setReset] = useState(false);
+  const [second, setSecond] = useState(googleSecond);
   useEffect(() => { api.authConfig().then((c) => { setGoogle(c.google); setReset(!!c.reset); }, () => {}); }, []);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.login(pw, email);
-      onDone();
+      const r = await api.login(pw, email);
+      if (r?.second) { setSecond(r.second); setPw(""); } else onDone();
     } catch (x) {
       const s = x instanceof ApiError ? x.status : 0;
-      setErr(s === 401 ? sv.login.wrong : s === 429 ? sv.login.tooMany : s === 404 ? sv.login.off : sv.error);
+      setErr(s === 401 ? sv.login.wrong : s === 429 ? sv.login.tooMany : s === 404 ? sv.login.off : s === 403 ? svAdmin.second.accountFirst : sv.error);
     }
     setBusy(false);
   };
+  if (second) return <SecondFactor first={second === "enroll"} onDone={onDone} restart={() => { setSecond(undefined); setErr(""); }} />;
   return <>
     <div className="top"><div className="logo">{sv.hub}</div></div>
     <h1>{sv.login.title}</h1>
@@ -60,6 +70,61 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
     {installed && <PasteLink />}
     <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a></p> {/* UI-13 */}
   </>;
+}
+
+/** SP-13: the superuser's second step: the code from the authenticator app or a recovery code. The first time it is set up: a QR code
+ * (drawn here, so the secret never leaves the device), a link that opens the app on a phone, the key to type, then the recovery codes. */
+function SecondFactor({ first, onDone, restart }: { first: boolean; onDone: () => void; restart: () => void }) {
+  const t = svAdmin.second;
+  const [setup, setSetup] = useState<{ secret: string; uri: string }>(), [code, setCode] = useState(""), [byRecovery, setByRecovery] = useState(false);
+  const [err, setErr] = useState(""), [busy, setBusy] = useState(false), [codes, setCodes] = useState<string[]>(), [left, setLeft] = useState<number>(), [copied, setCopied] = useState(false);
+  useEffect(() => { if (first) api.loginEnroll().then(setSetup, () => setErr(t.wrong)); }, [first, t]);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api.loginCode(code);
+      if (r?.recovery) setCodes(r.recovery); else if (r?.left !== undefined) setLeft(r.left); else onDone();
+    } catch (x) {
+      const s = x instanceof ApiError ? x.status : 0;
+      setErr(s === 401 ? t.wrong : s === 429 ? sv.login.tooMany : sv.error);
+      setCode("");
+    }
+    setBusy(false);
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(codes!.join("\n")); setCopied(true); } catch { /* the codes stay on screen */ } };
+  const top = <div className="top"><div className="logo">{sv.hub}</div></div>;
+  if (codes) return <>{top}<h1>{t.savedTitle}</h1>
+    <div className="card">
+      <p className="ro">{t.savedLead}</p>
+      <pre aria-label={t.savedTitle}>{codes.join("\n")}</pre>
+      <button type="button" className="btn ghost" onClick={copy}>{t.copy}</button>
+      {copied && <p className="ro note" role="status">{t.copied}</p>}
+      <button type="button" className="btn" onClick={onDone}>{t.done}</button>
+    </div></>;
+  if (left !== undefined) return <>{top}<h1>{t.title}</h1>
+    <div className="card"><p className="ro" role="status">{t.left(left)}</p><button type="button" className="btn" onClick={onDone} autoFocus>{t.next}</button></div></>;
+  const qrPath = setup && qrSvgPath(qr(setup.uri));
+  return <>{top}<h1>{first ? t.setupTitle : t.title}</h1>
+    <form className="card" onSubmit={submit}>
+      {first && <>
+        <p className="ro">{t.setupLead}</p>
+        {setup && qrPath && <>
+          <svg className="qr" viewBox={`0 0 ${qrPath.box} ${qrPath.box}`} role="img" aria-label={t.qr} shapeRendering="crispEdges"><rect width={qrPath.box} height={qrPath.box} className="qrbg" /><path d={qrPath.path} /></svg>
+          <p className="ro"><a className="place" href={setup.uri}>{t.openApp}</a></p>
+          <p className="ro note">{t.manual} <code>{setup.secret.replace(/(.{4})(?=.)/g, "$1 ")}</code></p>
+        </>}
+      </>}
+      {!first && <p className="ro">{byRecovery ? t.useRecovery : t.ask}</p>}
+      <label>{byRecovery ? t.recoveryCode : t.code}
+        <input key={String(byRecovery)} inputMode={byRecovery ? "text" : "numeric"} autoComplete={byRecovery ? "off" : "one-time-code"} autoCapitalize="none"
+          value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }} autoFocus maxLength={byRecovery ? 16 : 8} />
+      </label>
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn" type="submit" disabled={busy || !code.trim() || (first && !setup)}>{first ? t.confirm : t.submit}</button>
+      {!first && <p className="ro"><button type="button" className="place" onClick={() => { setByRecovery(!byRecovery); setCode(""); setErr(""); }}>{byRecovery ? t.useCode : t.useRecovery}</button></p>}
+      <p className="ro"><button type="button" className="place" onClick={restart}>{t.restart}</button></p>
+    </form></>;
 }
 
 /** US-35: a forgotten password: a mailed password link when the server has a mail service, else how to get in again: a new link from
@@ -117,14 +182,17 @@ export function ConsentPage({ onDone, logout }: { onDone: () => void; logout: ()
 export function SetupPassword({ user, secret, onDone }: { user: string; secret: string; onDone: () => void }) {
   const [who, setWho] = useState<{ name: string; email: string } | null | undefined>(undefined);
   const [pw, setPw] = useState(""), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [ok, setOk] = useState(false);
+  const [second, setSecond] = useState<"code" | "enroll">(); // SP-13
   useEffect(() => { api.setupInfo(user, secret).then(setWho, () => setWho(null)); }, [user, secret]);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if ([...pw].length < 10) { setErr(sv.login.setShort); return; }
     setBusy(true);
-    try { await api.setup(user, secret, pw, ok); onDone(); } catch (x) { setErr(x instanceof ApiError && x.status === 410 ? sv.login.setGone : sv.error); }
+    try { const r = await api.setup(user, secret, pw, ok); if (r?.second) setSecond(r.second); else onDone(); } catch (x) { setErr(x instanceof ApiError && x.status === 410 ? sv.login.setGone : sv.error); }
     setBusy(false);
   };
+  // The link is used up once the password is set; starting over is the login page.
+  if (second) return <SecondFactor first={second === "enroll"} onDone={onDone} restart={() => { location.hash = "#login"; location.reload(); }} />;
   return <>
     <div className="top"><div className="logo">{sv.hub}</div></div>
     <h1>{sv.login.setTitle}</h1>

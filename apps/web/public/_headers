@@ -1,0 +1,8 @@
+# Written by apps/web/headers.ts (SP-12); do not edit by hand.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-tndUuhOBpQBKEI+058JJM4mur6062+arcLSI8nN//e4=' 'sha256-csYmfZ/bbdg+X9IlRe6XoObgYzV5Ihb4XdThyjuqSo0=' 'sha256-GX9R0hEHei044liCfVQx6J01EAFn5rW1UWXbRE3dSl8=' 'sha256-RUuUtTB2ShMP/spADBwxBz/d1PUZpuuPPT+PEC/X+hY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.frankfurter.dev; frame-src https://maps.google.com https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), geolocation=(self), microphone=(), payment=(), usb=()

@@ -7,7 +7,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** The pages of a PDF as PNG images `width` pixels wide; at most 10 pages. */
 export async function pdfPages(blob: Blob, width: number): Promise<string[]> {
-  const doc = await getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+  const doc = await getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise; // SP-12: the CSP allows no eval
   const out: string[] = [];
   try {
     for (let i = 1; i <= Math.min(doc.numPages, 10); i++) {

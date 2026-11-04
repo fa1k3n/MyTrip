@@ -10,6 +10,7 @@ import { miscRoutes } from "./routes/misc.ts";
 import { bookingRoutes } from "./routes/bookings.ts";
 import { dreamRoutes } from "./routes/dreams.ts";
 import { aiRoutes } from "./routes/ai.ts";
+import { securityHeaders } from "./security-headers.ts";
 
 // Callers import the store, its types and the helpers from here as before.
 export * from "./routes/shared.ts";
@@ -21,6 +22,7 @@ export function createApp(store: Store, tokens: Tokens, opts: AppOpts = {}) {
   const app = new Hono<Env>();
   const k = makeCtx(store, tokens, opts);
   const { sessionKey, membersOf, scoped } = k;
+  app.use("*", securityHeaders); // SP-12: first, so it covers every route
   authRoutes(app, k);
 
   // Who is calling: an admin or account session, an MCP token, the common share link or a personal link (AU-01, AU-04, AU-09, AU-11, US-11).

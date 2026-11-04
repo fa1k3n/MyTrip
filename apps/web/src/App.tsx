@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Op, Settings, Trip } from "@trip/schema";
 import { api, ApiError, askedForAdmin, chooseLink, copy, deviceLinks, forgetDeviceAccount, forgetLink, installed, linkKey, needsChoice, isOffline, offlineState, onOffline, queue, sendVerdicts, sendWaiting, verdictQueue, type AiAdded, type Me } from "./api.ts";
 import { noAnswer, dequeue, enqueue, keptForecast, offlineText, retry, sendTrip, waitingFor, withVerdicts, withWaiting, type Expense, type Waiting } from "./offline.ts";
-import { APP_VERSION, NEWS_KEY, usedBefore, whatsNewFor } from "./version.ts";
+import { APP_VERSION, NEWS_KEY, NEWS_PAGE, usedBefore, whatsNewFor } from "./version.ts";
 import { ABOUT_PAGE, isTestInstance, forInstalled, freshAgain, installedTab, landsOnAbout, needsConsent, needsFullApp, parseSetupHash, permsFor, roleIn, safariUrl, seenKey, showInstallHint, whoChip } from "./access.ts";
 import { applyOps } from "@trip/schema/src/ops.ts";
 import { canUndo, undoOps, UNDOABLE } from "./undo.ts";
@@ -31,6 +31,7 @@ const AppAdmin = lazy(() => import("./Settings.tsx").then((m) => ({ default: m.A
 const AdminPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.AdminPage })));
 const Login = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.Login })));
 const WhatsNewDialog = lazy(() => import("./WhatsNew.tsx").then((m) => ({ default: m.WhatsNewDialog }))); // US-41
+const WhatsNewPage = lazy(() => import("./WhatsNew.tsx").then((m) => ({ default: m.WhatsNewPage }))); // US-43
 const ConsentPage = lazy(() => import("./Admin.tsx").then((m) => ({ default: m.ConsentPage }))); // US-26
 const FeedbackDialog = lazy(() => import("./Feedback.tsx").then((m) => ({ default: m.FeedbackDialog }))); // US-27
 const NewTripDialog = lazy(() => import("./NewTrip.tsx").then((m) => ({ default: m.NewTripDialog }))); // AI-10
@@ -520,6 +521,7 @@ export function App() {
     />
   );
 
+  if (location.hash === NEWS_PAGE.slice(1)) return <Suspense fallback={null}><WhatsNewPage /></Suspense>; // US-43: opened in its own tab
   return <>
     {isTestInstance(location.hostname) && <div className="testbanner" role="note">{sv.testInstance}</div>} {/* DP-12 */}
     <div className="wrap">{off && <div className="offline" role="status">{offlineText(off.at, new Date(), t?.timezone ?? "Europe/Stockholm")}</div>}

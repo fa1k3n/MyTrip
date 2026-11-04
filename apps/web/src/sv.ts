@@ -106,6 +106,7 @@ export const sv = {
   testInstance: "Testinstans", // DP-12: the banner on the test instance
   whatsNew: { // US-41: the news of a version, shown once per device
     title: (v: string) => `Nytt i Basläger ${v}`, more: "Allt som är nytt", ok: "Okej", open: "Nytt i den här versionen",
+    pageTitle: "Nytt i Basläger", changelog: "Hela ändringslistan på GitHub", back: "Till Basläger", // US-43: the page
     news: {
       "0.2.0": [
         "Egna konton: logga in med lösenord eller Google och bjud in de andra. Den som skapar en resa är dess Planerare.",

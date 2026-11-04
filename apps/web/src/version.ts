@@ -11,6 +11,8 @@ export const APP_FULL_VERSION = fullVersion(APP_VERSION, APP_BUILD);
 
 /** US-41: the changelog with all that is new, in the public repository. */
 export const CHANGELOG_URL = "https://github.com/fa1k3n/MyTrip/blob/main/CHANGELOG.md";
+/** US-43: the page "Nytt i Basläger" with the news of every version, opened from the dialog's link in a new tab. */
+export const NEWS_PAGE = "/#nytt";
 /** The device's last version whose news was shown (US-41). */
 export const NEWS_KEY = "mytrip.newsSeen";
 /** Whether version a comes after version b, number by number. */
@@ -18,6 +20,10 @@ export function laterVersion(a: string, b: string) {
   const x = a.split(".").map(Number), y = b.split(".").map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
   return false;
+}
+/** US-43: the versions with news, newest first. */
+export function newsVersions(news: Record<string, readonly string[]>) {
+  return Object.keys(news).filter((v) => news[v]!.length).sort((a, b) => (laterVersion(a, b) ? -1 : laterVersion(b, a) ? 1 : 0));
 }
 /** US-41: the version whose news to show: on a device that used the app before, once, when news is written for it. */
 export function whatsNewFor(version: string, seen: string | null, usedBefore: boolean, news: Record<string, readonly string[]> = sv.whatsNew.news) {

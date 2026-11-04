@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHANGELOG_URL, laterVersion, whatsNewFor } from "../src/version.ts";
+import { readFileSync } from "node:fs";
+import { CHANGELOG_URL, NEWS_PAGE, laterVersion, newsVersions, whatsNewFor } from "../src/version.ts";
 import { sv } from "../src/sv.ts";
+
+const newsSource = readFileSync(new URL("../src/WhatsNew.tsx", import.meta.url), "utf8");
 
 // REQ: US-41 a new version is shown once per device that used an earlier one, with its main news and a link to the changelog
 test("US-41 when the news of a version is shown", () => {
@@ -21,4 +24,19 @@ test("US-41 the news of 0.2.0", () => {
   assert.ok(news.length >= 3 && news.length <= 7);
   assert.equal(sv.whatsNew.title("0.2.0"), "Nytt i Basläger 0.2.0");
   assert.match(CHANGELOG_URL, /^https:\/\/github\.com\/fa1k3n\/MyTrip\/blob\/main\/CHANGELOG\.md$/);
+});
+
+// REQ: US-43 the page lists the news of every version, newest first
+test("US-43 the news page lists every version with news, newest first", () => {
+  assert.deepEqual(newsVersions({ "0.2.0": ["a"], "0.10.0": ["b"], "0.9.1": ["c"], "0.3.0": [] }), ["0.10.0", "0.9.1", "0.2.0"]);
+  assert.deepEqual(newsVersions(sv.whatsNew.news), Object.keys(sv.whatsNew.news).sort((a, b) => (laterVersion(a, b) ? -1 : 1)));
+  assert.ok(Object.keys(sv.whatsNew.news).includes("0.2.0"));
+});
+
+// REQ: US-43 the dialog's link opens the news page, not GitHub
+test("US-43 the link of the dialog opens the news page", () => {
+  assert.equal(NEWS_PAGE, "/#nytt");
+  assert.match(newsSource, /href=\{NEWS_PAGE\}/);
+  assert.equal(sv.whatsNew.pageTitle, "Nytt i Basläger");
+  assert.match(newsSource, /href=\{CHANGELOG_URL\}/, "the page links to the changelog");
 });

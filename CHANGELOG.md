@@ -2,6 +2,23 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.3.1 – 2026-11-04
+
+Privacy and security.
+
+### Added
+- A privacy policy in plain Swedish, linked from the login, the beta notice and the settings (SP-09).
+- A second factor (code from an authenticator app, with recovery codes) for the superuser (SP-13).
+- Security headers and a content security policy on every page and API answer (SP-12).
+- SECURITY.md, `security.txt` and a software bill of materials (SBOM) attached to each release (DP-22).
+
+### Fixed
+- An account without AI sees one line that AI is not switched on for the account, instead of a text about a missing service and switches it cannot change (AI-99).
+- The login limit holds across server instances (SP-11).
+
+### Internal
+- Dependabot for npm and actions; CI actions are pinned to commit SHAs (DP-20).
+
 ## 0.3.0 – 2026-11-04
 
 Uppleva on the phone, "Kör nu" where the work is, and clearer warnings.

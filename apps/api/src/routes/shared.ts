@@ -80,6 +80,10 @@ export interface Store {
   saveAiUse(u: AiUse): Promise<void>;
   aiHelper(tripId: string, name: string): Promise<AiHelperState | undefined>;
   saveAiHelper(tripId: string, name: string, s: AiHelperState): Promise<void>;
+  /** Failed logins by key (an address or an account), as epoch milliseconds, so the limit holds across instances (SP-11). */
+  failCount(key: string, since: number): Promise<number>;
+  addFail(key: string, at: number): Promise<void>;
+  clearFails(key: string): Promise<void>;
 }
 /** A Commons lookup: the stored file with its credit and size, or nothing found (DB-11). */
 export type CacheEntry = { key: string; at: string; found?: { file: string; page: string; author?: string; licence: string; licenceUrl?: string; size: number } };
@@ -105,6 +109,7 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
   const cache = new Map<string, CacheEntry>();
   let users: User[] = [], owners: Record<string, string> = {}, notes: Feedback[] = [], seen: Usage[] = [], ais: AiUse[] = [];
   const helpers = new Map<string, AiHelperState>();
+  const fails = new Map<string, number[]>();
   const sameUse = (a: Usage, b: Usage) => a.tripId === b.tripId && a.who === b.who && a.tab === b.tab && a.day === b.day;
   return {
     feedback: async () => structuredClone(notes),
@@ -115,6 +120,9 @@ export function memoryStore(trips: unknown[] = [], images: Record<string, Uint8A
     saveAiUse: async (u) => { ais = [...ais, { ...u }]; },
     aiHelper: async (tripId, name) => structuredClone(helpers.get(`${tripId}/${name}`)),
     saveAiHelper: async (tripId, name, x) => void helpers.set(`${tripId}/${name}`, structuredClone(x)),
+    failCount: async (key, since) => (fails.get(key) ?? []).filter((at) => at > since).length, // SP-11
+    addFail: async (key, at) => void fails.set(key, [...(fails.get(key) ?? []), at]),
+    clearFails: async (key) => void fails.delete(key),
     users: async () => structuredClone(users).sort((a, b) => a.id.localeCompare(b.id)),
     saveUser: async (u) => { users = [...users.filter((x) => x.id !== u.id), structuredClone(u)]; },
     removeUser: async (id) => { users = users.filter((x) => x.id !== id); },

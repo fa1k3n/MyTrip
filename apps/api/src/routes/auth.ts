@@ -9,14 +9,10 @@ import type { Ctx } from "./ctx.ts";
 
 export function authRoutes(app: Hono<Env>, k: Ctx) {
   const { store, opts, adminPassword, sessionKey, google, clock, later } = k;
-  const fails = new Map<string, { n: number; since: number }>(); // per address and per account, in memory (AU-05, US-08)
+  // Failures are counted in the store, so every server instance sees them (AU-05, US-08, SP-11).
   const ipOf = (c: Context<Env>) => c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "local";
-  const blocked = (key: string) => {
-    const f = fails.get(key), now = Date.now();
-    if (f && now - f.since > FAIL_WINDOW_MS) fails.delete(key);
-    return (fails.get(key)?.n ?? 0) >= MAX_FAILS;
-  };
-  const failed = (key: string) => { const g = fails.get(key) ?? { n: 0, since: Date.now() }; fails.set(key, { ...g, n: g.n + 1 }); };
+  const blocked = async (key: string) => (await store.failCount(key, clock().getTime() - FAIL_WINDOW_MS)) >= MAX_FAILS;
+  const failed = (key: string) => store.addFail(key, clock().getTime());
   /** The session cookie: `admin.<exp>` for the admin password, `user.<id>.<exp>.<generation>` for an account (AU-04, US-11, US-35). */
   const startSession = async (c: Context<Env>, who: string | User, strict = true) => {
     const exp = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
@@ -32,22 +28,22 @@ export function authRoutes(app: Hono<Env>, k: Ctx) {
     if (typeof b.email === "string" && b.email.trim()) {
       if (!sessionKey) return c.json({ error: "login is off" }, 404);
       const email = normEmail(b.email), acct = `account:${email}`;
-      if (blocked(ip) || blocked(acct)) return c.json({ error: "too many attempts" }, 429);
+      if (await blocked(ip) || await blocked(acct)) return c.json({ error: "too many attempts" }, 429);
       const u = (await store.users()).find((x) => x.email === email && !x.disabled);
       const ok = !!u?.passwordHash && typeof b.password === "string" && await checkPassword(b.password, u.passwordHash);
-      if (!ok) { failed(ip); failed(acct); return c.json({ error: "wrong address or password" }, 401); } // the same answer either way (US-07)
-      fails.delete(ip); fails.delete(acct);
+      if (!ok) { await failed(ip); await failed(acct); return c.json({ error: "wrong address or password" }, 401); } // the same answer either way (US-07)
+      await store.clearFails(ip); await store.clearFails(acct);
       await loggedIn(u!);
       await startSession(c, u!);
       return c.body(null, 204);
     }
     if (!adminPassword || !sessionKey) return c.json({ error: "login is off" }, 404);
-    if (blocked(ip)) return c.json({ error: "too many attempts" }, 429);
+    if (await blocked(ip)) return c.json({ error: "too many attempts" }, 429);
     if (typeof b.password !== "string" || !same(b.password, adminPassword)) {
-      failed(ip);
+      await failed(ip);
       return c.json({ error: "wrong password" }, 401);
     }
-    fails.delete(ip);
+    await store.clearFails(ip);
     await startSession(c, "admin");
     return c.body(null, 204);
   });

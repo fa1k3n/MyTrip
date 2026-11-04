@@ -84,6 +84,9 @@ export function fileStore(dir: string): Store {
     removeImageCache: (keys) => serial(async () => writeJson("image-cache.json", (await readJson<CacheEntry[]>("image-cache.json", [])).filter((x) => !keys.includes(x.key)))),
     personLinks: () => readJson<PersonLink[]>("person-links.json", []),
     savePersonLinks: (l) => writeJson("person-links.json", l),
+    failCount: async (key, since) => ((await readJson<Record<string, number[]>>("login-fails.json", {}))[key] ?? []).filter((at) => at > since).length, // SP-11
+    addFail: (key, at) => serial(async () => { const all = await readJson<Record<string, number[]>>("login-fails.json", {}); await writeJson("login-fails.json", { ...all, [key]: [...(all[key] ?? []), at] }); }),
+    clearFails: (key) => serial(async () => { const { [key]: _gone, ...rest } = await readJson<Record<string, number[]>>("login-fails.json", {}); await writeJson("login-fails.json", rest); }),
     users: async () => (await readJson<User[]>("users.json", [])).sort((a, b) => a.id.localeCompare(b.id)), // US-01
     saveUser: (u) => serial(async () => writeJson("users.json", [...(await readJson<User[]>("users.json", [])).filter((x) => x.id !== u.id), u])),
     removeUser: (id) => serial(async () => writeJson("users.json", (await readJson<User[]>("users.json", [])).filter((x) => x.id !== id))),

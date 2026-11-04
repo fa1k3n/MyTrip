@@ -108,6 +108,17 @@ export function d1Store(db: D1Like, images?: R2Like): Store {
       await db.batch([db.prepare("DELETE FROM person_links"),
         ...l.map((x) => db.prepare("INSERT INTO person_links (trip_id, traveler_id, secret, role, account) VALUES (?, ?, ?, ?, ?)").bind(x.tripId, x.travelerId, x.secret, x.role, x.account ?? null))]);
     },
+    async failCount(key, since) { // SP-11
+      const r = await db.prepare("SELECT COUNT(*) AS n FROM login_fails WHERE key = ? AND at > ?").bind(key, since).first<{ n: number }>();
+      return r?.n ?? 0;
+    },
+    async addFail(key, at) {
+      await db.batch([db.prepare("DELETE FROM login_fails WHERE at < ?").bind(at - 86_400_000), // old rows are never counted again
+        db.prepare("INSERT INTO login_fails (key, at) VALUES (?, ?)").bind(key, at)]);
+    },
+    async clearFails(key) {
+      await db.prepare("DELETE FROM login_fails WHERE key = ?").bind(key).run();
+    },
     async users() { // US-01
       const { results } = await db.prepare("SELECT json FROM users ORDER BY id").all<{ json: string }>();
       return results.map((r) => JSON.parse(r.json) as User);

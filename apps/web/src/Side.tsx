@@ -272,7 +272,7 @@ function Packing({ t, run, part, tick, review }: { part: MayOf; t: Trip; run: Ru
 }
 
 /** Each section follows the role's level: hidden, read, check or change (AU-20, AU-21). */
-/** "Kontrollera resan": what the rules find in the plan, with a red or yellow triangle or a green check in the heading (DQ-08).
+/** "Kontrollera resan": what the rules find in the plan, with a red or yellow triangle or a green check in the heading (DQ-08). The card stays neutral; each row has its own level's tint (DQ-14).
  * A Planerare dismisses a warning with a reason and can take it back (DQ-11). */
 function TripCheck({ t, run }: { t: Trip; run: Run }) {
   const found = tripFindings(t), { active, dismissed } = splitDismissed(found, t.dismissed), level = checkLevel(active);
@@ -285,7 +285,7 @@ function TripCheck({ t, run }: { t: Trip; run: Run }) {
     setAsking(null); setWhy("");
   };
   return (
-    <Section title={sv.check.title} may flag={mark} tint={level === "ok" ? "" : level} id="sec-check">
+    <Section title={sv.check.title} may flag={mark} id="sec-check">
       {active.length ? <ul className="checks">{active.map((f) => <li key={f.text} className={f.level}>
         <Icon name="alert" /><span>{f.text}</span>
         <IconButton icon="close" look="bare" tip="left" label={sv.check.dismiss} pressed={asking === f.text} onClick={() => { setAsking(asking === f.text ? null : f.text); setWhy(""); }} />

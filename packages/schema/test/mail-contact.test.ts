@@ -25,3 +25,21 @@ test("BK-35 telephone and web page from the text", () => {
   assert.equal(readBooking({ subject: "x", html }, trip).website, undefined, "without a sender no link is taken");
   assert.equal(readBooking({ subject: "x", text: "Your phone: +46 70 123 45 67\nGuest telephone 0701234567" }, trip).phone, undefined);
 });
+
+// REQ: BK-40 the address of a stay from the text, after an address word on the same line or the next
+test("BK-40 address of a stay from the text", () => {
+  const stay = (t: string) => readBooking({ subject: "Bokningsbekräftelse – Hotell Kajen", text: `Incheckning: 2027-11-01 från kl. 15:00\nUtcheckning: 2027-11-03\n${t}` }, trip);
+  assert.equal(stay("Adress: Exempelgatan 12, 411 04 Göteborg").address, "Exempelgatan 12, 411 04 Göteborg");
+  assert.equal(stay("Adresse:\nBeispielkai 7, 20459 Hamburg\nTel.: 040 1").address, "Beispielkai 7, 20459 Hamburg");
+  assert.equal(stay("Anschrift: Beispielkai 7, 20459 Hamburg").address, "Beispielkai 7, 20459 Hamburg");
+  assert.equal(stay("Address: 5 Example Road, Brighton BN1 1AA").address, "5 Example Road, Brighton BN1 1AA");
+});
+test("BK-40 not the guest's own address or a footer's postal address", () => {
+  const t = "Incheckning: 2027-11-01\nUtcheckning: 2027-11-03\nIhre Adresse: Musterweg 1, 10115 Berlin\nYour address: 3 Sample St, London\nDin adress: Provgatan 4, 111 22 Stockholm\n-- \nPostadress: Box 12, 111 11 Stad\nPostal address: PO Box 9, 12345 Town\nE-postadress: info@x.example";
+  assert.equal(readBooking({ subject: "Bokningsbekräftelse", text: t }, trip).address, undefined);
+});
+test("BK-40 schema.org address still wins", () => {
+  const html = `<script type="application/ld+json">{ "@type": "LodgingReservation", "reservationNumber": "H-1", "reservationFor": { "@type": "LodgingBusiness", "name": "Hotel X",
+    "address": { "streetAddress": "Beispielkai 7", "postalCode": "20459", "addressLocality": "Hamburg" } } }</script>`;
+  assert.equal(readBooking({ subject: "Buchung", text: "Incheckning: 2027-11-01\nAdress: Annat 1, 111 11 Stad", html }, trip).address, "Beispielkai 7, 20459 Hamburg");
+});

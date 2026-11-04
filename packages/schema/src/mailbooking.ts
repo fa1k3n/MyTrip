@@ -131,6 +131,19 @@ function phone(text: string): string | undefined {
   for (const line of text.split("\n")) { const m = PHONE.exec(line); if (m && !GUEST.test(line)) return m[1]!.trim(); }
   return undefined;
 }
+/** The place's address after an address word, on the same line or the next, never the guest's own or a postal or mail address (BK-40). */
+const ADDRESS = /\b(?:adress|address|adresse|anschrift|dirección|direccion|indirizzo)\b[ \t]*:?[ \t]*(.*)$/i;
+const NOT_PLACE = /\b(?:ihre?|your|din|ditt|guest|gast|kund|customer|votre|su|billing|faktura|invoice|rechnung|e-?mail|mail|ip|postal|mailing|post|return)\b/i;
+function addressText(text: string): string | undefined {
+  const lines = text.split("\n").map((l) => l.trim());
+  for (let i = 0; i < lines.length; i++) {
+    const m = ADDRESS.exec(lines[i]!);
+    if (!m || NOT_PLACE.test(lines[i]!.slice(0, m.index + m[0].length - m[1]!.length))) continue;
+    const v = (m[1]!.trim() || lines.slice(i + 1).find((l) => l) || "").replace(/\s+/g, " ");
+    if (v.length >= 5 && v.length <= 120 && /\d/.test(v) && /\p{L}/u.test(v) && !/@/.test(v)) return v;
+  }
+  return undefined;
+}
 /** "hotel.example/de" as "https://hotel.example/de"; none when it is not a web address. */
 function site(s: string): string | undefined {
   try {
@@ -224,7 +237,7 @@ export function readBooking(mail: { subject?: string; text?: string; html?: stri
   const stay = k === "stay" || (!k && !!checkIn);
   const fromText = clean({
     kind: stay ? "stay" : k, name: (mail.subject ? subjectName(mail.subject, text) : undefined) ?? textName(text), reference: reference(text), price: price(text),
-    phone: phone(text), website: website(text, mail.html ?? "", mail.from), // BK-35
+    phone: phone(text), address: stay ? addressText(text) : undefined, website: website(text, mail.html ?? "", mail.from), // BK-35
     from: stay ? [...use].sort()[0] : use[0], to: stay ? [...use].sort().pop() : use[0],
     ...(stay ? { checkIn, checkOut: timeAfter(text, CHECK_OUT) } : k === "ticket" ? { start: timeAfter(text, START) }
       : k === "transport" ? transportText(text) : {}), // BK-38

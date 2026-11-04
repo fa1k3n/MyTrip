@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyOps, Trip } from "@trip/schema";
+import { applyOps, Trip, readBooking } from "@trip/schema";
 import { bookingForm, readingToForm, saveBooking } from "../src/edit.ts";
 
 const t = (places: object[] = []) => Trip.parse({
@@ -43,4 +43,15 @@ test("BK-36 saving the booking adds its place", () => {
 test("BK-36 an empty new place says what is missing", () => {
   const r = saveBooking(t(), { ...bookingForm(t()), name: "Testhotell", placeId: "__new" });
   assert.deepEqual(r, { ok: false, error: "Ange namn och adress för den nya platsen." });
+});
+
+// REQ: BK-40 a hotel mail with its address, telephone and web page only as text becomes a place with all three
+test("BK-40 a mail's text address makes the approved stay a place", () => {
+  const text = "Tack för din bokning hos Hotell Kajen (exempel)!\nBokningsnummer: HK-48213\nIncheckning: 2027-11-01 från kl. 15:00\nUtcheckning: 2027-11-03 senast kl. 11:00\n\nAdress: Exempelgatan 12, 411 04 Göteborg\nTelefon: 031-10 20 30\nWebbplats: hotellkajen.example.com\n";
+  const reading = readBooking({ subject: "Fwd: Bokningsbekräftelse – Hotell Kajen", text }, ["2027-11-01", "2027-11-03"]);
+  const f = readingToForm(bookingForm(t()), reading);
+  const r = saveBooking(t(), f);
+  assert.ok(r.ok);
+  const place = Trip.parse(applyOps(t(), r.ok ? r.ops : [])).places[0]!;
+  assert.deepEqual([place.address, place.phone, place.website], ["Exempelgatan 12, 411 04 Göteborg", "031-10 20 30", "https://hotellkajen.example.com"]);
 });

@@ -251,6 +251,7 @@ export const sv = {
       "Hjälpen körs av sig själv tio minuter efter att resans datum, platser, färdsätt, aktiviteter, resenärer eller syfte ändrats. Med Kör nu körs den direkt.",
       "Förslagen hamnar under Packlista i Nåla, ett per lista, märkta AI-förslag. Inget läggs till förrän du tar med det, och det som redan står på listan föreslås inte igen. Varje körning kostar en liten summa.",
     ] } as Record<string, string[]>,
+    where: { prep: "Kör nu finns på kortet Att göra i Nåla.", wishes: "Kör nu finns bland önskningarna i Önska.", packing: "Kör nu finns på kortet Packlista i Nåla." } as Record<string, string>, // AI-96
     runNow: (name: string) => `Kör nu: ${name}`, ran: (n: number) => (n ? `${n} nya förslag.` : "Inget nytt att föreslå."),
     never: "Har inte körts än", last: (when: string) => `Senast ${when}`, nothing: ", inget nytt", failed: (when: string) => `Misslyckades ${when}`,
     left: (n: number) => `ca ${n} ${n === 1 ? "körning" : "körningar"} kvar`, capped: "Taket för månaden är nått",

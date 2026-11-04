@@ -6,7 +6,7 @@ import { IconButton } from "./Icons.tsx";
 import { startAi } from "./aiStart.ts";
 import { InfoButton } from "./InfoButton.tsx";
 import { sv } from "./sv.ts";
-import { aiConsentLine, capValue, helperLine } from "./format.ts";
+import { aiConsentLine, capValue, helperLine, runNowWhere } from "./format.ts";
 import { ask } from "./Ask.tsx"; // UI-11
 import { Users } from "./Users.tsx";
 import { BetaNotes, BetaUsage } from "./Beta.tsx";
@@ -23,7 +23,7 @@ export function Switch({ id, label, tip, checked, disabled, onChange }: { id: st
 }
 
 /** AI on the trip in one card (AI-74): the trip's switch (AI-62), changed by the superuser, and under it the helpers for those who plan
- * the trip, each a switch with an "i", a "Kör nu" button, the latest run and the runs left (AI-68, AI-72); greyed while the trip's
+ * the trip, each a switch with an "i", the latest run and the runs left (AI-68, AI-72); greyed while the trip's
  * switch is off. Turning a helper on asks for the agreement first when the trip has none (AI-64). */
 export function TripAi({ t, superuser, change, reload, openSettings }: {
   t: Trip; superuser: boolean; change: (ops: Op[], reason: string) => void | Promise<unknown>; reload: () => void | Promise<unknown>; openSettings: () => void;
@@ -35,10 +35,10 @@ export function TripAi({ t, superuser, change, reload, openSettings }: {
   useEffect(() => { void refresh(); }, [t.id, t.revision]); // eslint-disable-line react-hooks/exhaustive-deps -- again after each change
   if (!st || (!st.enabled && !superuser)) return null; // AU-39: nothing to say to those who cannot turn AI on
   const shown = Object.entries(st.helpers).filter(([, h]) => h.available);
-  const runNow = async (name: string) => {
+  const startRun = async (name: string) => {
     setBusy(name); setMsg("");
     const r = await startAi(t.id, name);
-    if (r) setMsg("message" in r ? r.message : sv.aiRun.ran(r.proposalIds.length));
+    if (r) setMsg(`${"message" in r ? r.message : sv.aiRun.ran(r.proposalIds.length)} ${runNowWhere(name)}`.trim()); // AI-96
     setBusy(""); void refresh();
   };
   const flip = async (name: string, on: boolean) => {
@@ -48,7 +48,7 @@ export function TripAi({ t, superuser, change, reload, openSettings }: {
       try { await api.aiConsent(t.id, name); } catch { setMsg(sv.aiRun.errors.network); return; }
       await reload(); // the agreement and the switch came in one change
     } else await change([{ op: "set", path: "aiHelpers", value: { ...t.aiHelpers, [name]: on } }], `ai helper ${name} ${on ? "on" : "off"}`);
-    if (on) await runNow(name);
+    if (on) await startRun(name);
   };
   return (
     <div className="card">
@@ -62,8 +62,7 @@ export function TripAi({ t, superuser, change, reload, openSettings }: {
             <legend className="ro">{sv.aiRun.helpersTitle}</legend>
             {shown.map(([name, h]) => { const [label, tip] = sv.aiRun.helpers[name] ?? [name, ""]; return <div key={name}>
               <div className="row mid"><Switch id={`helper-${name}`} label={label} tip={tip} checked={h.on} disabled={!t.ai} onChange={(on) => void flip(name, on)} />
-                <span className="end"><InfoButton title={label} lines={sv.aiRun.about[name] ?? [tip]} label={sv.aiRun.info(label)} />
-                  <IconButton icon="refresh" look="bare" tip="left" label={sv.aiRun.runNow(label)} disabled={!!busy || !t.ai} onClick={() => void runNow(name)} /></span></div>
+                <span className="end"><InfoButton title={label} lines={sv.aiRun.about[name] ?? [tip]} label={sv.aiRun.info(label)} /></span></div>
               <p className="ro note" role="status">{busy === name ? sv.loading : helperLine(h, t.timezone)}</p></div>; })}
             {msg && <p className="ro note" role="status">{msg}</p>}
           </fieldset>}

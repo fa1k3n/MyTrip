@@ -11,6 +11,7 @@ import { addPacking, isPacked, packedCount, removePacking, togglePacked, toggleT
 import { isOverdue } from "./today.ts";
 import { checkLevel, dismissOps, splitDismissed, tripFindings, undismissOps, type Finding } from "./tripCheck.ts";
 import { sv } from "./sv.ts";
+import { RunNow } from "./RunNow.tsx";
 import { AiMark, Icon, IconButton, PlannedMark } from "./Icons.tsx";
 import { AiKeep, Emergency, HiddenText, InfoText, KindIcon, PlaceLink, TextEye, TicketButton, type Run } from "./TripView.tsx";
 import type { EditDlg } from "./editKinds.ts";
@@ -167,6 +168,7 @@ function Tasks({ t, today, edit, run, onPlace, part, tick, review }: { part: May
   const [err, setErr] = useState<string | null>(null);
   return (
     <Section title={sv.todo} may={part("tasks")} id="sec-tasks" flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
+      {review && <div className="dreambar"><RunNow t={t} name="prep" /></div> /* AI-96 */}
       {!t.tasks.length && !suggested.length && <p className="ro">{sv.noTasks}</p>}
       {t.tasks.map((k) => (
         <div className="row mid todo" key={k.id}>
@@ -255,6 +257,7 @@ function Packing({ t, run, part, tick, review }: { part: MayOf; t: Trip; run: Ru
     ...t.travelers.map((x) => ({ id: x.id, name: x.age ? `${x.name}, ${x.age} ${sv.years}` : x.name, items: x.packing, ai: x.packingAi ?? [] }))]; // PK-03
   return (
     <Section title={sv.packing} may={part("packing")} id="sec-packing" flag={<CountMark icon="sparkle" n={suggested.length} label={sv.marks.suggestions(suggested.length)} />}>
+      {review && <div className="dreambar"><RunNow t={t} name="packing" /></div> /* AI-96 */}
       {lists.map((l) => (
         <PackingList key={l.id} tick={tick} name={l.name} items={l.items} packed={(it) => isPacked(t, l.id, it)} count={packedCount(t, l.id)}
           onCheck={(it) => run((x) => togglePacked(x, l.id, it), isPacked(t, l.id, it) ? "unpacked" : "packed")}

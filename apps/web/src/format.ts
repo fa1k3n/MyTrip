@@ -194,6 +194,9 @@ export const runNowShown = (st: { enabled: boolean; helpers: Record<string, { av
 export const runNowTip = (label: string, h: { result?: string; remaining: number }) =>
   `${sv.aiRun.runNow(label)} · ${h.result === "cap" || h.remaining <= 0 ? sv.aiRun.capped : sv.aiRun.left(h.remaining)}`;
 
+/** The line under a helper's switch when it is turned on: where its Kör nu is now (AI-96). */
+export const runNowWhere = (name: string) => sv.aiRun.where[name] ?? "";
+
 /** US-31: the invitation as a mailto link for the phone's own mail app; spaces as %20, which every mail app reads. */
 export function inviteMail(x: { to: string; name: string; trip: string; url: string; until: string }) {
   const q = (v: string) => encodeURIComponent(v);

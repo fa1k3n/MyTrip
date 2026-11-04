@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { aiSuggestions, llmProposals } from "../src/proposals.ts";
-import { helperLine, runNowShown, runNowTip } from "../src/format.ts";
+import { helperLine, runNowShown, runNowTip, runNowWhere } from "../src/format.ts";
 
 const p = (id: string, source?: object, status = "pending") => ({ id, status, source: source as { kind: string } | undefined, ops: [] });
 
@@ -40,4 +40,12 @@ test("AI-96 runNowShown", () => {
 test("AI-96 runNowTip", () => {
   assert.equal(runNowTip("Förslag på önskningar", { remaining: 3 }), "Kör nu: Förslag på önskningar · ca 3 körningar kvar");
   assert.equal(runNowTip("Förslag på önskningar", { remaining: 0 }), "Kör nu: Förslag på önskningar · Taket för månaden är nått");
+});
+
+// REQ: AI-96 turning a helper's switch on says where its Kör nu is
+test("AI-96 runNowWhere", () => {
+  assert.match(runNowWhere("wishes"), /Önska/);
+  assert.match(runNowWhere("prep"), /Att göra/);
+  assert.match(runNowWhere("packing"), /Packlista/);
+  assert.equal(runNowWhere("other"), "");
 });

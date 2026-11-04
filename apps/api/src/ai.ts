@@ -161,6 +161,15 @@ const PROPOSE: Anthropic.Beta.BetaTool = {
 };
 const TRIES = 4;
 
+/** The fixed part of a feature's request, and its task: everything but the trip, the date and what is avoided (DP-18). */
+export const fixedOf = (f: AiFeature): Omit<Anthropic.Beta.MessageCreateParamsNonStreaming, "messages"> & { task: string } => ({
+  model: MODEL, max_tokens: 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "medium" },
+  // AI-97: the breakpoint on system covers the tools before it; the messages change and are left out
+  // no disable_parallel_tool_use: web search with dynamic filtering runs code, which rejects it
+  system: [{ type: "text", text: `${SYSTEM}\n\n${f.instructions}`, cache_control: { type: "ephemeral" } }],
+  tools: [PROPOSE, ...(f.web ? [{ type: "web_search_20260209", name: "web_search", max_uses: 5 } as const] : [])], tool_choice: { type: "auto" }, task: f.task,
+});
+
 /** The problems of proposed changes: outside the feature, not valid, new rule problems or a moved pin (MC-20). */
 function problemsOf(f: AiFeature, t: Trip, ops: Op[]): string[] {
   const outside = ops.filter((o) => !f.allows(o)).map((o) => `Not allowed here: ${o.op} ${o.path}`);
@@ -177,18 +186,13 @@ const isOps = (v: unknown): v is Op[] => Array.isArray(v) && v.every((o) => o &&
 /** Runs one feature on a trip: the service proposes, the server checks, and problems go back to be fixed (AI-65). */
 export async function runAi(call: AiCall, f: AiFeature, t: Trip, avoid: string[] = [], today = new Date().toISOString().slice(0, 10), memories?: unknown[]): Promise<AiResult> {
   const { view, refs, names } = aiView(t);
-  const tools: Anthropic.Beta.BetaToolUnion[] = [PROPOSE, ...(f.web ? [{ type: "web_search_20260209", name: "web_search", max_uses: 5 } as const] : [])];
+  const { task, ...fixed } = fixedOf(f);
   const known = avoid.length ? `<avoid>\n${avoid.map((x) => aiText(x, t)).join("\n")}\n</avoid>\n\n` : "";
   const earlier = memories?.length ? `<memories>\n${JSON.stringify(memories)}\n</memories>\n\n` : ""; // AI-14
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: `<today>${today}</today>\n<trip>\n${JSON.stringify(view)}\n</trip>\n\n${earlier}${known}${f.task}` }];
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: `<today>${today}</today>\n<trip>\n${JSON.stringify(view)}\n</trip>\n\n${earlier}${known}${task}` }];
   let cost = NO_COST;
   for (let i = 0; i < TRIES; i++) {
-    const m = await call({
-      model: MODEL, max_tokens: 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "medium" },
-      // AI-97: the breakpoint on system covers the tools before it; the messages change and are left out
-      // no disable_parallel_tool_use: web search with dynamic filtering runs code, which rejects it
-      system: [{ type: "text", text: `${SYSTEM}\n\n${f.instructions}`, cache_control: { type: "ephemeral" } }], tools, tool_choice: { type: "auto" }, messages,
-    });
+    const m = await call({ ...fixed, messages });
     cost = add(cost, costOf(m));
     if (m.stop_reason === "refusal") return { error: "refusal", cost };
     messages.push({ role: "assistant", content: m.content });

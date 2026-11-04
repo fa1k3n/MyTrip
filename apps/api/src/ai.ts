@@ -177,7 +177,7 @@ const isOps = (v: unknown): v is Op[] => Array.isArray(v) && v.every((o) => o &&
 /** Runs one feature on a trip: the service proposes, the server checks, and problems go back to be fixed (AI-65). */
 export async function runAi(call: AiCall, f: AiFeature, t: Trip, avoid: string[] = [], today = new Date().toISOString().slice(0, 10), memories?: unknown[]): Promise<AiResult> {
   const { view, refs, names } = aiView(t);
-  const tools: Anthropic.Beta.BetaToolUnion[] = [PROPOSE, ...(f.web ? [{ type: "web_search_20260209", name: "web_search", max_uses: 8 } as const] : [])];
+  const tools: Anthropic.Beta.BetaToolUnion[] = [PROPOSE, ...(f.web ? [{ type: "web_search_20260209", name: "web_search", max_uses: 5 } as const] : [])];
   const known = avoid.length ? `<avoid>\n${avoid.map((x) => aiText(x, t)).join("\n")}\n</avoid>\n\n` : "";
   const earlier = memories?.length ? `<memories>\n${JSON.stringify(memories)}\n</memories>\n\n` : ""; // AI-14
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: `<today>${today}</today>\n<trip>\n${JSON.stringify(view)}\n</trip>\n\n${earlier}${known}${f.task}` }];
@@ -185,8 +185,9 @@ export async function runAi(call: AiCall, f: AiFeature, t: Trip, avoid: string[]
   for (let i = 0; i < TRIES; i++) {
     const m = await call({
       model: MODEL, max_tokens: 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "medium" },
+      // AI-97: the breakpoint on system covers the tools before it; the messages change and are left out
       // no disable_parallel_tool_use: web search with dynamic filtering runs code, which rejects it
-      system: `${SYSTEM}\n\n${f.instructions}`, tools, tool_choice: { type: "auto" }, messages,
+      system: [{ type: "text", text: `${SYSTEM}\n\n${f.instructions}`, cache_control: { type: "ephemeral" } }], tools, tool_choice: { type: "auto" }, messages,
     });
     cost = add(cost, costOf(m));
     if (m.stop_reason === "refusal") return { error: "refusal", cost };

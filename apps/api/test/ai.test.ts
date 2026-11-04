@@ -85,7 +85,7 @@ test("AI-98 runAi asks for no references in texts and names them in the reason",
   const ai = fake(r);
   const out = await runAi(ai, tasksOnly, Trip.parse(trip()));
   assert.equal("reason" in out && out.reason, "Pass för Anna och Olle.");
-  assert.match(String(ai.seen[0]!.system), /"båda"/);
+  assert.match(JSON.stringify(ai.seen[0]!.system), /\\"båda\\"/);
 });
 
 // REQ: AI-65 fixed instructions, the trip as data, and a proposal that fails the dry run goes back to the service to be fixed

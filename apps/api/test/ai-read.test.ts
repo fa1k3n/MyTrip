@@ -117,8 +117,8 @@ test("AI-60 weekdays become the trip's days", async () => {
   const { req, pid } = await setup(ai, trip({ days, bookings: [] }));
   const { reading } = await (await req(`/api/trips/berlin/mailread/${pid}`, "POST", "{}")).json();
   assert.deepEqual([reading.from, reading.to], ["2027-11-01", "2027-11-05"]);
-  assert.ok(String(ai.seen[0]!.system).includes("2027-11-01 (Monday)"), "the days with weekdays");
-  assert.ok(String(ai.seen[0]!.system).includes("2027-11-05 (Friday)"));
+  assert.ok(JSON.stringify(ai.seen[0]!.system).includes("2027-11-01 (Monday)"), "the days with weekdays");
+  assert.ok(JSON.stringify(ai.seen[0]!.system).includes("2027-11-05 (Friday)"));
   const near = await setup(fake({ kind: "stay", from: "2027-10-31", to: "2027-11-02" }), trip({ days, bookings: [] }));
   const r2 = (await (await near.req(`/api/trips/berlin/mailread/${near.pid}`, "POST", "{}")).json()).reading;
   assert.deepEqual([r2.from, r2.to], ["2027-10-31", "2027-11-02"], "a day next to the trip stays");

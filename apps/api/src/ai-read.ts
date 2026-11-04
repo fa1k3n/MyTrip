@@ -12,8 +12,9 @@ const pick = (v: unknown, re: RegExp) => (typeof v === "string" && re.test(v) ? 
 async function give(call: AiCall, system: string, content: Anthropic.Beta.BetaContentBlockParam[], properties: Record<string, unknown>): Promise<{ input?: Record<string, unknown>; cost: AiCost; error?: "refusal" | "failed" }> {
   const tool: Anthropic.Beta.BetaTool = { name: "give_reading", description: "Give what was read. Leave out what is not clearly there.", input_schema: { type: "object", properties } };
   try {
+    // AI-97: the fixed part is cached
     const m = await call({ model: MODEL, max_tokens: 2000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "low" },
-      system, tools: [tool], tool_choice: { type: "auto", disable_parallel_tool_use: true }, messages: [{ role: "user", content }] }); // the model refuses a forced tool; the system says to call it
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }], tools: [tool], tool_choice: { type: "auto", disable_parallel_tool_use: true }, messages: [{ role: "user", content }] }); // the model refuses a forced tool; the system says to call it
     const cost = costOf(m);
     if (m.stop_reason === "refusal") return { cost, error: "refusal" };
     const use = m.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === tool.name);

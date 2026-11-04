@@ -478,6 +478,7 @@ export function App() {
   else if (view === "settings") page = <>
     <div className="top"><IconButton icon="back" label={sv.back} onClick={() => setView(settingsBack)} tip="right" /></div><h1>{sv.settings}</h1>
     {aiCard}
+    <p className="ro"><a className="place" href="/integritet.html">{sv.privacy.link}</a></p> {/* SP-09 */}
     {me && roleIn(me, undefined).role === "admin" && <Suspense fallback={null}><AppAdmin /></Suspense>} {/* MT-13, US-02 */}
   </>;
   else if (view === "portal" || !t) page = <>

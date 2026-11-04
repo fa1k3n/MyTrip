@@ -68,7 +68,7 @@ export function Login({ expired, onDone }: { expired: boolean; onDone: () => voi
     </form>
     <Forgot google={google} reset={reset} email={email} /> {/* US-35 */}
     {installed && <PasteLink />}
-    <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a></p> {/* UI-13 */}
+    <p className="ro"><a className="place" href="/om.html">{sv.login.about}</a> · <a className="place" href="/integritet.html">{sv.privacy.link}</a></p> {/* UI-13, SP-09 */}
   </>;
 }
 
@@ -155,6 +155,7 @@ function Forgot({ google, reset, email }: { google: boolean; reset: boolean; ema
 export const BetaNotice = () => <div className="betanotice">
   <p>{sv.beta.consentLead}</p>
   <ul>{sv.beta.consentPoints.map((t) => <li key={t}>{t}</li>)}</ul>
+  <p><a className="place" href="/integritet.html" target="_blank" rel="noopener">{sv.privacy.link}</a></p> {/* SP-09 */}
 </div>;
 
 /** US-26: an account that has not accepted the beta notice sees it before anything else. */

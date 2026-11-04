@@ -1,5 +1,6 @@
 // All interface text in one place (LC-01).
 export const sv = {
+  privacy: { link: "Integritetspolicy" }, // SP-09
   hub: "Drömmar", admin: "Administratör" /* US-25 */, newTrip: "+ Skapa ny resa", newTripTitle: "Ny resa",
   noDates: "Datum saknas", noPurpose: "Skriv syftet med resan här.",
   allTrips: "Alla resor", back: "Tillbaka", tripSettings: "Resans inställningar", // MT-13

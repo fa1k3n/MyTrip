@@ -2,6 +2,24 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.3.0 – 2026-11-04
+
+Uppleva on the phone, "Kör nu" where the work is, and clearer warnings.
+
+### Added
+- "Nytt i Basläger" is a page with the news of every version, newest first; the dialog links to it (US-43).
+- "Kör nu" sits on the Att göra and Packlista cards (AI-96).
+
+### Changed
+- Uppleva opens on the current or next activity (UP-56).
+- In Uppleva the day follows the finger when you swipe and slides in (UP-55).
+- Kontrollera resan tints each warning by its own level and keeps the card neutral (DQ-14).
+- A hotel's address is read from the mail text (BK-40).
+- The AI requests cache their fixed part and search the web at most five times a run, which makes them cheaper (AI-97).
+
+### Internal
+- CI runs type check, tests and web build on every push; the AI prompts have a lock file that shows stale recordings; the API is split into route modules (DP-17, DP-18, DP-19).
+
 ## 0.2.2 – 2026-11-03
 
 ### Fixed

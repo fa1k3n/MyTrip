@@ -108,6 +108,13 @@ export const sv = {
     title: (v: string) => `Nytt i Basläger ${v}`, more: "Allt som är nytt", ok: "Okej", open: "Nytt i den här versionen",
     pageTitle: "Nytt i Basläger", changelog: "Hela ändringslistan på GitHub", back: "Till Basläger", // US-43: the page
     news: {
+      "0.3.0": [
+        "Uppleva öppnar på pågående eller nästa aktivitet, och dagen följer fingret när du sveper mellan dagar.",
+        "Kör nu finns direkt på korten Att göra och Packlista, så AI-hjälpen finns där arbetet sker.",
+        "Kontrollera resan färgar varje varning efter hur allvarlig den är.",
+        "Hotellets adress läses ur bekräftelsemejlet.",
+        "Nytt i Basläger har en egen sida med nyheterna från alla versioner.",
+      ],
       "0.2.0": [
         "Egna konton: logga in med lösenord eller Google och bjud in de andra. Den som skapar en resa är dess Planerare.",
         "Skapa med AI: beskriv drömresan, så gör Basläger ett första utkast med dagar, förslag på önskningar, bra att veta och packlistor. AI är frivilligt.",

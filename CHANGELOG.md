@@ -2,6 +2,36 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.4.0 – 2026-11-06
+
+AI that is faster and cheaper, and a firmer hand on mail, links and limits.
+
+### Added
+- Wish suggestions appear one by one while the helper works, with a status line and empty cards during the wait (AI-108, AI-109).
+- A booking mail that lacks something is read with AI when it arrives (AI-106, AI-107). A ferry or train mail becomes a Resa (BK-45, BK-46).
+- "Logga ut på alla enheter" in the settings ends every login of the account, also the one you sit in (US-49).
+- A new inbox address for a trip can be made from the mail dialog (BK-41).
+- An account without AI sees a calm note on what AI would do in Ny resa and Önska (AI-100).
+
+### Changed
+- Kontrollera resan names the level of each warning in words, once per group, with no triangle on every row (DQ-15, replaced by DQ-17).
+- Packing lists and the reading of mails and receipts use a smaller AI model, and the helper for packing stops asking when nothing has changed (AI-97, AI-111).
+- Text that comes from outside (mails, mailed wishes) goes to the AI as data in its own delimiters (AI-101).
+
+### Fixed
+- A wish image of more than 150 kB no longer gives an error in the image search, and the number of Commons lookups per trip and day is capped (DB-07, DB-30).
+- A personal or share link that was just made works at once (SP-15).
+- The first change in the gear on an older trip no longer says that someone else has changed it (BK-44).
+- Packing lists are compared item by item, so travellers do not lose items (AI-112).
+- Uploads are refused by their stated size before they are read, and files sent back to a browser are sandboxed (BK-42, SP-16). Ticket files that nothing uses are removed once a day (BK-43).
+- The superuser's own opens are not counted in "Användning (beta)" (US-50).
+
+### Security
+- A daily cap on Google Routes calls, and the paid services are listed with their alerts (SP-14, SP-03).
+
+### Internal
+- The live deploy needs a passed user test per feature and a signed approval for the exact build (DP-32 to DP-37); CI runs ESLint and bundles the Worker; the code is private in one repository (DP-23, DP-44 to DP-53).
+
 ## 0.3.2 – 2026-11-04
 
 Dependency updates; nothing new to see in the app.

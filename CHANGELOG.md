@@ -2,6 +2,13 @@
 
 Requirement IDs refer to `requirements/*.md` in the planning repository. Interface names are in Swedish, as in the app.
 
+## 0.4.1 – 2026-11-07
+
+Nytt i Basläger lists patches too.
+
+### Changed
+- The news page lists every release, patches too, each under its own heading; the dialog "Nytt i Basläger" opens only for a minor or major release, and "Nytt i den här versionen" in Tyck till opens the page for a patch (US-52, US-53).
+
 ## 0.4.0 – 2026-11-06
 
 AI that is faster and cheaper, and a firmer hand on mail, links and limits.

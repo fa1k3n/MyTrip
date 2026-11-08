@@ -1,0 +1,23 @@
+name: Önskemål
+description: Berätta vad du skulle vilja kunna göra.
+title: ''
+labels: [enhancement]
+body:
+  - type: textarea
+    id: vad
+    attributes:
+      label: Vad skulle du vilja kunna göra?
+    validations:
+      required: true
+  - type: textarea
+    id: varfor
+    attributes:
+      label: Varför?
+      description: Vad blir bättre för dig eller resan?
+    validations:
+      required: true
+  - type: input
+    id: vem
+    attributes:
+      label: För vem?
+      description: Till exempel dig själv, den som planerar eller den som följer med.

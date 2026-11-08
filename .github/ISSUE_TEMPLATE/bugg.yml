@@ -1,0 +1,28 @@
+name: Något fungerar inte
+description: Berätta vad som gick fel.
+title: ''
+labels: [bug]
+body:
+  - type: textarea
+    id: hande
+    attributes:
+      label: Vad hände?
+      description: Beskriv vad du gjorde och vad du såg.
+    validations:
+      required: true
+  - type: textarea
+    id: forvantat
+    attributes:
+      label: Vad hade du väntat dig?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Står längst ner i appen, till exempel 0.4.0+1bca182a.
+  - type: input
+    id: enhet
+    attributes:
+      label: Enhet och webbläsare
+      description: Till exempel iPhone med Safari, eller dator med Firefox.
